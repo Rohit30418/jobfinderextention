@@ -1,7 +1,13 @@
 import {
+  addSkillToProfile,
+  dismissSkillFromVault,
   getGapInsights,
   getJobCache,
-  getListingContexts
+  getListingContexts,
+  getSkillVault,
+  getState,
+  removeSkillFromProfile,
+  restoreSkillInVault
 } from "../core/storage.js";
 
 const $ = (selector) => document.querySelector(selector);
@@ -54,7 +60,12 @@ const els = {
   insightSummary: $("#insightSummary"),
   insightStatus: $("#insightStatus"),
   missingRequiredInsights: $("#missingRequiredInsights"),
-  missingPreferredInsights: $("#missingPreferredInsights")
+  missingPreferredInsights: $("#missingPreferredInsights"),
+  skillVaultStatus: $("#skillVaultStatus"),
+  skillVaultList: $("#skillVaultList"),
+  vaultMissingCount: $("#vaultMissingCount"),
+  vaultAddedCount: $("#vaultAddedCount"),
+  vaultDismissedCount: $("#vaultDismissedCount")
 };
 
 let contextsState = {
@@ -65,6 +76,9 @@ let contextsState = {
 
 let cache = {};
 let insights = null;
+let skillVault = { version: 1, items: {}, updatedAt: null };
+let profileState = null;
+let vaultMode = "missing";
 let mode = "recommended";
 let portalMode = "all";
 let query = "";
@@ -525,6 +539,184 @@ function renderInsights() {
   );
 }
 
+
+function vaultItems() {
+  return Object.values(skillVault?.items || {})
+    .filter((item) => item?.skill);
+}
+
+function renderSkillVault() {
+  const items = vaultItems();
+
+  const missing = items.filter((item) => (item.status || "missing") === "missing");
+  const added = items.filter((item) => item.status === "added");
+  const dismissed = items.filter((item) => item.status === "dismissed");
+
+  if (els.skillVaultStatus) {
+    els.skillVaultStatus.textContent =
+      items.length + " saved";
+  }
+
+  if (els.vaultMissingCount) {
+    els.vaultMissingCount.textContent = missing.length;
+  }
+
+  if (els.vaultAddedCount) {
+    els.vaultAddedCount.textContent = added.length;
+  }
+
+  if (els.vaultDismissedCount) {
+    els.vaultDismissedCount.textContent = dismissed.length;
+  }
+
+  for (const button of document.querySelectorAll("[data-vault-mode]")) {
+    button.classList.toggle(
+      "active",
+      button.dataset.vaultMode === vaultMode
+    );
+  }
+
+  const current = items
+    .filter((item) => (item.status || "missing") === vaultMode)
+    .sort((a, b) => {
+      const kindDiff =
+        (a.kind === "required" ? 0 : 1) -
+        (b.kind === "required" ? 0 : 1);
+
+      if (kindDiff) return kindDiff;
+
+      const countDiff =
+        (b.sourceKeys?.length || 0) -
+        (a.sourceKeys?.length || 0);
+
+      if (countDiff) return countDiff;
+
+      return String(b.lastSeenAt || "")
+        .localeCompare(String(a.lastSeenAt || ""));
+    });
+
+  if (!els.skillVaultList) return;
+
+  if (!current.length) {
+    els.skillVaultList.innerHTML =
+      '<div class="insight-empty">No skills in this section yet.</div>';
+    return;
+  }
+
+  els.skillVaultList.innerHTML = current.map((item) => {
+    const seenCount = item.sourceKeys?.length || 0;
+    const portals = (item.portals || [])
+      .map((id) => portalMeta(id).name)
+      .join(", ");
+
+    let actions = "";
+
+    if (vaultMode === "missing") {
+      actions =
+        '<button class="vault-action add" type="button" data-vault-add="' +
+          escapeHtml(item.skill) +
+        '">Add to My Skills</button>' +
+        '<button class="vault-action ghost" type="button" data-vault-dismiss="' +
+          escapeHtml(item.skill) +
+        '">Dismiss</button>';
+    } else if (vaultMode === "added") {
+      actions =
+        '<button class="vault-action danger" type="button" data-vault-remove="' +
+          escapeHtml(item.skill) +
+        '">Remove from My Skills</button>';
+    } else {
+      actions =
+        '<button class="vault-action ghost" type="button" data-vault-restore="' +
+          escapeHtml(item.skill) +
+        '">Restore to Missing</button>';
+    }
+
+    return (
+      '<article class="vault-item">' +
+        '<div class="vault-copy">' +
+          '<div class="vault-topline">' +
+            '<strong>' + escapeHtml(item.skill) + '</strong>' +
+            '<span class="vault-kind ' + escapeHtml(item.kind || "required") + '">' +
+              escapeHtml((item.kind || "required").toUpperCase()) +
+            '</span>' +
+          '</div>' +
+          '<span>' +
+            (
+              seenCount
+                ? "Seen in " + seenCount + " analyzed job" + (seenCount === 1 ? "" : "s")
+                : "Manually saved"
+            ) +
+            (
+              portals
+                ? " · " + escapeHtml(portals)
+                : ""
+            ) +
+          '</span>' +
+        '</div>' +
+        '<div class="vault-actions">' +
+          actions +
+        '</div>' +
+      '</article>'
+    );
+  }).join("");
+
+  for (const button of els.skillVaultList.querySelectorAll("[data-vault-add]")) {
+    button.addEventListener("click", async () => {
+      const skill = button.dataset.vaultAdd || "";
+      button.disabled = true;
+      button.textContent = "Adding…";
+      try {
+        await addSkillToProfile(skill);
+        await load();
+      } catch (error) {
+        button.disabled = false;
+        button.textContent = error?.message || "Could not add";
+      }
+    });
+  }
+
+  for (const button of els.skillVaultList.querySelectorAll("[data-vault-remove]")) {
+    button.addEventListener("click", async () => {
+      const skill = button.dataset.vaultRemove || "";
+      button.disabled = true;
+      button.textContent = "Removing…";
+      try {
+        await removeSkillFromProfile(skill);
+        await load();
+      } catch (error) {
+        button.disabled = false;
+        button.textContent = error?.message || "Could not remove";
+      }
+    });
+  }
+
+  for (const button of els.skillVaultList.querySelectorAll("[data-vault-dismiss]")) {
+    button.addEventListener("click", async () => {
+      const skill = button.dataset.vaultDismiss || "";
+      button.disabled = true;
+      try {
+        await dismissSkillFromVault(skill);
+        await load();
+      } catch (_) {
+        button.disabled = false;
+      }
+    });
+  }
+
+  for (const button of els.skillVaultList.querySelectorAll("[data-vault-restore]")) {
+    button.addEventListener("click", async () => {
+      const skill = button.dataset.vaultRestore || "";
+      button.disabled = true;
+      try {
+        await restoreSkillInVault(skill);
+        await load();
+      } catch (_) {
+        button.disabled = false;
+      }
+    });
+  }
+}
+
 function renderJobs() {
   const all = allCapturedJobs();
 
@@ -729,18 +921,29 @@ function render() {
   renderPortalSources();
   renderPortalFilters();
   renderInsights();
+  renderSkillVault();
   renderJobs();
 }
 
 async function load() {
-  [contextsState, cache, insights] =
+  [contextsState, cache, insights, skillVault, profileState] =
     await Promise.all([
       getListingContexts(),
       getJobCache(),
-      getGapInsights(7)
+      getGapInsights(7),
+      getSkillVault(),
+      getState()
     ]);
 
   render();
+}
+
+
+for (const button of document.querySelectorAll("[data-vault-mode]")) {
+  button.addEventListener("click", () => {
+    vaultMode = button.dataset.vaultMode || "missing";
+    renderSkillVault();
+  });
 }
 
 els.aiRankBtn?.addEventListener("click", async () => {
@@ -846,7 +1049,9 @@ chrome.storage.onChanged.addListener(
       (
         changes["jobpilot.stage6.listingContexts"] ||
         changes["jobpilot.jobs.cache"] ||
-        changes["jobpilot.insights.gapHistory"]
+        changes["jobpilot.insights.gapHistory"] ||
+        changes["jobpilot.skills.vault"] ||
+        changes["jobpilot.stage1.state"]
       )
     ) {
       load().catch(() => {});
