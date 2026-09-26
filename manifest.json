@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "JobPilot - Universal Job Portal Assistant",
-  "version": "0.8.1",
-  "description": "Stage 5 application decision: deterministic APPLY / REVIEW FIRST / SKIP on top of evidence-based deep match.",
+  "version": "0.9.0",
+  "description": "Inline detail intelligence: APPLY / REVIEW / SKIP, Puter AI, deep match, JD highlights and back-to-list directly on job pages.",
   "permissions": [
     "storage",
     "unlimitedStorage",
@@ -41,7 +41,8 @@
         "portals/naukri/detail.js",
         "portals/naukri/adapter.js",
         "core/relevance-gate.js",
-        "content/portal-runtime.js"
+        "content/portal-runtime.js",
+        "content/detail-intelligence.js"
       ],
       "css": [
         "content/portal-runtime.css"
