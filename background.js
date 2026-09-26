@@ -22,7 +22,64 @@ const PORTAL_CAPTURE_KEY = "jobpilot.stage4.portalCapture";
 const LISTING_CONTEXT_KEY = "jobpilot.stage6.listingContext";
 const INJECTION_STATUS_KEY = "jobpilot.naukri.injectionStatus";
 
-const NAUKRI_HOST_RE = /^https:\/\/(?:[^/]+\.)?naukri\.com\//i;
+const PORTAL_FILES = [
+  "core/portal-engine.js",
+  "portals/naukri/listing.js",
+  "portals/naukri/detail.js",
+  "portals/naukri/adapter.js",
+  "portals/shared/configured-factory.js",
+  "portals/shared/configured-portals.js",
+  "core/relevance-gate.js",
+  "content/portal-runtime.js",
+  "content/detail-intelligence.js"
+];
+
+const STARTUP_PORTAL_URLS = [
+  "https://naukri.com/*",
+  "https://www.naukri.com/*",
+  "https://*.naukri.com/*",
+  "https://foundit.in/*",
+  "https://www.foundit.in/*",
+  "https://*.linkedin.com/jobs/*",
+  "https://in.indeed.com/*",
+  "https://*.indeed.com/*",
+  "https://hirist.tech/*",
+  "https://www.hirist.tech/*"
+];
+
+function isSupportedPortalUrl(value) {
+  try {
+    const url = new URL(String(value || ""));
+    const host = url.hostname.toLowerCase();
+
+    if (host === "naukri.com" || host.endsWith(".naukri.com")) {
+      return true;
+    }
+
+    if (host === "foundit.in" || host.endsWith(".foundit.in")) {
+      return true;
+    }
+
+    if (
+      (host === "linkedin.com" || host.endsWith(".linkedin.com")) &&
+      url.pathname.toLowerCase().startsWith("/jobs")
+    ) {
+      return true;
+    }
+
+    if (host === "indeed.com" || host.endsWith(".indeed.com")) {
+      return true;
+    }
+
+    if (host === "hirist.tech" || host.endsWith(".hirist.tech")) {
+      return true;
+    }
+
+    return false;
+  } catch (_) {
+    return false;
+  }
+}
 
 function openPage(path) {
   chrome.tabs.create({ url: chrome.runtime.getURL(path) });
@@ -170,8 +227,8 @@ async function setInjectionStatus(payload) {
   } catch (_) {}
 }
 
-async function injectJobPilotIntoNaukri(tabId, url, reason = "background") {
-  if (!tabId || !NAUKRI_HOST_RE.test(String(url || ""))) {
+async function injectJobPilotIntoPortal(tabId, url, reason = "background") {
+  if (!tabId || !isSupportedPortalUrl(url)) {
     return false;
   }
 
@@ -185,15 +242,7 @@ async function injectJobPilotIntoNaukri(tabId, url, reason = "background") {
 
     await chrome.scripting.executeScript({
       target: { tabId },
-      files: [
-        "core/portal-engine.js",
-        "portals/naukri/listing.js",
-        "portals/naukri/detail.js",
-        "portals/naukri/adapter.js",
-        "core/relevance-gate.js",
-        "content/portal-runtime.js",
-        "content/detail-intelligence.js"
-      ]
+      files: PORTAL_FILES
     });
 
     await setInjectionStatus({
@@ -214,7 +263,7 @@ async function injectJobPilotIntoNaukri(tabId, url, reason = "background") {
       error: error?.message || String(error)
     });
 
-    console.warn("JobPilot Naukri injection failed", error);
+    console.warn("JobPilot portal injection failed", error);
     return false;
   }
 }
@@ -251,23 +300,19 @@ chrome.runtime.onInstalled.addListener((details) => {
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.status === "complete" && tab.url) {
-    injectJobPilotIntoNaukri(tabId, tab.url, "tab-complete");
+    injectJobPilotIntoPortal(tabId, tab.url, "tab-complete");
   }
 });
 
 chrome.runtime.onStartup.addListener(async () => {
   try {
     const tabs = await chrome.tabs.query({
-      url: [
-        "https://naukri.com/*",
-        "https://www.naukri.com/*",
-        "https://*.naukri.com/*"
-      ]
+      url: STARTUP_PORTAL_URLS
     });
 
     for (const tab of tabs) {
       if (tab.id && tab.url) {
-        await injectJobPilotIntoNaukri(tab.id, tab.url, "browser-startup");
+        await injectJobPilotIntoPortal(tab.id, tab.url, "browser-startup");
       }
     }
   } catch (error) {
@@ -282,9 +327,9 @@ chrome.runtime.onStartup.addListener(async () => {
 
 chrome.action.onClicked.addListener(async (tab) => {
   // A toolbar click grants activeTab access for the current page.
-  // If the user clicks JobPilot while on Naukri, force-inject there first.
-  if (tab?.id && NAUKRI_HOST_RE.test(String(tab.url || ""))) {
-    await injectJobPilotIntoNaukri(
+  // Force-inject JobPilot on any supported portal tab.
+  if (tab?.id && isSupportedPortalUrl(tab.url)) {
+    await injectJobPilotIntoPortal(
       tab.id,
       tab.url,
       "toolbar-activeTab"
