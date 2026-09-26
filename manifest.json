@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "JobPilot - Profile, Preferences & Naukri Search",
-  "version": "0.3.1",
-  "description": "Stage 1 profile + Stage 2 preferences + Stage 3 Naukri search using real SEO URLs and learned native filters.",
+  "version": "0.3.2",
+  "description": "Stage 3 Naukri search now mirrors real SEO-path + k/l query URL behavior and learned native filters.",
   "permissions": [
     "storage",
     "unlimitedStorage"
