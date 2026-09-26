@@ -12,7 +12,7 @@ import { evaluateDeepMatch } from "./core/match-engine.js";
 
 const SETUP_PAGE = "onboarding/onboarding.html";
 const PREFERENCES_PAGE = "preferences/preferences.html";
-const NAUKRI_PAGE = "stage3/naukri.html";
+const SEARCH_HUB_PAGE = "stage3/naukri.html";
 const JOB_LIST_PAGE = "stage6/list.html";
 
 const STATE_KEY = "jobpilot.stage1.state";
@@ -384,5 +384,5 @@ chrome.action.onClicked.addListener(async (tab) => {
 
   // Search setup is the only extension page needed before a list exists.
   // Detail analysis stays on the portal website itself.
-  openPage(NAUKRI_PAGE);
+  openPage(SEARCH_HUB_PAGE);
 });
