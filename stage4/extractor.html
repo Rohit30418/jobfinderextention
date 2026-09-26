@@ -31,12 +31,12 @@
       </div>
 
       <div class="metric-grid">
-        <div class="metric"><strong id="detectedCount">0</strong><span>Detected</span></div>
-        <div class="metric"><strong id="parsedCount">0</strong><span>Normalized</span></div>
-        <div class="metric"><strong id="failedCount">0</strong><span>Failed</span></div>
-        <div class="metric"><strong id="highCount">0</strong><span>High confidence</span></div>
-        <div class="metric"><strong id="mediumCount">0</strong><span>Medium confidence</span></div>
-        <div class="metric"><strong id="lowCount">0</strong><span>Low confidence</span></div>
+        <div class="metric"><strong id="detectedCount">0</strong><span>Extracted</span></div>
+        <div class="metric"><strong id="parsedCount">0</strong><span>Relevant</span></div>
+        <div class="metric"><strong id="failedCount">0</strong><span>Review</span></div>
+        <div class="metric"><strong id="highCount">0</strong><span>Filtered</span></div>
+        <div class="metric"><strong id="mediumCount">0</strong><span>High extraction</span></div>
+        <div class="metric"><strong id="lowCount">0</strong><span>Low extraction</span></div>
       </div>
 
       <div class="actions">
@@ -58,6 +58,17 @@
           <h2>Normalized listing jobs</h2>
         </div>
         <div class="status-chip" id="cardCountChip">0 jobs</div>
+      </div>
+      <div class="actions" style="justify-content:flex-start;margin-top:0;margin-bottom:14px">
+        <label class="field-label" style="display:grid;gap:6px">
+          Listing view
+          <select id="relevanceMode" class="btn" style="min-width:180px">
+            <option value="recommended">Relevant + Review</option>
+            <option value="relevant">Relevant only</option>
+            <option value="review">Review only</option>
+            <option value="all">All extracted jobs</option>
+          </select>
+        </label>
       </div>
       <div class="job-list" id="jobList"></div>
     </section>
@@ -94,6 +105,7 @@
     </details>
   </div>
 
+  <script src="../core/relevance-gate.js"></script>
   <script type="module" src="extractor.js"></script>
 </body>
 </html>
