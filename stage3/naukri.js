@@ -1,4 +1,6 @@
 import {
+  clearNaukriNativeFilters,
+  getNaukriNativeFilters,
   getNaukriSearch,
   getPreferences,
   getState,
@@ -20,6 +22,8 @@ const els = {
   freshness: $("#freshness"),
   mappingNote: $("#mappingNote"),
   urlPreview: $("#urlPreview"),
+  nativeFilterStatus: $("#nativeFilterStatus"),
+  clearNativeFiltersBtn: $("#clearNativeFiltersBtn"),
   message: $("#message"),
   sessionStatus: $("#sessionStatus"),
   refreshPreviewBtn: $("#refreshPreviewBtn"),
@@ -31,6 +35,7 @@ const els = {
 let profile = null;
 let preferences = null;
 let lastSearch = null;
+let nativeFilters = null;
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -50,6 +55,13 @@ function splitList(value) {
   )];
 }
 
+function normalizeKey(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function slugify(value) {
   return String(value || "")
     .toLowerCase()
@@ -59,12 +71,25 @@ function slugify(value) {
     .replace(/-{2,}/g, "-");
 }
 
+function experienceContextKey(min, max) {
+  return String(min ?? "") + "|" + String(max ?? "");
+}
+
+function locationContextKey(locations) {
+  return (Array.isArray(locations) ? locations : [])
+    .map(normalizeKey)
+    .filter(Boolean)
+    .sort()
+    .join("|");
+}
+
 function setMessage(text, type) {
   if (!text) {
     els.message.textContent = "";
     els.message.className = "message hidden";
     return;
   }
+
   els.message.textContent = text;
   els.message.className = "message" + (type ? " " + type : "");
 }
@@ -78,14 +103,34 @@ function freshnessMapping(value) {
     "30d": { jobAge: "30", label: "Last 30 days", approximate: false },
     "any": { jobAge: null, label: "Any time", approximate: false }
   };
+
   return map[value] || map.any;
 }
 
 function nullableInt(value) {
   const raw = String(value ?? "").trim();
   if (!raw) return null;
+
   const number = Number(raw);
-  return Number.isFinite(number) ? Math.max(0, Math.round(number)) : null;
+  return Number.isFinite(number)
+    ? Math.max(0, Math.round(number))
+    : null;
+}
+
+function matchingNativeExperience(min, max) {
+  if (!nativeFilters || !nativeFilters.experienceValue) return "";
+
+  return nativeFilters.experienceContextKey === experienceContextKey(min, max)
+    ? String(nativeFilters.experienceValue)
+    : "";
+}
+
+function matchingNativeCities(locations) {
+  if (!nativeFilters || !Array.isArray(nativeFilters.cityTypeGids)) return [];
+
+  return nativeFilters.locationContextKey === locationContextKey(locations)
+    ? nativeFilters.cityTypeGids.map(String).filter(Boolean)
+    : [];
 }
 
 function buildSearchSpec() {
@@ -97,34 +142,30 @@ function buildSearchSpec() {
   const freshness = els.freshness.value;
   const fresh = freshnessMapping(freshness);
 
+  const nativeExperienceValue = matchingNativeExperience(min, max);
+  const cityTypeGids = matchingNativeCities(locations);
+
   const params = new URLSearchParams();
-  params.set("k", keywords);
-
-  if (locations.length) {
-    params.set("l", locations.join(", "));
-  }
-
-  if (min !== null || max !== null) {
-    if (min !== null && max !== null) {
-      params.set("experience", min + "-" + max);
-    } else if (min !== null) {
-      params.set("experience", String(min));
-    } else {
-      params.set("experience", "0-" + max);
-    }
-  }
 
   if (fresh.jobAge) {
     params.set("jobAge", fresh.jobAge);
   }
 
-  const roleSlug = slugify(role || keywords) || "jobs";
-  const primaryLocation = locations.length === 1 ? slugify(locations[0]) : "";
+  if (nativeExperienceValue) {
+    params.set("experience", nativeExperienceValue);
+  }
+
+  cityTypeGids.forEach((gid) => params.append("cityTypeGid", gid));
+
+  const roleSlug = slugify(keywords || role) || "jobs";
+  const primaryLocation = locations.length ? slugify(locations[0]) : "";
+
   const path = primaryLocation
     ? "/" + roleSlug + "-jobs-in-" + primaryLocation
     : "/" + roleSlug + "-jobs";
 
-  const url = "https://www.naukri.com" + path + "?" + params.toString();
+  const query = params.toString();
+  const url = "https://www.naukri.com" + path + (query ? "?" + query : "");
 
   return {
     primaryRole: role,
@@ -132,16 +173,27 @@ function buildSearchSpec() {
     locations,
     experienceMin: min,
     experienceMax: max,
+    experienceContextKey: experienceContextKey(min, max),
+    locationContextKey: locationContextKey(locations),
     requestedFreshness: freshness,
     naukriJobAge: fresh.jobAge,
+    nativeExperienceValue,
+    cityTypeGids,
     url
   };
 }
 
 function validateSpec(spec) {
   const errors = [];
-  if (!spec.primaryRole) errors.push("Choose a primary role.");
-  if (!spec.keywords) errors.push("Search phrase cannot be empty.");
+
+  if (!spec.primaryRole) {
+    errors.push("Choose a primary role.");
+  }
+
+  if (!spec.keywords) {
+    errors.push("Search phrase cannot be empty.");
+  }
+
   if (
     spec.experienceMin !== null &&
     spec.experienceMax !== null &&
@@ -149,7 +201,41 @@ function validateSpec(spec) {
   ) {
     errors.push("Minimum experience cannot be greater than maximum experience.");
   }
+
   return errors;
+}
+
+function renderNativeStatus(spec) {
+  const parts = [];
+
+  if (spec.nativeExperienceValue) {
+    parts.push(
+      "experience=" + spec.nativeExperienceValue +
+      " learned for desired range " +
+      (spec.experienceMin ?? "any") + "–" + (spec.experienceMax ?? "any")
+    );
+  } else if (spec.experienceMin !== null || spec.experienceMax !== null) {
+    parts.push(
+      "Experience is not encoded yet. Open Naukri and apply its native experience filter once; JobPilot will learn the real URL value."
+    );
+  } else {
+    parts.push("No experience restriction requested.");
+  }
+
+  if (spec.cityTypeGids.length) {
+    parts.push(
+      "Learned cityTypeGid values: " +
+      spec.cityTypeGids.join(", ")
+    );
+  } else if (spec.locations.length > 1) {
+    parts.push(
+      "Only the first location is used in the SEO path until Naukri city filters are learned. Apply the native city filters once to capture repeated cityTypeGid values."
+    );
+  } else {
+    parts.push("No additional Naukri city IDs are currently required.");
+  }
+
+  els.nativeFilterStatus.textContent = parts.join(" ");
 }
 
 function refreshPreview() {
@@ -157,17 +243,20 @@ function refreshPreview() {
   const errors = validateSpec(spec);
 
   els.urlPreview.textContent = spec.url;
+  renderNativeStatus(spec);
 
   const fresh = freshnessMapping(spec.requestedFreshness);
+
   if (fresh.approximate) {
     els.mappingNote.textContent =
-      "Your Stage 2 preference is about 14 days. Naukri currently uses a 15-day freshness bucket, so JobPilot maps this search to jobAge=15.";
+      "Your Stage 2 preference is about 14 days. Naukri uses a 15-day freshness bucket here, so JobPilot maps it to jobAge=15.";
     els.mappingNote.classList.remove("hidden");
   } else {
     els.mappingNote.classList.add("hidden");
   }
 
   els.openNaukriBtn.disabled = errors.length > 0;
+
   if (errors.length) {
     setMessage(errors.join(" "), "error");
   } else {
@@ -178,9 +267,16 @@ function refreshPreview() {
 }
 
 function fillFromPreferences() {
-  const roles = Array.isArray(preferences.targetRoles) ? preferences.targetRoles : [];
+  const roles = Array.isArray(preferences.targetRoles)
+    ? preferences.targetRoles
+    : [];
+
   els.primaryRole.innerHTML = roles
-    .map((role) => '<option value="' + escapeHtml(role) + '">' + escapeHtml(role) + "</option>")
+    .map((role) =>
+      '<option value="' + escapeHtml(role) + '">' +
+      escapeHtml(role) +
+      "</option>"
+    )
     .join("");
 
   if (roles.length) {
@@ -191,6 +287,7 @@ function fillFromPreferences() {
   els.locations.value = Array.isArray(preferences.preferredLocations)
     ? preferences.preferredLocations.join("\n")
     : "";
+
   els.experienceMin.value = preferences.experienceMin ?? "";
   els.experienceMax.value = preferences.experienceMax ?? "";
   els.freshness.value = preferences.freshness || "3d";
@@ -198,17 +295,48 @@ function fillFromPreferences() {
 
 async function refreshDiagnostics() {
   const saved = await getNaukriSearch();
+  const spec = buildSearchSpec();
+
   const diagnostics = [
     ["Stage 1 profile", Boolean(profile), profile ? "Ready" : "Missing"],
     [
       "Stage 2 preferences",
-      Boolean(preferences && preferences.updatedAt && preferences.targetRoles && preferences.targetRoles.length),
+      Boolean(
+        preferences &&
+        preferences.updatedAt &&
+        preferences.targetRoles &&
+        preferences.targetRoles.length
+      ),
       preferences && preferences.updatedAt ? "Saved" : "Missing"
     ],
     [
-      "Target roles",
-      Boolean(preferences && preferences.targetRoles && preferences.targetRoles.length),
-      preferences && preferences.targetRoles ? preferences.targetRoles.length + " available" : "None"
+      "URL pattern",
+      true,
+      "SEO path + native Naukri query params"
+    ],
+    [
+      "Freshness",
+      true,
+      freshnessMapping(els.freshness.value).label
+    ],
+    [
+      "Native experience",
+      Boolean(spec.nativeExperienceValue) ||
+        (spec.experienceMin === null && spec.experienceMax === null),
+      spec.nativeExperienceValue
+        ? "experience=" + spec.nativeExperienceValue
+        : spec.experienceMin === null && spec.experienceMax === null
+          ? "Not requested"
+          : "Waiting to learn from Naukri"
+    ],
+    [
+      "Native cities",
+      Boolean(spec.cityTypeGids.length) || spec.locations.length <= 1,
+      spec.cityTypeGids.length
+        ? spec.cityTypeGids.length + " cityTypeGid value(s)"
+        : spec.locations.length <= 1
+          ? "SEO path only"
+          : "Waiting to learn from Naukri"
     ],
     [
       "Naukri session",
@@ -216,22 +344,7 @@ async function refreshDiagnostics() {
       saved && saved.createdAt ? "Stored" : "Not opened yet"
     ],
     [
-      "Generated URL",
-      Boolean(saved && saved.url),
-      saved && saved.url ? "Available" : "Not generated"
-    ],
-    [
-      "Freshness mapping",
-      true,
-      freshnessMapping(els.freshness.value).label
-    ],
-    [
-      "Scoring",
-      true,
-      "Disabled in Stage 3"
-    ],
-    [
-      "AI job analysis",
+      "Scoring / AI",
       true,
       "Disabled in Stage 3"
     ]
@@ -247,9 +360,17 @@ async function refreshDiagnostics() {
     .join("");
 }
 
+async function reloadNativeFilters() {
+  nativeFilters = await getNaukriNativeFilters();
+  refreshPreview();
+  await refreshDiagnostics();
+}
+
 async function initialize() {
   const state = await getState();
+
   preferences = await getPreferences();
+  nativeFilters = await getNaukriNativeFilters();
   profile = state.profile || null;
 
   const ready = Boolean(
@@ -262,7 +383,8 @@ async function initialize() {
 
   if (!ready) {
     els.gateTitle.textContent = "Stage 1 + Stage 2 are required";
-    els.gateMeta.textContent = "Save your candidate profile and job preferences first.";
+    els.gateMeta.textContent =
+      "Save your candidate profile and job preferences first.";
     els.gateStatus.textContent = "Blocked";
     els.gateStatus.style.color = "#ff9ba5";
     els.app.classList.add("hidden");
@@ -276,10 +398,13 @@ async function initialize() {
   els.gateTitle.textContent =
     (profile.currentRole || profile.headline || profile.name || "Candidate") +
     " · Naukri ready";
+
   els.gateMeta.textContent =
     years + "y " + months + "m profile experience · " +
     preferences.targetRoles.length + " target role(s) · " +
-    (preferences.preferredLocations?.length || 0) + " preferred location(s)";
+    (preferences.preferredLocations?.length || 0) +
+    " preferred location(s)";
+
   els.gateStatus.textContent = "Ready";
   els.gateStatus.style.color = "#a9fac3";
   els.app.classList.remove("hidden");
@@ -287,6 +412,7 @@ async function initialize() {
   fillFromPreferences();
 
   lastSearch = await getNaukriSearch();
+
   if (lastSearch && lastSearch.createdAt) {
     els.sessionStatus.textContent = "Previous search stored";
   }
@@ -301,15 +427,34 @@ els.primaryRole.addEventListener("change", () => {
 });
 
 ["input", "change"].forEach((eventName) => {
-  [els.keywords, els.locations, els.experienceMin, els.experienceMax, els.freshness]
-    .forEach((element) => element.addEventListener(eventName, refreshPreview));
+  [
+    els.keywords,
+    els.locations,
+    els.experienceMin,
+    els.experienceMax,
+    els.freshness
+  ].forEach((element) =>
+    element.addEventListener(eventName, refreshPreview)
+  );
 });
 
 els.refreshPreviewBtn.addEventListener("click", refreshPreview);
 
+els.clearNativeFiltersBtn.addEventListener("click", async () => {
+  await clearNaukriNativeFilters();
+  nativeFilters = await getNaukriNativeFilters();
+  setMessage(
+    "Learned Naukri experience/city URL values were cleared. Stage 1 and Stage 2 were not changed.",
+    "success"
+  );
+  refreshPreview();
+  await refreshDiagnostics();
+});
+
 els.openNaukriBtn.addEventListener("click", async () => {
   const spec = refreshPreview();
   const errors = validateSpec(spec);
+
   if (errors.length) return;
 
   els.openNaukriBtn.disabled = true;
@@ -317,20 +462,34 @@ els.openNaukriBtn.addEventListener("click", async () => {
   try {
     lastSearch = await setNaukriSearch(spec);
     els.sessionStatus.textContent = "Search opened";
+
     setMessage(
-      "Naukri opened in a new tab. JobPilot will show a small verification panel on the Naukri page.",
+      "Naukri opened. If experience or additional city filters are not learned yet, apply them once on Naukri; JobPilot will capture the real URL values automatically.",
       "success"
     );
+
     await chrome.tabs.create({ url: spec.url });
     await refreshDiagnostics();
   } catch (error) {
-    setMessage(error.message || "Naukri search could not be opened.", "error");
+    setMessage(
+      error.message || "Naukri search could not be opened.",
+      "error"
+    );
   } finally {
     els.openNaukriBtn.disabled = false;
   }
 });
 
 els.refreshDiagnosticsBtn.addEventListener("click", refreshDiagnostics);
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (
+    area === "local" &&
+    changes["jobpilot.stage3.naukriNativeFilters"]
+  ) {
+    reloadNativeFilters().catch(() => {});
+  }
+});
 
 initialize().catch((error) => {
   els.gateTitle.textContent = "Stage 3 could not initialize";
