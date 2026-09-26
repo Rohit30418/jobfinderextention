@@ -343,6 +343,14 @@
   function render(data) {
     if (closedForUrl === location.href) return;
 
+    if (
+      data?.pageType === "detail" &&
+      globalThis.__JOBPILOT_DETAIL_INTELLIGENCE__
+    ) {
+      document.getElementById(ROOT_ID)?.remove();
+      return;
+    }
+
     let root = document.getElementById(ROOT_ID);
 
     if (!root) {
