@@ -325,6 +325,11 @@ async function refreshDiagnostics() {
   const diagnostics = [
     ["PDF.js library", Boolean(globalThis.pdfjsLib), globalThis.pdfjsLib ? "Loaded" : "Missing"],
     [
+      "PDF.js worker engine",
+      Boolean(globalThis.pdfjsWorker && globalThis.pdfjsWorker.WorkerMessageHandler),
+      globalThis.pdfjsWorker && globalThis.pdfjsWorker.WorkerMessageHandler ? "Loaded" : "Missing"
+    ],
+    [
       "Resume selected",
       extractionState.selected,
       extractionState.selected && selectedFile ? fileSummary(selectedFile) : "No file selected"
