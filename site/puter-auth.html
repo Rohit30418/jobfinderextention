@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>JobPilot · Connect Puter</title>
+  <link rel="stylesheet" href="puter-auth.css">
+  <script src="https://js.puter.com/v2/"></script>
+  <script src="puter-auth.js" defer></script>
+</head>
+<body>
+  <main class="shell">
+    <section class="card">
+      <div class="brand">JOBPILOT</div>
+      <h1>Connect Puter AI</h1>
+      <p class="lede">
+        This secure bridge runs on a normal HTTPS page so Puter's official web
+        authentication and AI permission flow can work correctly.
+      </p>
+
+      <div class="flow">
+        <span>1. Sign in to Puter</span>
+        <span>2. Grant JobPilot AI permission</span>
+        <span>3. Return automatically to JobPilot</span>
+      </div>
+
+      <div id="status" class="status">Ready to connect.</div>
+
+      <button id="connectBtn" type="button">Connect Puter &amp; Authorize AI</button>
+
+      <p class="privacy">
+        Your Puter token is returned only to the JobPilot window that opened
+        this page. It is not stored by this bridge page.
+      </p>
+    </section>
+  </main>
+</body>
+</html>
