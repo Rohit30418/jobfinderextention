@@ -40,3 +40,19 @@ Do not add any job portal until these checks are stable.
 - [ ] Confirm the new resume/profile replaces the old data only after Save.
 - [ ] Delete resume/profile.
 - [ ] Diagnostics return to incomplete state.
+
+## Local profile autofill
+
+- [ ] A validated uploaded resume auto-fills the profile without Puter.
+- [ ] Name is filled only when a plausible name is present in the resume header.
+- [ ] Headline is filled from the resume header when available.
+- [ ] Current role is derived from experience/summary/headline evidence.
+- [ ] Explicit total experience such as "4 years of professional experience" is converted to months.
+- [ ] Skills are extracted from the resume Skills section.
+- [ ] Education is extracted from the Education section.
+- [ ] Projects are extracted from the Projects section.
+- [ ] Certifications remain blank when no Certifications section exists.
+- [ ] Target roles default only to the locally extracted current role; no invented roles are added.
+- [ ] Missing/uncertain facts remain blank rather than being invented.
+- [ ] Puter AI remains optional.
+- [ ] Going Back → Continue again does not overwrite profile edits unless the resume text changed.
