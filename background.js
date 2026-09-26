@@ -1,3 +1,15 @@
+import {
+  getAiAuthorized,
+  getJobCache,
+  getPuterToken,
+  getPreferences,
+  getState,
+  saveJobAiAnalysis,
+  saveJobDeepMatch
+} from "./core/storage.js";
+import { analyzeJobWithAi } from "./core/puter-client.js";
+import { evaluateDeepMatch } from "./core/match-engine.js";
+
 const SETUP_PAGE = "onboarding/onboarding.html";
 const PREFERENCES_PAGE = "preferences/preferences.html";
 const NAUKRI_PAGE = "stage3/naukri.html";
@@ -14,6 +26,137 @@ const NAUKRI_HOST_RE = /^https:\/\/(?:[^/]+\.)?naukri\.com\//i;
 
 function openPage(path) {
   chrome.tabs.create({ url: chrome.runtime.getURL(path) });
+}
+
+function comparableJobUrl(value) {
+  try {
+    const url = new URL(String(value || ""));
+    return (url.hostname + url.pathname)
+      .toLowerCase()
+      .replace(/\/+$/, "");
+  } catch (_) {
+    return String(value || "")
+      .toLowerCase()
+      .split("?")[0]
+      .replace(/\/+$/, "");
+  }
+}
+
+function findCachedJob(cache, incoming) {
+  if (!incoming || !cache) return null;
+
+  if (incoming.key && cache[incoming.key]) {
+    return cache[incoming.key];
+  }
+
+  const incomingId = String(incoming.portalJobId || "");
+  const incomingUrl = comparableJobUrl(incoming.canonicalUrl);
+
+  for (const job of Object.values(cache)) {
+    if (!job || job.portal !== incoming.portal) continue;
+
+    if (
+      incomingId &&
+      job.portalJobId &&
+      String(job.portalJobId) === incomingId
+    ) {
+      return job;
+    }
+
+    if (
+      incomingUrl &&
+      comparableJobUrl(job.canonicalUrl) === incomingUrl
+    ) {
+      return job;
+    }
+  }
+
+  return null;
+}
+
+async function buildInlineIntelligence(incomingJob, forceAi = false) {
+  if (!incomingJob || !incomingJob.title) {
+    throw new Error("The detail job is not ready yet.");
+  }
+
+  const [
+    state,
+    preferences,
+    token,
+    aiAuthorized,
+    cache
+  ] = await Promise.all([
+    getState(),
+    getPreferences(),
+    getPuterToken(),
+    getAiAuthorized(),
+    getJobCache()
+  ]);
+
+  if (!state?.profile) {
+    throw new Error("Save your Stage 1 profile first.");
+  }
+
+  if (!preferences?.updatedAt) {
+    throw new Error("Save Stage 2 preferences first.");
+  }
+
+  const cached = findCachedJob(cache, incomingJob);
+
+  let job = {
+    ...(cached || {}),
+    ...incomingJob,
+    aiAnalysis: cached?.aiAnalysis || incomingJob.aiAnalysis || null,
+    aiAnalyzedAt: cached?.aiAnalyzedAt || incomingJob.aiAnalyzedAt || null
+  };
+
+  let aiStatus = "not-connected";
+
+  if (token && aiAuthorized) {
+    aiStatus = job.aiAnalysis && !forceAi ? "cached" : "analyzing";
+
+    if (!job.aiAnalysis || forceAi) {
+      const analysis = await analyzeJobWithAi(job);
+      job = {
+        ...job,
+        aiAnalysis: analysis,
+        aiAnalyzedAt: analysis.analyzedAt || new Date().toISOString()
+      };
+
+      await saveJobAiAnalysis(job.key, analysis);
+      aiStatus = "completed";
+    }
+  } else if (job.aiAnalysis) {
+    aiStatus = "cached";
+  }
+
+  const deepMatch = evaluateDeepMatch(
+    state.profile,
+    preferences,
+    job
+  );
+
+  deepMatch.inputs = {
+    profileUpdatedAt: state.updatedAt || null,
+    preferencesUpdatedAt: preferences.updatedAt || null,
+    jobCapturedAt: job.capturedAt || null,
+    aiAnalyzedAt: job.aiAnalyzedAt || null
+  };
+
+  job = {
+    ...job,
+    deepMatch,
+    deepMatchedAt: deepMatch.evaluatedAt
+  };
+
+  await saveJobDeepMatch(job.key, deepMatch);
+
+  return {
+    job,
+    match: deepMatch,
+    aiStatus,
+    puterReady: Boolean(token && aiAuthorized)
+  };
 }
 
 async function setInjectionStatus(payload) {
@@ -74,6 +217,41 @@ async function injectJobPilotIntoNaukri(tabId, url, reason = "background") {
     return false;
   }
 }
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message?.type === "jobpilot:inline-analyze") {
+    (async () => {
+      try {
+        const result = await buildInlineIntelligence(
+          message.job,
+          message.forceAi === true
+        );
+        sendResponse({ ok: true, ...result });
+      } catch (error) {
+        sendResponse({
+          ok: false,
+          error: error?.message || String(error)
+        });
+      }
+    })();
+
+    return true;
+  }
+
+  if (message?.type === "jobpilot:open-full-match") {
+    openPage(MATCH_PAGE);
+    sendResponse({ ok: true });
+    return false;
+  }
+
+  if (message?.type === "jobpilot:open-stage4") {
+    openPage(EXTRACTOR_PAGE);
+    sendResponse({ ok: true });
+    return false;
+  }
+
+  return false;
+});
 
 chrome.runtime.onInstalled.addListener((details) => {
   if (details.reason === "install") {
