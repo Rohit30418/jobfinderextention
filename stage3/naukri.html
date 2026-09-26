@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>JobPilot - Stage 3 Naukri</title>
+  <link rel="stylesheet" href="naukri.css">
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <div>
+        <div class="eyebrow">JOBPILOT / STAGE 3</div>
+        <h1>Naukri search integration.</h1>
+        <p class="lede">Generate a Naukri search from your saved preferences, then verify what Naukri actually opened. No match scoring yet.</p>
+      </div>
+      <div class="top-actions">
+        <a class="btn ghost" href="../preferences/preferences.html">Edit preferences</a>
+        <span class="stage-chip">Naukri Search</span>
+      </div>
+    </header>
+
+    <section class="gate-card" id="gateCard">
+      <div>
+        <div class="kicker">READINESS</div>
+        <h2 id="gateTitle">Checking saved setup...</h2>
+        <p id="gateMeta">Stage 1 profile and Stage 2 preferences are required.</p>
+      </div>
+      <div class="status-chip" id="gateStatus">Checking</div>
+    </section>
+
+    <main id="app" class="hidden">
+      <section class="panel">
+        <div class="panel-heading">
+          <div>
+            <div class="kicker">SEARCH REQUEST</div>
+            <h2>What should Naukri search for?</h2>
+          </div>
+          <div class="status-chip" id="sessionStatus">Not opened</div>
+        </div>
+
+        <div class="form-grid">
+          <label>
+            <span>Primary role</span>
+            <select id="primaryRole"></select>
+          </label>
+
+          <label>
+            <span>Search phrase</span>
+            <input id="keywords" type="text" placeholder="e.g. Frontend Developer">
+            <small>Defaults to the selected target role. Keep this focused; priority keywords remain saved for later matching.</small>
+          </label>
+
+          <label class="span-2">
+            <span>Locations</span>
+            <textarea id="locations" rows="3" placeholder="Noida&#10;Delhi NCR&#10;Gurugram"></textarea>
+            <small>One per line or comma-separated. Multiple locations are passed through Naukri's location query.</small>
+          </label>
+
+          <div class="range-grid span-2">
+            <label>
+              <span>Minimum experience</span>
+              <input id="experienceMin" type="number" min="0" max="30" step="1">
+            </label>
+            <label>
+              <span>Maximum experience</span>
+              <input id="experienceMax" type="number" min="0" max="30" step="1">
+            </label>
+            <label>
+              <span>Freshness</span>
+              <select id="freshness">
+                <option value="24h">Last 24 hours</option>
+                <option value="3d">Last 3 days</option>
+                <option value="7d">Last 7 days</option>
+                <option value="14d">About 2 weeks</option>
+                <option value="30d">Last 30 days</option>
+                <option value="any">Any time</option>
+              </select>
+            </label>
+          </div>
+        </div>
+
+        <div class="mapping-note hidden" id="mappingNote"></div>
+
+        <div class="preview">
+          <div class="preview-label">Generated Naukri URL</div>
+          <code id="urlPreview"></code>
+        </div>
+
+        <div class="message hidden" id="message"></div>
+
+        <div class="footer-actions">
+          <button class="btn" id="refreshPreviewBtn" type="button">Refresh preview</button>
+          <button class="btn primary" id="openNaukriBtn" type="button">Open Naukri Search</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading">
+          <div>
+            <div class="kicker">WHAT HAPPENS NEXT</div>
+            <h2>Naukri page verification</h2>
+          </div>
+        </div>
+
+        <div class="flow-grid">
+          <div class="flow-card"><strong>1</strong><span>Open generated Naukri search</span></div>
+          <div class="flow-card"><strong>2</strong><span>Detect page type</span></div>
+          <div class="flow-card"><strong>3</strong><span>Compare requested filters with URL/page</span></div>
+          <div class="flow-card"><strong>4</strong><span>Show verification overlay on Naukri</span></div>
+        </div>
+
+        <div class="verification-list">
+          <div><span>Search results page</span><b>Detected</b></div>
+          <div><span>Individual job page</span><b>Detected</b></div>
+          <div><span>Login page</span><b>Detected</b></div>
+          <div><span>Expired / not-found page</span><b>Detected</b></div>
+          <div><span>Unknown Naukri page</span><b>Safe fallback</b></div>
+        </div>
+
+        <div class="notice">
+          Stage 3 does not score jobs. If a filter cannot be verified, JobPilot shows it as <strong>Unverified</strong> instead of pretending it worked.
+        </div>
+      </section>
+
+      <details class="diagnostics">
+        <summary>Developer diagnostics</summary>
+        <div class="diag-grid" id="diagnosticsGrid"></div>
+        <button class="btn small" id="refreshDiagnosticsBtn" type="button">Refresh diagnostics</button>
+      </details>
+    </main>
+  </div>
+
+  <script type="module" src="naukri.js"></script>
+</body>
+</html>
