@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "JobPilot - Naukri Job Extractor",
-  "version": "0.4.4",
-  "description": "Stage 4 Naukri extraction with direct in-app Naukri connection and exact injection diagnostics.",
+  "version": "0.4.5",
+  "description": "Stages 1-4 with local resume-to-profile autofill before optional AI and Naukri extraction.",
   "permissions": [
     "storage",
     "unlimitedStorage",
