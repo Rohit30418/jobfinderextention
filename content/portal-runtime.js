@@ -19,7 +19,9 @@
   let closedForUrl = "";
   let detailWaitUrl = "";
   let detailWaitStartedAt = 0;
-  const DETAIL_WAIT_TIMEOUT_MS = 12000;
+  let detailPollTimer = null;
+  const DETAIL_WAIT_TIMEOUT_MS = 15000;
+  const DETAIL_POLL_MS = 700;
 
   function cleanupLegacyOverlays() {
     for (const selector of [
@@ -463,7 +465,9 @@
         render(data);
 
         if (elapsed < DETAIL_WAIT_TIMEOUT_MS) {
-          schedule(700);
+          startDetailPoll();
+        } else {
+          stopDetailPoll();
         }
 
         return;
@@ -471,6 +475,7 @@
 
       detailWaitUrl = "";
       detailWaitStartedAt = 0;
+      stopDetailPoll();
 
       render(data);
       await persistCapture(data);
@@ -484,6 +489,23 @@
     schedule.timer = setTimeout(run, delay);
   }
 
+  function stopDetailPoll() {
+    if (detailPollTimer) {
+      clearInterval(detailPollTimer);
+      detailPollTimer = null;
+    }
+  }
+
+  function startDetailPoll() {
+    if (detailPollTimer) return;
+
+    detailPollTimer = setInterval(() => {
+      // Independent from the mutation debounce timer on purpose.
+      // Naukri can mutate continuously while rendering a job-detail page.
+      run();
+    }, DETAIL_POLL_MS);
+  }
+
   cleanupLegacyOverlays();
   run();
 
@@ -495,6 +517,7 @@
       closedForUrl = "";
       detailWaitUrl = "";
       detailWaitStartedAt = 0;
+      stopDetailPoll();
       schedule(300);
     }
   }, 900);
