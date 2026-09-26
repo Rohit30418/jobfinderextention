@@ -195,6 +195,12 @@ async function renderDiagnostics() {
   const preferences = await getPreferences();
   const search = await getNaukriSearch();
   const data = extraction || await getNaukriExtraction();
+  const connectionResult = await chrome.storage.local.get([
+    "jobpilot.stage3.connection",
+    "jobpilot.stage4.connection"
+  ]);
+  const stage3Connection = connectionResult["jobpilot.stage3.connection"];
+  const stage4Connection = connectionResult["jobpilot.stage4.connection"];
 
   const diagnostics = [
     ["Stage 1 profile", Boolean(state.profile), state.profile ? "Ready" : "Missing"],
@@ -207,6 +213,16 @@ async function renderDiagnostics() {
       "Stage 3 search",
       Boolean(search.createdAt),
       search.createdAt ? "Stored" : "Not opened"
+    ],
+    [
+      "Stage 3 verifier connection",
+      Boolean(stage3Connection && stage3Connection.status === "connected"),
+      stage3Connection ? "Connected to Naukri" : "Not connected"
+    ],
+    [
+      "Stage 4 extractor connection",
+      Boolean(stage4Connection && stage4Connection.status === "connected"),
+      stage4Connection ? "Connected to Naukri" : "Not connected"
     ],
     [
       "Stage 4 page type",
