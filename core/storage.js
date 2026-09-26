@@ -681,11 +681,80 @@ export async function getGapHistory() {
 }
 
 export async function getGapInsights(days = 7) {
-  const history = await getGapHistory();
-  const cutoff =
-    Date.now() - Math.max(1, Number(days) || 7) * 24 * 60 * 60 * 1000;
+  const rangeDays = Math.max(1, Number(days) || 7);
 
-  const records = Object.values(history).filter((item) => {
+  const [history, cache] = await Promise.all([
+    getGapHistory(),
+    getJobCache()
+  ]);
+
+  const cutoff =
+    Date.now() - rangeDays * 24 * 60 * 60 * 1000;
+
+  const recordMap = new Map(
+    Object.entries(history).map(([key, value]) => [
+      key,
+      value
+    ])
+  );
+
+  for (const [key, job] of Object.entries(cache)) {
+    if (!job?.deepMatch || recordMap.has(key)) continue;
+
+    const seenAt =
+      job.deepMatchedAt ||
+      job.deepMatch.evaluatedAt ||
+      null;
+
+    const time = Date.parse(seenAt || "");
+
+    if (!Number.isFinite(time) || time < cutoff) {
+      continue;
+    }
+
+    recordMap.set(key, {
+      key,
+      portal: job.portal || job.deepMatch.portal || "",
+      title: job.title || "",
+      company: job.company || "",
+      canonicalUrl: job.canonicalUrl || "",
+      roleFamily: job.deepMatch.source?.roleFamily || "",
+      matchScore: Number.isFinite(job.deepMatch.matchScore?.score)
+        ? job.deepMatch.matchScore.score
+        : null,
+      decision: job.deepMatch.applyDecision?.action || "",
+      verdict: job.deepMatch.verdict || "",
+
+      missingRequired: uniqueGapValues(
+        job.deepMatch.skills?.required?.missing || []
+      ),
+
+      missingPreferred: uniqueGapValues(
+        job.deepMatch.skills?.preferred?.missing || []
+      ),
+
+      blockers: uniqueGapValues(
+        (job.deepMatch.blockers || []).map((item) =>
+          item?.detail
+            ? item.label + ": " + item.detail
+            : item?.label
+        )
+      ),
+
+      gaps: uniqueGapValues(
+        (job.deepMatch.gaps || []).map((item) =>
+          item?.detail
+            ? item.label + ": " + item.detail
+            : item?.label
+        )
+      ),
+
+      firstSeenAt: seenAt,
+      lastSeenAt: seenAt
+    });
+  }
+
+  const records = [...recordMap.values()].filter((item) => {
     const time = Date.parse(item?.lastSeenAt || "");
     return Number.isFinite(time) && time >= cutoff;
   });
@@ -736,7 +805,7 @@ export async function getGapInsights(days = 7) {
   }
 
   return {
-    days: Math.max(1, Number(days) || 7),
+    days: rangeDays,
     analyzedJobs: records.length,
     missingRequired: countValues("missingRequired"),
     missingPreferred: countValues("missingPreferred"),
