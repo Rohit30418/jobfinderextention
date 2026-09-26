@@ -180,8 +180,11 @@ function renderDetail(job) {
 
   els.detailTitle.textContent = job.title || "Normalized job detail";
   els.detailConfidence.textContent =
-    "Extraction " + confidence.level + " · completeness " +
-    Number(confidence.score || 0) + "%";
+    confidence.level === "HIGH"
+      ? "READY"
+      : confidence.level === "MEDIUM"
+        ? "PARTIAL"
+        : "LOW DATA";
   els.detailConfidence.className =
     "confidence-chip " + confidenceClass(confidence.level);
 
@@ -281,6 +284,7 @@ async function renderDiagnostics() {
         : "Waiting for job-detail page"
     ],
     ["Job cache", Object.keys(cache).length > 0, Object.keys(cache).length + " cached"],
+    ["Extraction status", true, "Categorical only · no percentage score"],
     ["Match scoring", true, "Disabled"],
     ["AI job analysis", true, "Disabled"]
   ];
