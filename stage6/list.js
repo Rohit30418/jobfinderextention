@@ -203,20 +203,54 @@ function allCapturedJobs() {
 function decisionRank(job) {
   const deepAction = job.deepMatch?.applyDecision?.action;
   const aiAction = job.aiRanking?.decision;
+  const relevance = job.relevance?.status || "review";
+  const numericScore = score(job);
 
+  // Strong positive decisions always lead.
   if (deepAction === "APPLY") return 0;
   if (aiAction === "APPLY") return 1;
-  if (deepAction === "REVIEW FIRST") return 2;
-  if (aiAction === "REVIEW") return 3;
-  if (!job.deepMatch && !job.aiRanking && job.relevance?.status === "relevant") {
+
+  // Fresh jobs that passed the relevance gate should stay above weak
+  // REVIEW FIRST results when we do not yet have a stronger AI/deep signal.
+  if (
+    relevance === "relevant" &&
+    !deepAction &&
+    !aiAction
+  ) {
+    return 2;
+  }
+
+  // A REVIEW FIRST job with a genuinely strong score can still rank well.
+  if (
+    deepAction === "REVIEW FIRST" &&
+    Number.isFinite(numericScore) &&
+    numericScore >= 75
+  ) {
+    return 3;
+  }
+
+  if (
+    aiAction === "REVIEW" &&
+    Number.isFinite(numericScore) &&
+    numericScore >= 75
+  ) {
     return 4;
   }
-  if (!job.deepMatch && !job.aiRanking && job.relevance?.status === "review") {
-    return 5;
-  }
-  if (deepAction === "SKIP" || aiAction === "SKIP") return 7;
 
-  return 6;
+  if (deepAction === "REVIEW FIRST") return 5;
+  if (aiAction === "REVIEW") return 6;
+
+  if (
+    relevance === "review" &&
+    !deepAction &&
+    !aiAction
+  ) {
+    return 7;
+  }
+
+  if (deepAction === "SKIP" || aiAction === "SKIP") return 9;
+
+  return 8;
 }
 
 function score(job) {
@@ -951,6 +985,12 @@ function renderJobs() {
 
       const scoreDiff = score(b) - score(a);
       if (scoreDiff) return scoreDiff;
+
+      const relevanceDiff =
+        (a.relevance?.status === "relevant" ? 0 : 1) -
+        (b.relevance?.status === "relevant" ? 0 : 1);
+
+      if (relevanceDiff) return relevanceDiff;
 
       return String(b.listingCapturedAt || "")
         .localeCompare(
