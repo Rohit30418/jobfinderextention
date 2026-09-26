@@ -300,3 +300,151 @@ export async function analyzeResumeWithAi(resumeText) {
   const parsed = extractJson(responseText(result));
   return normalizeAiProfile(parsed);
 }
+
+
+function cleanAiString(value, max = 1200) {
+  return String(value || "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, max);
+}
+
+function cleanAiList(value, maxItems = 40, maxLength = 300) {
+  const input = Array.isArray(value) ? value : [];
+  const seen = new Set();
+  const output = [];
+
+  for (const item of input) {
+    const text = cleanAiString(item, maxLength);
+    if (!text) continue;
+
+    const key = text.toLowerCase();
+    if (seen.has(key)) continue;
+
+    seen.add(key);
+    output.push(text);
+
+    if (output.length >= maxItems) break;
+  }
+
+  return output;
+}
+
+function normalizeJobAiAnalysis(raw) {
+  const source = raw && typeof raw === "object" ? raw : {};
+
+  return {
+    roleFamily: cleanAiString(source.roleFamily, 180),
+    seniority: cleanAiString(source.seniority, 120),
+    domain: cleanAiString(source.domain, 180),
+
+    requiredSkills: cleanAiList(source.requiredSkills, 40, 120),
+    preferredSkills: cleanAiList(source.preferredSkills, 30, 120),
+
+    mustHaveRequirements: cleanAiList(source.mustHaveRequirements, 30, 500),
+    niceToHaveRequirements: cleanAiList(source.niceToHaveRequirements, 25, 500),
+    responsibilities: cleanAiList(source.responsibilities, 35, 500),
+    disqualifiers: cleanAiList(source.disqualifiers, 20, 500),
+
+    educationRequirements: cleanAiList(source.educationRequirements, 15, 500),
+    workMode: cleanAiString(source.workMode, 120),
+    employmentType: cleanAiString(source.employmentType, 120),
+
+    experience: {
+      minYears:
+        Number.isFinite(Number(source.experience?.minYears))
+          ? Number(source.experience.minYears)
+          : null,
+      maxYears:
+        Number.isFinite(Number(source.experience?.maxYears))
+          ? Number(source.experience.maxYears)
+          : null,
+      text: cleanAiString(source.experience?.text, 180)
+    },
+
+    summary: cleanAiString(source.summary, 1200),
+
+    evidence: {
+      roleFamily: cleanAiList(source.evidence?.roleFamily, 5, 220),
+      seniority: cleanAiList(source.evidence?.seniority, 5, 220),
+      requiredSkills: cleanAiList(source.evidence?.requiredSkills, 12, 220),
+      preferredSkills: cleanAiList(source.evidence?.preferredSkills, 12, 220),
+      mustHaveRequirements: cleanAiList(source.evidence?.mustHaveRequirements, 12, 220),
+      disqualifiers: cleanAiList(source.evidence?.disqualifiers, 8, 220)
+    },
+
+    analyzedAt: new Date().toISOString(),
+    source: "puter-ai"
+  };
+}
+
+export async function analyzeJobWithAi(job) {
+  const safeJob = job && typeof job === "object" ? job : {};
+
+  const payload = {
+    portal: cleanAiString(safeJob.portal, 80),
+    title: cleanAiString(safeJob.title, 300),
+    company: cleanAiString(safeJob.company, 300),
+    experienceText: cleanAiString(safeJob.experienceText, 300),
+    location: cleanAiString(safeJob.location, 500),
+    salaryText: cleanAiString(safeJob.salaryText, 300),
+    skills: cleanAiList(safeJob.skills, 60, 140),
+    employmentType: cleanAiString(safeJob.employmentType, 180),
+    workMode: cleanAiString(safeJob.workMode, 180),
+    education: cleanAiString(safeJob.education, 1200),
+    requirementStatements: cleanAiList(safeJob.requirementStatements, 50, 700),
+    preferredStatements: cleanAiList(safeJob.preferredStatements, 40, 700),
+    responsibilities: cleanAiList(safeJob.responsibilities, 50, 700),
+    description: String(safeJob.description || "").slice(0, 24000)
+  };
+
+  if (!payload.title && !payload.description) {
+    throw new Error("The job detail is not ready for AI analysis yet.");
+  }
+
+  const prompt = [
+    "You are a job-description interpreter inside a universal job-search browser extension.",
+    "Your job is to STRUCTURE the supplied job posting, not to score the candidate and not to invent facts.",
+    "Use only evidence present in JOB_DATA below.",
+    "Portal facts such as title, company, location, salary, and experience are authoritative and must not be rewritten.",
+    "If the JD does not clearly support a field, return an empty string, null, or empty array.",
+    "Distinguish required skills from preferred/nice-to-have skills.",
+    "A technology merely mentioned in a responsibility is not automatically required.",
+    "Disqualifiers must only contain explicit hard constraints such as mandatory years, mandatory degree, location/work-mode restriction, certification, notice period, citizenship, language, or other stated must-have condition.",
+    "Return ONLY one valid JSON object. No markdown.",
+    "Schema:",
+    "{",
+    '  "roleFamily": "",',
+    '  "seniority": "",',
+    '  "domain": "",',
+    '  "requiredSkills": [],',
+    '  "preferredSkills": [],',
+    '  "mustHaveRequirements": [],',
+    '  "niceToHaveRequirements": [],',
+    '  "responsibilities": [],',
+    '  "disqualifiers": [],',
+    '  "educationRequirements": [],',
+    '  "workMode": "",',
+    '  "employmentType": "",',
+    '  "experience": {"minYears": null, "maxYears": null, "text": ""},',
+    '  "summary": "",',
+    '  "evidence": {',
+    '    "roleFamily": [],',
+    '    "seniority": [],',
+    '    "requiredSkills": [],',
+    '    "preferredSkills": [],',
+    '    "mustHaveRequirements": [],',
+    '    "disqualifiers": []',
+    "  }",
+    "}",
+    "Evidence entries should be short phrases copied or tightly paraphrased from the supplied JD.",
+    "Do NOT compare this job to any candidate.",
+    "Do NOT produce a match percentage.",
+    "JOB_DATA:",
+    JSON.stringify(payload)
+  ].join("\n");
+
+  const result = await callPuterAi(prompt);
+  const parsed = extractJson(responseText(result));
+  return normalizeJobAiAnalysis(parsed);
+}
