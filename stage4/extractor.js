@@ -1,10 +1,20 @@
 import {
   clearPortalCapture,
+  getAiAuthorized,
   getJobCache,
   getPortalCapture,
   getPreferences,
-  getState
+  getPuterToken,
+  getState,
+  saveJobAiAnalysis
 } from "../core/storage.js";
+
+import {
+  analyzeJobWithAi,
+  authorizePuterAi,
+  connectPuter,
+  disconnectPuter
+} from "../core/puter-client.js";
 
 const $ = (selector) => document.querySelector(selector);
 
@@ -36,7 +46,27 @@ const els = {
   detailSources: $("#detailSources"),
   emptyPanel: $("#emptyPanel"),
   diagnosticsGrid: $("#diagnosticsGrid"),
-  relevanceMode: $("#relevanceMode")
+  relevanceMode: $("#relevanceMode"),
+
+  aiPanel: $("#aiPanel"),
+  aiStatus: $("#aiStatus"),
+  aiMessage: $("#aiMessage"),
+  connectPuterStage4Btn: $("#connectPuterStage4Btn"),
+  authorizePuterStage4Btn: $("#authorizePuterStage4Btn"),
+  analyzeJobAiBtn: $("#analyzeJobAiBtn"),
+  disconnectPuterStage4Btn: $("#disconnectPuterStage4Btn"),
+
+  aiSummaryGrid: $("#aiSummaryGrid"),
+  aiRequiredCard: $("#aiRequiredCard"),
+  aiRequiredSkills: $("#aiRequiredSkills"),
+  aiPreferredCard: $("#aiPreferredCard"),
+  aiPreferredSkills: $("#aiPreferredSkills"),
+  aiMustHaveCard: $("#aiMustHaveCard"),
+  aiMustHave: $("#aiMustHave"),
+  aiResponsibilitiesCard: $("#aiResponsibilitiesCard"),
+  aiResponsibilities: $("#aiResponsibilities"),
+  aiDisqualifiersCard: $("#aiDisqualifiersCard"),
+  aiDisqualifiers: $("#aiDisqualifiers")
 };
 
 let capture = null;
@@ -243,6 +273,8 @@ function renderDetail(job) {
 
   els.detailDescription.textContent = job.description || "Unknown";
 
+  renderAiAnalysis(job.aiAnalysis);
+
   const sources = job.sources || {};
   els.detailSources.innerHTML =
     '<div class="sources-grid">' +
@@ -253,6 +285,234 @@ function renderDetail(job) {
         '</div>'
       ).join("") +
     '</div>';
+}
+
+function setAiMessage(text, type = "") {
+  if (!els.aiMessage) return;
+
+  if (!text) {
+    els.aiMessage.textContent = "";
+    els.aiMessage.className = "notice hidden";
+    return;
+  }
+
+  els.aiMessage.textContent = text;
+  els.aiMessage.className =
+    "notice" + (type ? " " + type : "");
+}
+
+function renderAiTags(element, values) {
+  if (!element) return;
+
+  const list = Array.isArray(values)
+    ? values.filter(Boolean)
+    : [];
+
+  element.innerHTML = list.length
+    ? list.map((value) =>
+        '<span class="skill">' + escapeHtml(value) + '</span>'
+      ).join("")
+    : '<span class="unknown">Unknown</span>';
+}
+
+function renderAiList(element, values) {
+  if (!element) return;
+
+  const list = Array.isArray(values)
+    ? values.filter(Boolean)
+    : [];
+
+  element.textContent = list.length
+    ? list.map((item) => "• " + item).join("\n")
+    : "Unknown";
+}
+
+function renderAiAnalysis(analysis) {
+  const hasAnalysis =
+    analysis &&
+    typeof analysis === "object" &&
+    analysis.source === "puter-ai";
+
+  els.aiSummaryGrid?.classList.toggle("hidden", !hasAnalysis);
+  els.aiRequiredCard?.classList.toggle("hidden", !hasAnalysis);
+  els.aiPreferredCard?.classList.toggle("hidden", !hasAnalysis);
+  els.aiMustHaveCard?.classList.toggle("hidden", !hasAnalysis);
+  els.aiResponsibilitiesCard?.classList.toggle("hidden", !hasAnalysis);
+  els.aiDisqualifiersCard?.classList.toggle("hidden", !hasAnalysis);
+
+  if (!hasAnalysis) return;
+
+  const fields = [
+    ["Role family", analysis.roleFamily],
+    ["Seniority", analysis.seniority],
+    ["Domain", analysis.domain],
+    ["Work mode", analysis.workMode],
+    ["Employment type", analysis.employmentType],
+    [
+      "AI experience interpretation",
+      analysis.experience?.text ||
+        (
+          analysis.experience?.minYears != null ||
+          analysis.experience?.maxYears != null
+            ? [
+                analysis.experience?.minYears != null
+                  ? analysis.experience.minYears
+                  : "?",
+                analysis.experience?.maxYears != null
+                  ? analysis.experience.maxYears
+                  : "?"
+              ].join(" - ") + " years"
+            : ""
+        )
+    ],
+    ["Summary", analysis.summary]
+  ];
+
+  els.aiSummaryGrid.innerHTML = fields.map(([label, value]) =>
+    '<div class="detail-field">' +
+      '<div class="field-label">' + escapeHtml(label) + '</div>' +
+      '<div class="' + fieldClass(value) + '">' +
+        escapeHtml(display(value)) +
+      '</div>' +
+    '</div>'
+  ).join("");
+
+  renderAiTags(
+    els.aiRequiredSkills,
+    analysis.requiredSkills
+  );
+
+  renderAiTags(
+    els.aiPreferredSkills,
+    analysis.preferredSkills
+  );
+
+  renderAiList(
+    els.aiMustHave,
+    analysis.mustHaveRequirements
+  );
+
+  renderAiList(
+    els.aiResponsibilities,
+    analysis.responsibilities
+  );
+
+  renderAiList(
+    els.aiDisqualifiers,
+    analysis.disqualifiers
+  );
+}
+
+async function updatePuterStage4Ui() {
+  const [token, authorized] = await Promise.all([
+    getPuterToken(),
+    getAiAuthorized()
+  ]);
+
+  const connected = Boolean(token);
+  const detailReady = Boolean(
+    capture?.pageType === "detail" &&
+    capture?.detail &&
+    capture.detail.status?.detailLoaded &&
+    (
+      capture.detail.description ||
+      capture.detail.title
+    )
+  );
+
+  if (els.aiStatus) {
+    els.aiStatus.textContent =
+      connected
+        ? authorized
+          ? "AI ready"
+          : "Connected · authorization needed"
+        : "Not connected";
+  }
+
+  if (els.connectPuterStage4Btn) {
+    els.connectPuterStage4Btn.disabled = connected;
+  }
+
+  if (els.authorizePuterStage4Btn) {
+    els.authorizePuterStage4Btn.disabled =
+      !connected || authorized;
+  }
+
+  if (els.analyzeJobAiBtn) {
+    els.analyzeJobAiBtn.disabled =
+      !connected ||
+      !authorized ||
+      !detailReady;
+  }
+
+  if (els.disconnectPuterStage4Btn) {
+    els.disconnectPuterStage4Btn.disabled = !connected;
+  }
+}
+
+async function analyzeCurrentJobWithAi() {
+  if (
+    !capture ||
+    capture.pageType !== "detail" ||
+    !capture.detail
+  ) {
+    setAiMessage(
+      "Open a fully loaded job-detail page first.",
+      "error"
+    );
+    return;
+  }
+
+  if (!capture.detail.status?.detailLoaded) {
+    setAiMessage(
+      "JobPilot is still waiting for the job detail to finish loading.",
+      "error"
+    );
+    return;
+  }
+
+  const button = els.analyzeJobAiBtn;
+  const originalText = button?.textContent || "";
+
+  try {
+    if (button) {
+      button.disabled = true;
+      button.textContent = "Analyzing JD…";
+    }
+
+    setAiMessage(
+      "Puter AI is interpreting the extracted job description. Verified portal facts will not be overwritten."
+    );
+
+    const analysis = await analyzeJobWithAi(
+      capture.detail
+    );
+
+    await saveJobAiAnalysis(
+      capture.detail.key,
+      analysis
+    );
+
+    capture = await getPortalCapture();
+    renderAiAnalysis(capture.detail?.aiAnalysis);
+
+    setAiMessage(
+      "AI enrichment completed and saved on this normalized job.",
+      "success"
+    );
+  } catch (error) {
+    setAiMessage(
+      error?.message || String(error),
+      "error"
+    );
+  } finally {
+    if (button) {
+      button.textContent =
+        originalText || "Analyze current job with AI";
+    }
+
+    await updatePuterStage4Ui();
+  }
 }
 
 async function renderDiagnostics() {
@@ -285,8 +545,25 @@ async function renderDiagnostics() {
     ],
     ["Job cache", Object.keys(cache).length > 0, Object.keys(cache).length + " cached"],
     ["Extraction status", true, "Categorical only · no percentage score"],
-    ["Match scoring", true, "Disabled"],
-    ["AI job analysis", true, "Disabled"]
+    [
+      "Puter AI",
+      Boolean(await getPuterToken()),
+      (await getPuterToken())
+        ? (await getAiAuthorized())
+          ? "Connected · authorized"
+          : "Connected · authorization needed"
+        : "Not connected"
+    ],
+    [
+      "AI enrichment",
+      data.pageType !== "detail" || Boolean(data.detail?.aiAnalysis),
+      data.pageType === "detail"
+        ? data.detail?.aiAnalysis
+          ? "Completed · " + (data.detail.aiAnalysis.roleFamily || "structured")
+          : "Ready to analyze"
+        : "Waiting for detail page"
+    ],
+    ["Match scoring", true, "Disabled"]
   ];
 
   els.diagnosticsGrid.innerHTML = diagnostics.map((item) =>
@@ -349,6 +626,7 @@ async function render() {
     (Number(capture.stats?.normalized || 0) === 0 && !capture.detail);
 
   els.emptyPanel.classList.toggle("hidden", !empty);
+  await updatePuterStage4Ui();
   await renderDiagnostics();
 }
 
@@ -361,6 +639,53 @@ els.openSourceBtn.addEventListener("click", async () => {
 els.refreshBtn.addEventListener("click", render);
 els.relevanceMode?.addEventListener("change", () => {
   renderJobs(capture?.jobs || []);
+});
+
+els.connectPuterStage4Btn?.addEventListener("click", async () => {
+  try {
+    setAiMessage("Opening Puter sign-in…");
+    await connectPuter();
+    setAiMessage(
+      "Puter connected. Authorize AI once, then analyze the current job.",
+      "success"
+    );
+  } catch (error) {
+    setAiMessage(
+      error?.message || String(error),
+      "error"
+    );
+  } finally {
+    await updatePuterStage4Ui();
+  }
+});
+
+els.authorizePuterStage4Btn?.addEventListener("click", async () => {
+  try {
+    setAiMessage("Requesting Puter AI permission…");
+    await authorizePuterAi();
+    setAiMessage(
+      "Puter AI authorized. You can analyze this job now.",
+      "success"
+    );
+  } catch (error) {
+    setAiMessage(
+      error?.message || String(error),
+      "error"
+    );
+  } finally {
+    await updatePuterStage4Ui();
+  }
+});
+
+els.analyzeJobAiBtn?.addEventListener(
+  "click",
+  analyzeCurrentJobWithAi
+);
+
+els.disconnectPuterStage4Btn?.addEventListener("click", async () => {
+  await disconnectPuter();
+  setAiMessage("Puter disconnected.");
+  await updatePuterStage4Ui();
 });
 
 els.clearBtn.addEventListener("click", async () => {
