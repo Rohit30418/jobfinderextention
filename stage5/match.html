@@ -19,7 +19,7 @@
       </div>
       <div class="top-actions">
         <a class="btn ghost" href="../stage4/extractor.html">Back to Stage 4</a>
-        <span class="stage-chip">Evidence-based Match</span>
+        <span class="stage-chip">Match + Apply Decision</span>
       </div>
     </header>
 
@@ -40,6 +40,35 @@
     </section>
 
     <main id="matchApp" class="hidden">
+      <section class="apply-decision panel" id="applyDecisionPanel" data-action="REVIEW FIRST">
+        <div class="decision-layout">
+          <div>
+            <div class="kicker">APPLICATION DECISION</div>
+            <div class="decision-action" id="applyDecisionAction">REVIEW FIRST</div>
+            <h2 id="applyDecisionHeadline">Check these points before applying</h2>
+            <p class="lede" id="applyDecisionSummary"></p>
+          </div>
+          <div class="decision-side">
+            <span>Decision confidence</span>
+            <strong id="applyDecisionConfidence">LOW</strong>
+            <button class="btn primary" id="decisionOpenJobBtn" type="button">Open job →</button>
+          </div>
+        </div>
+
+        <div class="decision-columns">
+          <div>
+            <h3>Why</h3>
+            <div class="evidence-list" id="applyDecisionReasons"></div>
+          </div>
+          <div>
+            <h3>Check before acting</h3>
+            <div class="evidence-list" id="applyDecisionCautions"></div>
+          </div>
+        </div>
+
+        <div class="decision-next" id="applyDecisionNextStep"></div>
+      </section>
+
       <section class="hero-result panel">
         <div class="verdict-wrap">
           <div>
