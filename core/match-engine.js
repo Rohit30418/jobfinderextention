@@ -152,7 +152,89 @@ function candidateSkills(profile) {
   return unique(items, 160);
 }
 
-function skillMatch(candidateSkillList, jobSkillList, semanticMatches = []) {
+function baselineCapabilityEvidence(profile) {
+  const profileText = clean(flattenProfileText(profile));
+  const skillText = clean(candidateSkills(profile).join(" "));
+  const combined = " " + profileText + " " + skillText + " ";
+
+  const hasAny = (terms) =>
+    terms.some((term) => includesTerm(combined, term));
+
+  const hasAll = (terms) =>
+    terms.every((term) => includesTerm(combined, term));
+
+  const evidence = {};
+
+  const add = (labels, supported, reasons) => {
+    if (!supported) return;
+
+    for (const label of labels) {
+      evidence[clean(label)] = {
+        status: "INFERRED",
+        evidence: reasons,
+        explanation:
+          "Recognized as a foundational capability from the saved frontend profile evidence."
+      };
+    }
+  };
+
+  const frontendCore =
+    hasAny(["frontend", "ui developer", "web developer", "react"]) ||
+    hasAll(["html", "css"]) ||
+    hasAll(["javascript", "css"]);
+
+  add(
+    ["Responsive Web Design", "Responsive Design", "Mobile Responsive Design"],
+    frontendCore && hasAny(["css", "bootstrap", "tailwind", "media query", "responsive"]),
+    ["Frontend/UI profile", "CSS framework or responsive styling evidence"]
+  );
+
+  add(
+    ["Cross Browser Compatibility", "Cross-Browser Compatibility", "Cross Browser Testing"],
+    frontendCore && hasAny(["html", "css", "javascript"]),
+    ["Frontend implementation evidence", "HTML/CSS/JavaScript experience"]
+  );
+
+  add(
+    ["Semantic HTML", "Semantic Markup"],
+    frontendCore && hasAny(["html", "html5"]),
+    ["HTML/frontend implementation evidence"]
+  );
+
+  add(
+    ["Browser Debugging", "Debugging", "Frontend Debugging", "Troubleshooting"],
+    frontendCore && hasAny(["javascript", "jquery", "react", "typescript"]),
+    ["Frontend JavaScript implementation evidence"]
+  );
+
+  add(
+    ["Basic Accessibility", "Web Accessibility", "Accessibility"],
+    frontendCore && hasAny(["accessibility", "a11y", "focus", "keyboard", "aria"]),
+    ["Explicit accessibility/a11y evidence in saved profile"]
+  );
+
+  add(
+    ["SEO", "Technical SEO", "On-Page SEO"],
+    hasAny(["seo", "meta tags", "sitemap", "robots", "structured data", "schema markup"]),
+    ["Explicit SEO implementation evidence in saved profile"]
+  );
+
+  add(
+    ["API Integration", "REST API Integration", "REST APIs"],
+    hasAny(["api integration", "axios", "fetch", "rest api", "api"]),
+    ["API integration/client-side HTTP evidence"]
+  );
+
+  add(
+    ["Version Control", "Version Control Git", "Git"],
+    hasAny(["git", "github", "gitlab", "version control"]),
+    ["Git/version-control evidence in saved profile"]
+  );
+
+  return evidence;
+}
+
+function skillMatch(candidateSkillList, jobSkillList, semanticMatches = [], baselineEvidence = {}) {
   const candidateNormalized = candidateSkillList.map((skill) => ({
     raw: skill,
     normalized: clean(skill)
@@ -236,7 +318,9 @@ function skillMatch(candidateSkillList, jobSkillList, semanticMatches = []) {
     }
 
     const semanticHit = semanticFor(skill);
-    const status = String(semanticHit?.status || "").toUpperCase();
+    const baselineHit = baselineEvidence[normalized] || null;
+    const effectiveHit = semanticHit || baselineHit;
+    const status = String(effectiveHit?.status || "").toUpperCase();
 
     if (status === "EXACT") {
       matched.push(skill);
@@ -250,13 +334,13 @@ function skillMatch(candidateSkillList, jobSkillList, semanticMatches = []) {
       missing.push(skill);
     }
 
-    evidence[skill] = semanticHit
+    evidence[skill] = effectiveHit
       ? {
           status: status || "MISSING",
-          evidence: Array.isArray(semanticHit.evidence)
-            ? semanticHit.evidence
+          evidence: Array.isArray(effectiveHit.evidence)
+            ? effectiveHit.evidence
             : [],
-          explanation: String(semanticHit.explanation || "")
+          explanation: String(effectiveHit.explanation || "")
         }
       : {
           status: "MISSING",
@@ -1025,16 +1109,21 @@ export function evaluateDeepMatch(profile, preferences, job) {
   const semanticMatches =
     job?.aiAnalysis?.candidateRequirementMatches || [];
 
+  const baselineEvidence =
+    baselineCapabilityEvidence(profile);
+
   const required = skillMatch(
     candidateSkillList,
     requiredSkills,
-    semanticMatches
+    semanticMatches,
+    baselineEvidence
   );
 
   const preferred = skillMatch(
     candidateSkillList,
     preferredSkills,
-    semanticMatches
+    semanticMatches,
+    baselineEvidence
   );
 
   const role = roleCompatibility(profile, preferences, job);
