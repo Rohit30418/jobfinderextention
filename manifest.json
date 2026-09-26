@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "JobPilot - Universal Job Portal Assistant",
-  "version": "0.6.1",
-  "description": "Stage 4C detail readiness gate: wait for dynamic portal content before saving or displaying detail captures.",
+  "version": "0.6.2",
+  "description": "Stage 4C compatibility fix: both current and legacy detail extractors wait for Naukri to finish rendering.",
   "permissions": [
     "storage",
     "unlimitedStorage",
