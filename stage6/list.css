@@ -360,3 +360,22 @@ input{
     margin-top:10px
   }
 }
+
+
+.vault-head-actions{
+  display:flex;
+  gap:7px;
+  align-items:center;
+  flex-wrap:wrap;
+  justify-content:flex-end
+}
+.vault-head-actions .btn{
+  padding:8px 10px;
+  font-size:10px
+}
+@media(max-width:800px){
+  .vault-head-actions{
+    justify-content:flex-start;
+    margin-top:12px
+  }
+}
