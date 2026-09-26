@@ -663,11 +663,11 @@ els.backToResumeBtn.addEventListener("click", () => setStep(1));
 els.backToValidationBtn.addEventListener("click", () => setStep(2));
 
 els.connectPuterBtn.addEventListener("click", async () => {
-  setMessage(els.aiMessage, "Opening Puter sign-in...");
+  setMessage(els.aiMessage, "Opening secure Puter bridge...");
 
   try {
     await connectPuter();
-    setMessage(els.aiMessage, "Puter connected. Authorize AI next.", "success");
+    setMessage(els.aiMessage, "Puter connected and AI authorized.", "success");
   } catch (error) {
     setMessage(
       els.aiMessage,
