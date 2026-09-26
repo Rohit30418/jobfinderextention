@@ -400,3 +400,31 @@ PORTAL DETAIL PAGE
 Stage 4 and Stage 5 files remain available as developer/debug surfaces, but they are no longer part of the normal user flow.
 
 The browser-action button opens the saved Job List once a listing has been captured. Detail analysis never requires leaving the original job portal page.
+
+
+## Multi-portal support
+
+JobPilot v1.1.0 supports the same normalized workflow on:
+
+- Naukri
+- Foundit
+- LinkedIn Jobs
+- Indeed
+- Hirist
+
+The portal adapter only extracts portal-specific markup. Everything after normalization is shared:
+
+```text
+portal listing/detail
+→ normalized Job
+→ relevance gate
+→ optional Puter AI
+→ deterministic Deep Match
+→ Match %
+→ APPLY / REVIEW FIRST / SKIP
+→ inline portal UI
+```
+
+LinkedIn permissions are limited to `/jobs/*`; JobPilot does not intentionally inject into the normal feed/profile experience.
+
+Portal HTML changes over time, so each adapter has its own acceptance checks in `tests/MULTI_PORTAL_CHECKLIST.md`.
