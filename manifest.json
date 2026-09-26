@@ -1,11 +1,13 @@
 {
   "manifest_version": 3,
   "name": "JobPilot - Naukri Job Extractor",
-  "version": "0.4.0",
-  "description": "Stages 1-4: candidate profile, job preferences, Naukri search verification and structured Naukri job extraction.",
+  "version": "0.4.1",
+  "description": "Stage 4 structured Naukri extraction with reliable content-script injection diagnostics.",
   "permissions": [
     "storage",
-    "unlimitedStorage"
+    "unlimitedStorage",
+    "scripting",
+    "tabs"
   ],
   "host_permissions": [
     "https://api.puter.com/*",
