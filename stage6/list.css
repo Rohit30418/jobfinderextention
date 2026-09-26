@@ -37,7 +37,7 @@ h2{margin:4px 0;font-size:23px}
 }
 .summary-head{display:flex;justify-content:space-between;gap:18px;align-items:flex-start}
 .status{border:1px solid var(--line);border-radius:999px;padding:8px 11px;color:var(--muted);white-space:nowrap}
-.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:9px;margin-top:18px}
+.stats{display:grid;grid-template-columns:repeat(6,1fr);gap:9px;margin-top:18px}
 .stats>div{border:1px solid var(--line);border-radius:12px;background:#0a1119;padding:12px}
 .stats strong,.stats span{display:block}.stats strong{font-size:24px}.stats span{font-size:11px;color:var(--muted);margin-top:3px}
 .toolbar{display:flex;justify-content:space-between;gap:12px;align-items:center;position:sticky;top:10px;z-index:3}
@@ -375,6 +375,83 @@ input{
 }
 @media(max-width:800px){
   .vault-head-actions{
+    justify-content:flex-start;
+    margin-top:12px
+  }
+}
+
+
+.applied-panel{
+  border-color:rgba(111,240,160,.24)
+}
+.applied-head-actions{
+  display:flex;
+  gap:7px;
+  flex-wrap:wrap;
+  align-items:center;
+  justify-content:flex-end
+}
+.applied-head-actions .btn{
+  padding:8px 10px;
+  font-size:10px
+}
+.applied-list{
+  display:grid;
+  gap:8px;
+  margin-top:14px
+}
+.applied-item{
+  display:flex;
+  justify-content:space-between;
+  gap:14px;
+  align-items:center;
+  border:1px solid #213047;
+  border-radius:12px;
+  background:#091019;
+  padding:11px 12px
+}
+.applied-copy{
+  min-width:0
+}
+.applied-copy strong,
+.applied-copy span{
+  display:block
+}
+.applied-copy strong{
+  font-size:13px
+}
+.applied-copy span{
+  margin-top:4px;
+  color:#7f91a8;
+  font-size:10px
+}
+.applied-actions,
+.job-action-buttons{
+  display:flex;
+  gap:7px;
+  align-items:center;
+  flex-wrap:wrap;
+  justify-content:flex-end
+}
+@media(max-width:900px){
+  .stats{grid-template-columns:repeat(3,1fr)}
+}
+@media(max-width:650px){
+  .applied-item{
+    display:block
+  }
+  .applied-actions{
+    justify-content:flex-start;
+    margin-top:10px
+  }
+  .job-actions{
+    align-items:flex-start;
+    flex-direction:column
+  }
+  .job-action-buttons{
+    justify-content:flex-start
+  }
+  .applied-head-actions{
     justify-content:flex-start;
     margin-top:12px
   }
