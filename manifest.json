@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "JobPilot - Stage 1 Profile Setup",
-  "version": "0.1.0",
-  "description": "Stage 1: create a validated reusable job profile from a resume.",
+  "version": "0.1.1",
+  "description": "Stage 1: reliable resume extraction, validation and local candidate profile setup.",
   "permissions": [
     "storage",
     "unlimitedStorage"
