@@ -394,7 +394,7 @@
       html +=
         '<div class="jpp-note">' +
           '<strong>Waiting for job details…</strong><br>' +
-          'Naukri is still rendering this job. JobPilot will capture it automatically when the important fields are ready.' +
+          escapeHtml(portalName) + ' is still rendering this job. JobPilot will capture it automatically when the important fields are ready.' +
         '</div>' +
         '<div class="jpp-note">' +
           'Readiness: ' + readyCount + '/' + Object.keys(signals).length +
