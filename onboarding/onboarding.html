@@ -37,14 +37,14 @@
         <div class="grid two">
           <article class="card">
             <h3>Upload a file</h3>
-            <p>PDF uses bundled PDF.js. DOCX is extracted locally. TXT/MD use native text reading.</p>
+            <p>Selecting a file starts extraction automatically. PDF uses bundled PDF.js with a local extension worker.</p>
             <label class="upload-zone" for="resumeFile">
               <strong>Choose resume</strong>
               <span>PDF, DOCX, TXT or MD</span>
             </label>
             <input id="resumeFile" class="sr-only" type="file" accept=".pdf,.docx,.txt,.md,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown">
             <div class="file-row" id="selectedFile">No file selected.</div>
-            <button class="btn primary" id="parseFileBtn" type="button">Extract resume</button>
+            <button class="btn primary" id="parseFileBtn" type="button">Extract resume</button><p class="file-row">If automatic extraction fails, this button becomes Retry extraction.</p>
           </article>
 
           <article class="card">
