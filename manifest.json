@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "JobPilot - Universal Job Portal Assistant",
-  "version": "0.7.1",
-  "description": "Puter AI now authenticates through a normal HTTPS GitHub Pages bridge using official Puter.js.",
+  "version": "0.8.0",
+  "description": "Stage 5 deep match: deterministic blockers, role fit, skill coverage, experience/location checks, gaps and evidence confidence.",
   "permissions": [
     "storage",
     "unlimitedStorage",
