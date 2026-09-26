@@ -1,4 +1,24 @@
 (() => {
+  if (globalThis.__JOBPILOT_STAGE4_ACTIVE__) {
+    return;
+  }
+  globalThis.__JOBPILOT_STAGE4_ACTIVE__ = true;
+
+  const CONNECTION_KEY = "jobpilot.stage4.connection";
+
+  function publishConnection(status = "connected") {
+    try {
+      chrome.storage.local.set({
+        [CONNECTION_KEY]: {
+          status,
+          url: location.href,
+          seenAt: new Date().toISOString()
+        }
+      });
+    } catch (_) {}
+  }
+
+  publishConnection();
   const EXTRACTION_KEY = "jobpilot.stage4.naukriExtraction";
   const ROOT_ID = "jobpilot-naukri-stage4";
   const MAX_CARDS = 75;
