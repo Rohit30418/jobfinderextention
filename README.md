@@ -6,8 +6,9 @@ The repository currently contains:
 
 - **Stage 1 — Candidate Profile**
 - **Stage 2 — Job Preferences**
+- **Stage 3 — Naukri Search + Page Verification**
 
-There is still **no job portal integration or match scoring** in this build.
+There is now **Naukri-only search integration**, but there is still **no job match scoring or AI job analysis** in this build.
 
 ## Stage 1 — Candidate Profile
 
@@ -120,3 +121,46 @@ The original uploaded resume file is stored in IndexedDB.
 Resume text is sent to Puter only when the user explicitly connects/authorizes Puter and clicks the AI analysis button.
 
 See `PRIVACY.md`.
+
+
+## Stage 3 — Naukri Search
+
+Stage 3 reads the saved Stage 2 preferences and generates a Naukri search URL.
+
+Current search inputs:
+
+- primary target role / editable search phrase
+- preferred locations
+- minimum/maximum experience
+- freshness
+
+Freshness mapping:
+
+- 24 hours -> Naukri `jobAge=1`
+- 3 days -> `jobAge=3`
+- 7 days -> `jobAge=7`
+- about 14 days -> Naukri's 15-day bucket (`jobAge=15`)
+- 30 days -> `jobAge=30`
+- any time -> no `jobAge`
+
+A content script runs only on `https://www.naukri.com/*` and displays a small Stage 3 verification panel.
+
+It detects:
+
+- Naukri search results
+- individual Naukri job pages
+- login/auth pages
+- expired/not-found pages
+- unknown pages
+
+On search-result pages, JobPilot compares the stored request with the URL/page evidence and marks each filter as verified or unverified.
+
+Stage 3 does **not**:
+
+- score jobs
+- call Puter AI for jobs
+- hide jobs
+- auto-apply
+- click application controls
+
+See `tests/STAGE3_CHECKLIST.md`.
