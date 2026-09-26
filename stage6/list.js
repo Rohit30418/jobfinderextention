@@ -202,7 +202,21 @@ function visible(job) {
   if (mode === "relevant") return status === "relevant";
   if (mode === "review") return status === "review";
   if (mode === "analyzed") return analyzed;
-  if (mode === "recommended") return status !== "filtered";
+  if (mode === "recommended") {
+    const decision = job.deepMatch?.applyDecision?.action;
+
+    if (decision === "APPLY" || decision === "REVIEW FIRST") {
+      return true;
+    }
+
+    if (decision === "SKIP") {
+      return false;
+    }
+
+    // Before deep analysis, Recommended stays strict.
+    // Uncertain jobs remain available under the Review tab.
+    return status === "relevant";
+  }
 
   return true;
 }
