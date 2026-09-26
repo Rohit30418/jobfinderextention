@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>JobPilot - Stage 4 Naukri Extractor</title>
+  <link rel="stylesheet" href="extractor.css">
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <div>
+        <div class="eyebrow">JOBPILOT / STAGE 4</div>
+        <h1>Naukri job extraction.</h1>
+        <p class="lede">Inspect the structured job data JobPilot actually read. Extraction confidence is not a job-match score.</p>
+      </div>
+      <div class="top-actions">
+        <a class="btn ghost" href="../stage3/naukri.html">Back to Stage 3</a>
+        <span class="stage-chip">Extraction Only</span>
+      </div>
+    </header>
+
+    <section class="panel">
+      <div class="panel-heading">
+        <div>
+          <div class="kicker">LATEST EXTRACTION</div>
+          <h2 id="pageTitle">Waiting for Naukri data...</h2>
+          <p id="pageMeta">Open a Naukri search result or job-detail page after reloading the extension.</p>
+        </div>
+        <div class="status-chip" id="pageStatus">Waiting</div>
+      </div>
+
+      <div class="metric-grid">
+        <div class="metric"><strong id="detectedCount">0</strong><span>Detected</span></div>
+        <div class="metric"><strong id="parsedCount">0</strong><span>Parsed</span></div>
+        <div class="metric"><strong id="failedCount">0</strong><span>Failed</span></div>
+        <div class="metric"><strong id="highCount">0</strong><span>High confidence</span></div>
+        <div class="metric"><strong id="mediumCount">0</strong><span>Medium confidence</span></div>
+        <div class="metric"><strong id="lowCount">0</strong><span>Low confidence</span></div>
+      </div>
+
+      <div class="actions">
+        <button class="btn" id="openSourceBtn" type="button">Open source Naukri page</button>
+        <button class="btn" id="refreshBtn" type="button">Refresh extraction</button>
+        <button class="btn danger" id="clearBtn" type="button">Clear Stage 4 data</button>
+      </div>
+
+      <div class="notice">
+        Stage 4 never treats missing fields as positive evidence. <strong>Unknown stays Unknown.</strong>
+        No profile matching, AI ranking, auto-apply, or job hiding runs here.
+      </div>
+    </section>
+
+    <section class="panel hidden" id="cardsPanel">
+      <div class="panel-heading">
+        <div>
+          <div class="kicker">SEARCH RESULTS</div>
+          <h2>Structured Naukri job cards</h2>
+        </div>
+        <div class="status-chip" id="cardCountChip">0 jobs</div>
+      </div>
+      <div class="job-list" id="jobList"></div>
+    </section>
+
+    <section class="panel hidden" id="detailPanel">
+      <div class="panel-heading">
+        <div>
+          <div class="kicker">JOB DETAIL</div>
+          <h2 id="detailTitle">Structured job</h2>
+        </div>
+        <div class="confidence-chip" id="detailConfidence">Unknown</div>
+      </div>
+      <div class="detail-grid" id="detailGrid"></div>
+      <div class="description-card">
+        <div class="field-label">Full job description</div>
+        <div id="detailDescription" class="description-text">Unknown</div>
+      </div>
+      <details class="sources">
+        <summary>Extraction sources</summary>
+        <div id="detailSources"></div>
+      </details>
+    </section>
+
+    <section class="panel hidden" id="emptyPanel">
+      <div class="empty">
+        <strong>No extractable Naukri job data yet.</strong>
+        <span>Open a Naukri search-results page or an individual job page. Stage 4 runs automatically on naukri.com.</span>
+      </div>
+    </section>
+
+    <details class="diagnostics">
+      <summary>Developer diagnostics</summary>
+      <div class="diag-grid" id="diagnosticsGrid"></div>
+    </details>
+  </div>
+
+  <script type="module" src="extractor.js"></script>
+</body>
+</html>
