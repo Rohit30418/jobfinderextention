@@ -137,10 +137,17 @@
         </div>
       </section>
 
-      <details class="diagnostics">
+      <details class="diagnostics" open>
         <summary>Developer diagnostics</summary>
+        <div class="notice" id="connectionHelp">
+          If the Naukri overlays are missing, keep a Naukri results tab open and click <strong>Connect to Naukri tab</strong>.
+        </div>
         <div class="diag-grid" id="diagnosticsGrid"></div>
-        <button class="btn small" id="refreshDiagnosticsBtn" type="button">Refresh diagnostics</button>
+        <div class="footer-actions">
+          <button class="btn small primary" id="connectNaukriBtn" type="button">Connect to Naukri tab</button>
+          <button class="btn small" id="refreshDiagnosticsBtn" type="button">Refresh diagnostics</button>
+        </div>
+        <div class="message hidden" id="connectionMessage"></div>
       </details>
     </main>
   </div>
