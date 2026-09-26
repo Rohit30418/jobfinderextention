@@ -3,6 +3,7 @@ export const PUTER_TOKEN_KEY = "jobpilot.puter.token";
 export const PUTER_AI_AUTH_KEY = "jobpilot.puter.ai.authorized";
 export const PREFERENCES_KEY = "jobpilot.stage2.preferences";
 export const NAUKRI_SEARCH_KEY = "jobpilot.stage3.naukriSearch";
+export const NAUKRI_NATIVE_FILTERS_KEY = "jobpilot.stage3.naukriNativeFilters";
 
 export function emptyState() {
   return {
@@ -131,4 +132,37 @@ export async function setNaukriSearch(search) {
 
 export async function clearNaukriSearch() {
   await chrome.storage.local.remove(NAUKRI_SEARCH_KEY);
+}
+
+
+export function emptyNaukriNativeFilters() {
+  return {
+    version: 1,
+    experienceValue: "",
+    experienceContextKey: "",
+    cityTypeGids: [],
+    locationContextKey: "",
+    sourceUrl: "",
+    learnedAt: null
+  };
+}
+
+export async function getNaukriNativeFilters() {
+  const result = await chrome.storage.local.get(NAUKRI_NATIVE_FILTERS_KEY);
+  return result[NAUKRI_NATIVE_FILTERS_KEY] || emptyNaukriNativeFilters();
+}
+
+export async function setNaukriNativeFilters(filters) {
+  const next = {
+    ...emptyNaukriNativeFilters(),
+    ...filters,
+    version: 1,
+    learnedAt: new Date().toISOString()
+  };
+  await chrome.storage.local.set({ [NAUKRI_NATIVE_FILTERS_KEY]: next });
+  return next;
+}
+
+export async function clearNaukriNativeFilters() {
+  await chrome.storage.local.remove(NAUKRI_NATIVE_FILTERS_KEY);
 }
