@@ -81,16 +81,38 @@
 
   function uniqueJobLinks() {
     const set = new Set();
+    const selectors = [
+      ".srp-jobtuple-wrapper h2 a.title",
+      ".cust-job-tuple h2 a.title",
+      "h2 a.title",
+      "a.title",
+      'a[href*="job-listings"]'
+    ];
 
-    document.querySelectorAll('a[href*="job-listings"]').forEach((anchor) => {
+    for (const selector of selectors) {
+      let anchors = [];
       try {
-        const url = new URL(anchor.href, location.href);
-
-        if (url.hostname.endsWith("naukri.com")) {
-          set.add(url.href.split("?")[0]);
-        }
+        anchors = Array.from(document.querySelectorAll(selector));
       } catch (_) {}
-    });
+
+      for (const anchor of anchors) {
+        try {
+          const url = new URL(anchor.href, location.href);
+          const nearby = anchor.closest(
+            ".cust-job-tuple, .srp-jobtuple-wrapper, [class*='jobTuple'], [class*='job-tuple'], article"
+          );
+
+          if (
+            url.hostname.endsWith("naukri.com") &&
+            (nearby || /job-listings/i.test(url.pathname))
+          ) {
+            set.add(url.href.split("?")[0]);
+          }
+        } catch (_) {}
+      }
+
+      if (set.size >= 2) break;
+    }
 
     return [...set];
   }
