@@ -4,6 +4,7 @@ export const PUTER_AI_AUTH_KEY = "jobpilot.puter.ai.authorized";
 export const PREFERENCES_KEY = "jobpilot.stage2.preferences";
 export const NAUKRI_SEARCH_KEY = "jobpilot.stage3.naukriSearch";
 export const NAUKRI_NATIVE_FILTERS_KEY = "jobpilot.stage3.naukriNativeFilters";
+export const NAUKRI_EXTRACTION_KEY = "jobpilot.stage4.naukriExtraction";
 
 export function emptyState() {
   return {
@@ -165,4 +166,43 @@ export async function setNaukriNativeFilters(filters) {
 
 export async function clearNaukriNativeFilters() {
   await chrome.storage.local.remove(NAUKRI_NATIVE_FILTERS_KEY);
+}
+
+
+export function emptyNaukriExtraction() {
+  return {
+    version: 1,
+    pageType: "unknown",
+    sourceUrl: "",
+    cards: [],
+    detail: null,
+    stats: {
+      detected: 0,
+      parsed: 0,
+      high: 0,
+      medium: 0,
+      low: 0
+    },
+    extractedAt: null
+  };
+}
+
+export async function getNaukriExtraction() {
+  const result = await chrome.storage.local.get(NAUKRI_EXTRACTION_KEY);
+  return result[NAUKRI_EXTRACTION_KEY] || emptyNaukriExtraction();
+}
+
+export async function setNaukriExtraction(extraction) {
+  const next = {
+    ...emptyNaukriExtraction(),
+    ...extraction,
+    version: 1,
+    extractedAt: new Date().toISOString()
+  };
+  await chrome.storage.local.set({ [NAUKRI_EXTRACTION_KEY]: next });
+  return next;
+}
+
+export async function clearNaukriExtraction() {
+  await chrome.storage.local.remove(NAUKRI_EXTRACTION_KEY);
 }
