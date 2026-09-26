@@ -198,25 +198,6 @@ function score(job) {
 }
 
 function visible(job) {
-  const aiDecision = job.aiRanking?.decision;
-
-  if (aiDecision) {
-    const cls =
-      aiDecision === "APPLY"
-        ? "apply"
-        : aiDecision === "SKIP"
-          ? "skip"
-          : "review";
-
-    return (
-      '<span class="badge ' +
-      cls +
-      '">AI ' +
-      escapeHtml(aiDecision) +
-      "</span>"
-    );
-  }
-
   const status = job.relevance?.status || "review";
   const analyzed = Boolean(job.deepMatch);
 
@@ -287,6 +268,25 @@ function badgeFor(job) {
       cls +
       '">' +
       escapeHtml(decision) +
+      "</span>"
+    );
+  }
+
+  const aiDecision = job.aiRanking?.decision;
+
+  if (aiDecision) {
+    const cls =
+      aiDecision === "APPLY"
+        ? "apply"
+        : aiDecision === "SKIP"
+          ? "skip"
+          : "review";
+
+    return (
+      '<span class="badge ' +
+      cls +
+      '">AI ' +
+      escapeHtml(aiDecision) +
       "</span>"
     );
   }
