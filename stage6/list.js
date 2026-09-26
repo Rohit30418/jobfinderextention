@@ -1,11 +1,13 @@
 import {
   addSkillToProfile,
   dismissSkillFromVault,
+  exportJobPilotBackup,
   getGapInsights,
   getJobCache,
   getListingContexts,
   getSkillVault,
   getState,
+  importJobPilotBackup,
   removeSkillFromProfile,
   restoreSkillInVault
 } from "../core/storage.js";
@@ -65,7 +67,10 @@ const els = {
   skillVaultList: $("#skillVaultList"),
   vaultMissingCount: $("#vaultMissingCount"),
   vaultAddedCount: $("#vaultAddedCount"),
-  vaultDismissedCount: $("#vaultDismissedCount")
+  vaultDismissedCount: $("#vaultDismissedCount"),
+  exportBackupBtn: $("#exportBackupBtn"),
+  importBackupBtn: $("#importBackupBtn"),
+  importBackupInput: $("#importBackupInput")
 };
 
 let contextsState = {
@@ -569,7 +574,63 @@ function renderSkillVault() {
     els.vaultDismissedCount.textContent = dismissed.length;
   }
 
-  for (const button of document.querySelectorAll("[data-vault-mode]")) {
+  
+els.exportBackupBtn?.addEventListener("click", async () => {
+  try {
+    const payload = await exportJobPilotBackup();
+    const blob = new Blob(
+      [JSON.stringify(payload, null, 2)],
+      { type: "application/json" }
+    );
+
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    const stamp = new Date().toISOString().slice(0, 10);
+
+    anchor.href = url;
+    anchor.download = "jobpilot-backup-" + stamp + ".json";
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch (error) {
+    if (els.skillVaultStatus) {
+      els.skillVaultStatus.textContent =
+        error?.message || "Backup failed";
+    }
+  }
+});
+
+els.importBackupBtn?.addEventListener("click", () => {
+  els.importBackupInput?.click();
+});
+
+els.importBackupInput?.addEventListener("change", async () => {
+  const file = els.importBackupInput.files?.[0];
+  if (!file) return;
+
+  try {
+    const text = await file.text();
+    const payload = JSON.parse(text);
+    await importJobPilotBackup(payload);
+
+    if (els.skillVaultStatus) {
+      els.skillVaultStatus.textContent = "Backup restored";
+    }
+
+    await load();
+  } catch (error) {
+    if (els.skillVaultStatus) {
+      els.skillVaultStatus.textContent =
+        error?.message || "Restore failed";
+    }
+  } finally {
+    els.importBackupInput.value = "";
+  }
+});
+
+for (const button of document.querySelectorAll("[data-vault-mode]")) {
     button.classList.toggle(
       "active",
       button.dataset.vaultMode === vaultMode
