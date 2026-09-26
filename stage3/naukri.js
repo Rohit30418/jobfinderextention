@@ -29,7 +29,9 @@ const els = {
   refreshPreviewBtn: $("#refreshPreviewBtn"),
   openNaukriBtn: $("#openNaukriBtn"),
   diagnosticsGrid: $("#diagnosticsGrid"),
-  refreshDiagnosticsBtn: $("#refreshDiagnosticsBtn")
+  refreshDiagnosticsBtn: $("#refreshDiagnosticsBtn"),
+  connectNaukriBtn: $("#connectNaukriBtn"),
+  connectionMessage: $("#connectionMessage")
 };
 
 let profile = null;
@@ -301,6 +303,94 @@ function fillFromPreferences() {
   els.freshness.value = preferences.freshness || "3d";
 }
 
+function setConnectionMessage(text, type = "") {
+  if (!els.connectionMessage) return;
+  if (!text) {
+    els.connectionMessage.textContent = "";
+    els.connectionMessage.className = "message hidden";
+    return;
+  }
+  els.connectionMessage.textContent = text;
+  els.connectionMessage.className = "message" + (type ? " " + type : "");
+}
+
+function isNaukriUrl(url) {
+  return /^https:\/\/(?:[^/]+\.)?naukri\.com\//i.test(String(url || ""));
+}
+
+async function forceConnectToNaukri() {
+  if (!els.connectNaukriBtn) return;
+
+  els.connectNaukriBtn.disabled = true;
+  els.connectNaukriBtn.textContent = "Connecting...";
+  setConnectionMessage("");
+
+  try {
+    const tabs = await chrome.tabs.query({});
+    const naukriTabs = tabs
+      .filter((tab) => tab.id && isNaukriUrl(tab.url))
+      .sort((a, b) => Number(b.active) - Number(a.active));
+
+    if (!naukriTabs.length) {
+      throw new Error("No open Naukri tab found. Open a Naukri search-results page first.");
+    }
+
+    const target = naukriTabs[0];
+
+    await chrome.scripting.insertCSS({
+      target: { tabId: target.id },
+      files: [
+        "content/naukri-detector.css",
+        "content/naukri-extractor.css"
+      ]
+    });
+
+    await chrome.scripting.executeScript({
+      target: { tabId: target.id },
+      files: [
+        "content/naukri-detector.js",
+        "content/naukri-extractor.js"
+      ]
+    });
+
+    await chrome.storage.local.set({
+      "jobpilot.naukri.injectionStatus": {
+        ok: true,
+        reason: "stage3-direct-connect",
+        tabId: target.id,
+        url: target.url,
+        error: "",
+        at: new Date().toISOString()
+      }
+    });
+
+    setConnectionMessage(
+      "Connected to: " + target.url + ". Return to that Naukri tab; Stage 3 and Stage 4 overlays should now be visible.",
+      "success"
+    );
+
+    await refreshDiagnostics();
+  } catch (error) {
+    const message = error?.message || String(error);
+
+    await chrome.storage.local.set({
+      "jobpilot.naukri.injectionStatus": {
+        ok: false,
+        reason: "stage3-direct-connect",
+        url: "",
+        error: message,
+        at: new Date().toISOString()
+      }
+    });
+
+    setConnectionMessage("Connection failed: " + message, "error");
+    await refreshDiagnostics();
+  } finally {
+    els.connectNaukriBtn.disabled = false;
+    els.connectNaukriBtn.textContent = "Connect to Naukri tab";
+  }
+}
+
 async function refreshDiagnostics() {
   const saved = await getNaukriSearch();
   const spec = buildSearchSpec();
@@ -313,7 +403,10 @@ async function refreshDiagnostics() {
   const stage4Connection = connectionResult["jobpilot.stage4.connection"];
   const injectionStatus = connectionResult["jobpilot.naukri.injectionStatus"];
 
+  const loadedVersion = chrome.runtime.getManifest().version;
+
   const diagnostics = [
+    ["Loaded extension version", loadedVersion === "0.4.4", "v" + loadedVersion],
     ["Stage 1 profile", Boolean(profile), profile ? "Ready" : "Missing"],
     [
       "Stage 2 preferences",
@@ -516,6 +609,7 @@ els.openNaukriBtn.addEventListener("click", async () => {
 });
 
 els.refreshDiagnosticsBtn.addEventListener("click", refreshDiagnostics);
+els.connectNaukriBtn?.addEventListener("click", forceConnectToNaukri);
 
 chrome.storage.onChanged.addListener((changes, area) => {
   if (
