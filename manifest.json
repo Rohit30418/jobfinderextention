@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "JobPilot - Universal Job Portal Assistant",
-  "version": "0.6.3",
-  "description": "Stage 4C: in-place detail polling plus categorical READY/PARTIAL extraction status; no misleading extraction percentages.",
+  "version": "0.7.0",
+  "description": "Stage 4D: Puter AI job-description enrichment on top of verified portal capture; no candidate match score yet.",
   "permissions": [
     "storage",
     "unlimitedStorage",
