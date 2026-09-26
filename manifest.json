@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "JobPilot - Universal Job Portal Assistant",
-  "version": "0.7.0",
-  "description": "Stage 4D: Puter AI job-description enrichment on top of verified portal capture; no candidate match score yet.",
+  "version": "0.7.1",
+  "description": "Puter AI now authenticates through a normal HTTPS GitHub Pages bridge using official Puter.js.",
   "permissions": [
     "storage",
     "unlimitedStorage",
