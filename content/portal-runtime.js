@@ -398,8 +398,14 @@
 
       html +=
         '<div class="jpp-confidence jpp-' + confidenceClass(confidence.level) + '">' +
-          '<strong>' + escapeHtml("Extraction " + (confidence.level || "LOW")) + '</strong>' +
-          '<span>Completeness ' + Number(confidence.score || 0) + '% · not a match score</span>' +
+          '<strong>' + escapeHtml(
+            confidence.level === "HIGH"
+              ? "READY"
+              : confidence.level === "MEDIUM"
+                ? "PARTIAL"
+                : "LOW DATA"
+          ) + '</strong>' +
+          '<span>Extraction status · not a match score</span>' +
         '</div>' +
         '<div class="jpp-fields">' +
           [
