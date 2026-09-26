@@ -832,6 +832,14 @@ function buildApplyDecision({
     });
   }
 
+  if (required.partial?.length) {
+    cautions.push({
+      code: "required-skills-partial",
+      label: "Some required capabilities only have partial evidence",
+      detail: required.partial.join(", ")
+    });
+  }
+
   if (required.missing.length) {
     cautions.push({
       code: "required-skills-missing",
@@ -919,6 +927,7 @@ function buildApplyDecision({
     experience.candidateStatus !== "below" &&
     requiredSkills.length > 0 &&
     required.missing.length === 0 &&
+    (required.partial?.length || 0) === 0 &&
     requiredCoverage !== null &&
     requiredCoverage >= 0.75 &&
     location.status !== "mismatch" &&
@@ -1077,6 +1086,22 @@ export function evaluateDeepMatch(profile, preferences, job) {
       });
     }
 
+    if (required.inferred?.length) {
+      strengths.push({
+        code: "required-skills-inferred",
+        label: "Required capabilities supported by resume evidence",
+        detail: required.inferred.join(", ")
+      });
+    }
+
+    if (required.partial?.length) {
+      review.push({
+        code: "required-skills-partial",
+        label: "Related evidence found, but not a full match",
+        detail: required.partial.join(", ")
+      });
+    }
+
     if (required.missing.length) {
       gaps.push({
         code: "required-skills-missing",
@@ -1097,6 +1122,22 @@ export function evaluateDeepMatch(profile, preferences, job) {
       code: "preferred-skills-matched",
       label: "Preferred skills matched",
       detail: preferred.matched.join(", ")
+    });
+  }
+
+  if (preferred.inferred?.length) {
+    strengths.push({
+      code: "preferred-skills-inferred",
+      label: "Preferred capabilities supported by resume evidence",
+      detail: preferred.inferred.join(", ")
+    });
+  }
+
+  if (preferred.partial?.length) {
+    review.push({
+      code: "preferred-skills-partial",
+      label: "Preferred skills have partial evidence",
+      detail: preferred.partial.join(", ")
     });
   }
 
