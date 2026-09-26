@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>JobPilot - Stage 1</title>
+  <link rel="stylesheet" href="onboarding.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div>
+        <div class="eyebrow">JOBPILOT / STAGE 1</div>
+        <h1>Build a trustworthy job profile.</h1>
+        <p class="lede">Resume first. Validate every step. No job scoring until this profile is clean.</p>
+      </div>
+      <div class="stage-chip">Profile Foundation</div>
+    </header>
+
+    <nav class="stepper" aria-label="Setup progress">
+      <button class="step is-active" data-step-nav="1"><span>1</span>Resume</button>
+      <button class="step" data-step-nav="2"><span>2</span>Validate</button>
+      <button class="step" data-step-nav="3"><span>3</span>Profile</button>
+      <button class="step" data-step-nav="4"><span>4</span>Save</button>
+    </nav>
+
+    <main>
+      <section class="panel step-panel" data-step="1">
+        <div class="panel-heading">
+          <div>
+            <div class="kicker">STEP 1</div>
+            <h2>Add your resume</h2>
+          </div>
+          <div class="status-dot" id="resumeSourceStatus">Waiting</div>
+        </div>
+
+        <div class="grid two">
+          <article class="card">
+            <h3>Upload a file</h3>
+            <p>PDF uses bundled PDF.js. DOCX is extracted locally. TXT/MD use native text reading.</p>
+            <label class="upload-zone" for="resumeFile">
+              <strong>Choose resume</strong>
+              <span>PDF, DOCX, TXT or MD</span>
+            </label>
+            <input id="resumeFile" class="sr-only" type="file" accept=".pdf,.docx,.txt,.md,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown">
+            <div class="file-row" id="selectedFile">No file selected.</div>
+            <button class="btn primary" id="parseFileBtn" type="button">Extract resume</button>
+          </article>
+
+          <article class="card">
+            <h3>Or paste resume text</h3>
+            <p>This is also the fallback when a PDF cannot be read reliably.</p>
+            <textarea id="pasteText" rows="12" placeholder="Paste the complete resume text here..."></textarea>
+            <button class="btn" id="usePasteBtn" type="button">Use pasted text</button>
+          </article>
+        </div>
+
+        <div class="message hidden" id="parseMessage"></div>
+      </section>
+
+      <section class="panel step-panel hidden" data-step="2">
+        <div class="panel-heading">
+          <div>
+            <div class="kicker">STEP 2</div>
+            <h2>Validate what JobPilot actually read</h2>
+          </div>
+          <div class="quality-badge" id="qualityBadge">Not checked</div>
+        </div>
+
+        <div class="metric-grid" id="qualityMetrics"></div>
+
+        <div class="grid preview-grid">
+          <div>
+            <label for="resumePreview">Extracted resume text</label>
+            <textarea id="resumePreview" class="resume-preview" rows="24"></textarea>
+          </div>
+          <aside class="validation-side">
+            <h3>Validation</h3>
+            <div id="validationDetails"></div>
+            <div class="button-stack">
+              <button class="btn" id="revalidateBtn" type="button">Revalidate edited text</button>
+              <button class="btn ghost" id="backToResumeBtn" type="button">Back</button>
+              <button class="btn primary" id="continueProfileBtn" type="button">Continue to profile</button>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="panel step-panel hidden" data-step="3">
+        <div class="panel-heading">
+          <div>
+            <div class="kicker">STEP 3</div>
+            <h2>Create the structured candidate profile</h2>
+          </div>
+          <div class="status-dot" id="aiStatus">AI optional</div>
+        </div>
+
+        <div class="ai-box">
+          <div>
+            <h3>Puter AI profile assist</h3>
+            <p>AI receives only the validated resume text after you click Analyze. You review everything before it is saved.</p>
+          </div>
+          <div class="ai-actions">
+            <button class="btn" id="connectPuterBtn" type="button">Connect Puter</button>
+            <button class="btn" id="authorizeAiBtn" type="button">Authorize AI</button>
+            <button class="btn primary" id="analyzeAiBtn" type="button">Analyze resume with AI</button>
+            <button class="btn ghost" id="disconnectPuterBtn" type="button">Disconnect</button>
+          </div>
+          <div class="message hidden" id="aiMessage"></div>
+        </div>
+
+        <div class="form-grid">
+          <label>
+            <span>Name</span>
+            <input id="profileName" type="text" autocomplete="name">
+          </label>
+          <label>
+            <span>Headline</span>
+            <input id="profileHeadline" type="text" placeholder="e.g. Frontend Developer">
+          </label>
+          <label>
+            <span>Current role</span>
+            <input id="profileCurrentRole" type="text">
+          </label>
+          <div class="experience-row">
+            <label>
+              <span>Experience years</span>
+              <input id="experienceYears" type="number" min="0" max="60" step="1">
+            </label>
+            <label>
+              <span>Months</span>
+              <input id="experienceMonths" type="number" min="0" max="11" step="1">
+            </label>
+          </div>
+          <label class="span-2">
+            <span>Skills</span>
+            <textarea id="profileSkills" rows="5" placeholder="One per line or comma-separated"></textarea>
+          </label>
+          <label class="span-2">
+            <span>Target roles</span>
+            <textarea id="profileTargetRoles" rows="4" placeholder="Roles you actually want JobPilot to search later"></textarea>
+          </label>
+          <label class="span-2">
+            <span>Resume keywords</span>
+            <textarea id="profileKeywords" rows="4" placeholder="Important skills, qualifications, tools, domains or role keywords"></textarea>
+          </label>
+          <label class="span-2">
+            <span>Education</span>
+            <textarea id="profileEducation" rows="4" placeholder="One item per line"></textarea>
+          </label>
+          <label class="span-2">
+            <span>Certifications</span>
+            <textarea id="profileCertifications" rows="3" placeholder="One item per line"></textarea>
+          </label>
+          <label class="span-2">
+            <span>Projects / notable work</span>
+            <textarea id="profileProjects" rows="5" placeholder="One item per line"></textarea>
+          </label>
+        </div>
+
+        <div class="footer-actions">
+          <button class="btn ghost" id="backToValidationBtn" type="button">Back</button>
+          <button class="btn primary" id="reviewProfileBtn" type="button">Review profile</button>
+        </div>
+      </section>
+
+      <section class="panel step-panel hidden" data-step="4">
+        <div class="panel-heading">
+          <div>
+            <div class="kicker">STEP 4</div>
+            <h2>Review and save locally</h2>
+          </div>
+          <div class="status-dot" id="saveStatus">Not saved</div>
+        </div>
+
+        <div class="review-grid" id="profileReview"></div>
+
+        <div class="privacy-note">
+          <strong>Local-first:</strong>
+          the confirmed profile and validated resume text are stored in Chrome local storage.
+          The original uploaded file is stored in IndexedDB. AI is only called when you explicitly use the AI button.
+        </div>
+
+        <div class="footer-actions wrap">
+          <button class="btn ghost" id="editProfileBtn" type="button">Edit profile</button>
+          <button class="btn" id="replaceResumeBtn" type="button">Replace resume</button>
+          <button class="btn danger" id="deleteProfileBtn" type="button">Delete resume & profile</button>
+          <button class="btn primary" id="saveProfileBtn" type="button">Save confirmed profile</button>
+        </div>
+
+        <div class="message hidden" id="saveMessage"></div>
+      </section>
+    </main>
+
+    <details class="diagnostics">
+      <summary>Developer diagnostics</summary>
+      <div class="diag-grid" id="diagnosticsGrid"></div>
+      <div class="diag-actions">
+        <button class="btn small" id="refreshDiagnosticsBtn" type="button">Refresh diagnostics</button>
+      </div>
+    </details>
+  </div>
+
+  <script src="../vendor/pdf.min.js"></script>
+  <script type="module" src="onboarding.js"></script>
+</body>
+</html>
