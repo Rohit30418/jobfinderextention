@@ -1,15 +1,19 @@
 import {
   addSkillToProfile,
   dismissSkillFromVault,
+  exportAppliedJobsData,
   exportJobPilotBackup,
+  getAppliedJobs,
   getGapInsights,
   getJobCache,
   getListingContexts,
   getSkillVault,
   getState,
   importJobPilotBackup,
+  markJobApplied,
   removeSkillFromProfile,
-  restoreSkillInVault
+  restoreSkillInVault,
+  unmarkJobApplied
 } from "../core/storage.js";
 
 const $ = (selector) => document.querySelector(selector);
@@ -51,6 +55,7 @@ const els = {
   reviewCount: $("#reviewCount"),
   filteredCount: $("#filteredCount"),
   analyzedCount: $("#analyzedCount"),
+  appliedCount: $("#appliedCount"),
   aiRankBtn: $("#aiRankBtn"),
   aiRankStatus: $("#aiRankStatus"),
   openSourceBtn: $("#openSourceBtn"),
@@ -70,7 +75,12 @@ const els = {
   vaultDismissedCount: $("#vaultDismissedCount"),
   exportBackupBtn: $("#exportBackupBtn"),
   importBackupBtn: $("#importBackupBtn"),
-  importBackupInput: $("#importBackupInput")
+  importBackupInput: $("#importBackupInput"),
+  appliedStatus: $("#appliedStatus"),
+  appliedSummary: $("#appliedSummary"),
+  appliedList: $("#appliedList"),
+  exportAppliedCsvBtn: $("#exportAppliedCsvBtn"),
+  exportAppliedJsonBtn: $("#exportAppliedJsonBtn")
 };
 
 let contextsState = {
@@ -83,6 +93,7 @@ let cache = {};
 let insights = null;
 let skillVault = { version: 1, items: {}, updatedAt: null };
 let profileState = null;
+let appliedJobsState = { version: 1, items: {}, updatedAt: null };
 let vaultMode = "missing";
 let mode = "recommended";
 let portalMode = "all";
@@ -545,6 +556,208 @@ function renderInsights() {
 }
 
 
+
+function appliedItems() {
+  return Object.values(appliedJobsState?.items || {})
+    .filter((item) => item?.status === "applied")
+    .sort((a, b) =>
+      String(b.appliedAt || "").localeCompare(
+        String(a.appliedAt || "")
+      )
+    );
+}
+
+function jobAppliedRecord(job) {
+  if (!job) return null;
+
+  const items = appliedJobsState?.items || {};
+
+  if (job.key && items[job.key]) {
+    return items[job.key];
+  }
+
+  const portalId = String(job.portalJobId || "");
+  const url = comparableUrl(job.canonicalUrl);
+
+  for (const item of Object.values(items)) {
+    if (!item) continue;
+
+    if (
+      portalId &&
+      item.portalJobId &&
+      String(item.portalJobId) === portalId &&
+      item.portal === job.portal
+    ) {
+      return item;
+    }
+
+    if (
+      url &&
+      comparableUrl(item.canonicalUrl) === url
+    ) {
+      return item;
+    }
+  }
+
+  return null;
+}
+
+function downloadTextFile(filename, text, type) {
+  const blob = new Blob([text], { type });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function csvCell(value) {
+  const text = Array.isArray(value)
+    ? value.join(", ")
+    : String(value ?? "");
+
+  return '"' + text.replace(/"/g, '""') + '"';
+}
+
+function appliedJobsToCsv(items) {
+  const headers = [
+    "Applied Date",
+    "Portal",
+    "Job Title",
+    "Company",
+    "Location",
+    "Experience",
+    "Salary",
+    "Match Score",
+    "AI Fit Score",
+    "Decision",
+    "Verdict",
+    "Role Family",
+    "Skills",
+    "Job URL",
+    "Note"
+  ];
+
+  const rows = items.map((item) => [
+    item.appliedAt
+      ? new Date(item.appliedAt).toLocaleString()
+      : "",
+    item.portalName || item.portal || "",
+    item.title || "",
+    item.company || "",
+    item.location || "",
+    item.experienceText || "",
+    item.salaryText || "",
+    Number.isFinite(item.matchScore) ? item.matchScore : "",
+    Number.isFinite(item.aiFitScore) ? item.aiFitScore : "",
+    item.decision || "",
+    item.verdict || "",
+    item.roleFamily || "",
+    item.skills || [],
+    item.canonicalUrl || "",
+    item.note || ""
+  ]);
+
+  return [
+    headers.map(csvCell).join(","),
+    ...rows.map((row) => row.map(csvCell).join(","))
+  ].join("\r\n");
+}
+
+function renderAppliedJobs() {
+  const items = appliedItems();
+
+  if (els.appliedCount) {
+    els.appliedCount.textContent = items.length;
+  }
+
+  if (els.appliedStatus) {
+    els.appliedStatus.textContent =
+      items.length + " applied";
+  }
+
+  if (els.appliedSummary) {
+    els.appliedSummary.textContent =
+      items.length
+        ? "Your latest applications are saved locally and included in JobPilot backups."
+        : "Mark jobs as applied and export the history anytime.";
+  }
+
+  if (els.exportAppliedCsvBtn) {
+    els.exportAppliedCsvBtn.disabled = !items.length;
+  }
+
+  if (els.exportAppliedJsonBtn) {
+    els.exportAppliedJsonBtn.disabled = !items.length;
+  }
+
+  if (!els.appliedList) return;
+
+  if (!items.length) {
+    els.appliedList.innerHTML =
+      '<div class="insight-empty">No applied jobs yet. Use “Mark Applied” on a job card or job detail page.</div>';
+    return;
+  }
+
+  els.appliedList.innerHTML = items
+    .slice(0, 8)
+    .map((item) => {
+      const appliedDate = item.appliedAt
+        ? new Date(item.appliedAt).toLocaleString()
+        : "Unknown date";
+
+      return (
+        '<article class="applied-item">' +
+          '<div class="applied-copy">' +
+            '<div class="job-source">' +
+              escapeHtml(item.portalName || item.portal || "Portal") +
+            '</div>' +
+            '<strong>' + escapeHtml(item.title || "Untitled job") + '</strong>' +
+            '<span>' +
+              escapeHtml(item.company || "Company unknown") +
+              ' · ' +
+              escapeHtml(appliedDate) +
+            '</span>' +
+          '</div>' +
+          '<div class="applied-actions">' +
+            (
+              item.canonicalUrl
+                ? '<a class="vault-action add" href="' +
+                    escapeHtml(item.canonicalUrl) +
+                    '" target="_blank" rel="noopener">Open</a>'
+                : ""
+            ) +
+            '<button class="vault-action danger" type="button" data-applied-remove="' +
+              escapeHtml(item.key || "") +
+            '">Undo Applied</button>' +
+          '</div>' +
+        '</article>'
+      );
+    })
+    .join("");
+
+  for (const button of els.appliedList.querySelectorAll("[data-applied-remove]")) {
+    button.addEventListener("click", async () => {
+      const key = button.dataset.appliedRemove || "";
+      button.disabled = true;
+
+      try {
+        await unmarkJobApplied(key);
+        await load();
+      } catch (error) {
+        button.disabled = false;
+        button.textContent =
+          error?.message || "Could not undo";
+      }
+    });
+  }
+}
+
 function vaultItems() {
   return Object.values(skillVault?.items || {})
     .filter((item) => item?.skill);
@@ -867,15 +1080,56 @@ function renderJobs() {
                   : "Deep analysis runs on the portal page"
             ) +
           "</span>" +
-          '<a class="open" href="' +
-            escapeHtml(job.canonicalUrl || "#") +
-            '" target="_blank" rel="noopener">' +
-            "Open job →" +
-          "</a>" +
+          '<div class="job-action-buttons">' +
+            '<button class="vault-action ' +
+              (jobAppliedRecord(job) ? "danger" : "add") +
+              '" type="button" data-job-applied="' +
+              escapeHtml(job.key || job.canonicalUrl || "") +
+            '">' +
+              (jobAppliedRecord(job) ? "Undo Applied" : "Mark Applied") +
+            '</button>' +
+            '<a class="open" href="' +
+              escapeHtml(job.canonicalUrl || "#") +
+              '" target="_blank" rel="noopener">' +
+              "Open job →" +
+            "</a>" +
+          "</div>" +
         "</div>" +
       "</article>"
     );
   }).join("");
+
+  for (const button of els.jobList.querySelectorAll("[data-job-applied]")) {
+    button.addEventListener("click", async () => {
+      const identity = button.dataset.jobApplied || "";
+      const job = all.find((item) =>
+        item.key === identity ||
+        item.canonicalUrl === identity
+      );
+
+      if (!job) return;
+
+      button.disabled = true;
+
+      try {
+        const existing = jobAppliedRecord(job);
+
+        if (existing) {
+          await unmarkJobApplied(existing.key);
+        } else {
+          await markJobApplied(job, {
+            source: "job-list"
+          });
+        }
+
+        await load();
+      } catch (error) {
+        button.disabled = false;
+        button.textContent =
+          error?.message || "Could not update";
+      }
+    });
+  }
 }
 
 function renderHeader() {
@@ -928,24 +1182,75 @@ function render() {
   renderPortalSources();
   renderPortalFilters();
   renderInsights();
+  renderAppliedJobs();
   renderSkillVault();
   renderJobs();
 }
 
 async function load() {
-  [contextsState, cache, insights, skillVault, profileState] =
+  [contextsState, cache, insights, skillVault, profileState, appliedJobsState] =
     await Promise.all([
       getListingContexts(),
       getJobCache(),
       getGapInsights(7),
       getSkillVault(),
-      getState()
+      getState(),
+      getAppliedJobs()
     ]);
 
   render();
 }
 
 
+
+
+els.exportAppliedCsvBtn?.addEventListener("click", async () => {
+  try {
+    const items = await exportAppliedJobsData();
+    if (!items.length) return;
+
+    const stamp = new Date().toISOString().slice(0, 10);
+    downloadTextFile(
+      "jobpilot-applied-jobs-" + stamp + ".csv",
+      appliedJobsToCsv(items),
+      "text/csv;charset=utf-8"
+    );
+  } catch (error) {
+    if (els.appliedSummary) {
+      els.appliedSummary.textContent =
+        error?.message || "Could not export applied jobs.";
+    }
+  }
+});
+
+els.exportAppliedJsonBtn?.addEventListener("click", async () => {
+  try {
+    const items = await exportAppliedJobsData();
+    if (!items.length) return;
+
+    const stamp = new Date().toISOString().slice(0, 10);
+    downloadTextFile(
+      "jobpilot-applied-jobs-" + stamp + ".json",
+      JSON.stringify(
+        {
+          type: "jobpilot-applied-jobs",
+          version: 1,
+          exportedAt: new Date().toISOString(),
+          count: items.length,
+          jobs: items
+        },
+        null,
+        2
+      ),
+      "application/json"
+    );
+  } catch (error) {
+    if (els.appliedSummary) {
+      els.appliedSummary.textContent =
+        error?.message || "Could not export applied jobs.";
+    }
+  }
+});
 
 els.exportBackupBtn?.addEventListener("click", async () => {
   try {
@@ -1114,6 +1419,7 @@ chrome.storage.onChanged.addListener(
         changes["jobpilot.jobs.cache"] ||
         changes["jobpilot.insights.gapHistory"] ||
         changes["jobpilot.skills.vault"] ||
+        changes["jobpilot.jobs.applied"] ||
         changes["jobpilot.stage1.state"]
       )
     ) {
