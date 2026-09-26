@@ -726,6 +726,99 @@
           font-size: 11px;
         }
 
+        .deep {
+          margin-top: 14px;
+          border: 1px solid #26354a;
+          border-radius: 12px;
+          background: #0a121c;
+          overflow: hidden;
+        }
+
+        .deep > summary {
+          list-style: none;
+          cursor: pointer;
+          padding: 11px 12px;
+          font-weight: 900;
+          color: #dce8f5;
+          border-bottom: 1px solid transparent;
+        }
+
+        .deep[open] > summary {
+          border-bottom-color: #223147;
+        }
+
+        .deep > summary::-webkit-details-marker {
+          display: none;
+        }
+
+        .deep-content {
+          padding: 11px 12px;
+        }
+
+        .breakdown {
+          display: grid;
+          gap: 7px;
+        }
+
+        .breakdown-row {
+          display: grid;
+          grid-template-columns: minmax(0,1fr) auto;
+          gap: 8px;
+          align-items: center;
+          padding: 7px 8px;
+          border: 1px solid #223147;
+          border-radius: 8px;
+          background: #0b141e;
+        }
+
+        .breakdown-row span {
+          color: #aebed0;
+          font-size: 11px;
+        }
+
+        .breakdown-row strong {
+          color: #edf5ff;
+          font-size: 11px;
+        }
+
+        .kv {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 7px;
+        }
+
+        .kv > div {
+          padding: 8px;
+          border: 1px solid #223147;
+          border-radius: 8px;
+          background: #0b141e;
+        }
+
+        .kv span,
+        .kv strong {
+          display: block;
+        }
+
+        .kv span {
+          color: #8091a8;
+          font-size: 9px;
+          text-transform: uppercase;
+          letter-spacing: .08em;
+        }
+
+        .kv strong {
+          margin-top: 3px;
+          color: #dfeafa;
+          font-size: 11px;
+          overflow-wrap: anywhere;
+        }
+
+        .ai-summary {
+          color: #aebdd0;
+          font-size: 11px;
+          line-height: 1.55;
+        }
+
         .buttons {
           display: grid;
           grid-template-columns: 1fr 1fr;
@@ -870,6 +963,66 @@
       .join("");
   }
 
+  function renderScoreBreakdown(match) {
+    const components = match?.matchScore?.components || [];
+
+    if (!components.length) {
+      return '<div class="item"><span>Score breakdown unavailable.</span></div>';
+    }
+
+    return '<div class="breakdown">' +
+      components.map((component) =>
+        '<div class="breakdown-row">' +
+          '<span>' + escapeHtml(component.label || "Evidence") + '</span>' +
+          '<strong>' +
+            escapeHtml(
+              component.points + "/" + component.weight
+            ) +
+          '</strong>' +
+        '</div>'
+      ).join("") +
+    '</div>';
+  }
+
+  function renderTextValues(values, emptyText = "None") {
+    const list = Array.isArray(values) ? values : [];
+
+    if (!list.length) {
+      return '<div class="item"><span>' + escapeHtml(emptyText) + '</span></div>';
+    }
+
+    return list.slice(0, 10).map((value) =>
+      '<div class="item"><span>' + escapeHtml(value) + '</span></div>'
+    ).join("");
+  }
+
+  function renderCoreCompatibility(match, job) {
+    const rows = [
+      ["Role fit", match?.role?.compatible ? "Compatible" : "Needs review"],
+      ["Role family", match?.source?.roleFamily || "Unknown"],
+      ["Seniority", match?.source?.seniority || "Unknown"],
+      [
+        "Candidate experience",
+        match?.experience?.candidateYears == null
+          ? "Unknown"
+          : match.experience.candidateYears + " years"
+      ],
+      ["Job experience", job?.experienceText || "Unknown"],
+      ["Location", job?.location || "Unknown"],
+      ["Location result", match?.location?.status || "Unknown"],
+      ["Work mode", job?.workMode || job?.aiAnalysis?.workMode || "Unknown"]
+    ];
+
+    return '<div class="kv">' +
+      rows.map(([label, value]) =>
+        '<div>' +
+          '<span>' + escapeHtml(label) + '</span>' +
+          '<strong>' + escapeHtml(value) + '</strong>' +
+        '</div>'
+      ).join("") +
+    '</div>';
+  }
+
   function renderPanel() {
     const host = ensureHost();
     const shadow = host.shadowRoot;
@@ -904,8 +1057,7 @@
         </div>
         <div class="buttons">
           <button class="btn full" data-action="retry" type="button">Retry analysis</button>
-          <button class="btn" data-action="back" type="button">Back to Job List</button>
-          <button class="btn" data-action="full-report" type="button">Full report</button>
+          <button class="btn full" data-action="back" type="button">← Back to Job List</button>
         </div>
       `;
       bindActions(shadow);
@@ -950,6 +1102,15 @@
       scoreValue === null ? 0 : scoreValue;
     const scoreLabel =
       match.matchScore?.label || "INSUFFICIENT DATA";
+
+    const job = result.job || {};
+    const ai = job.aiAnalysis || {};
+    const blockers = match.blockers || [];
+    const strengths = match.strengths || [];
+    const gaps = match.gaps || [];
+    const reviewItems = match.review || [];
+    const explicitRequirements = match.explicitRequirements || [];
+    const explicitDisqualifiers = match.explicitDisqualifiers || [];
 
     content.innerHTML = `
       <div class="decision" data-action="${escapeHtml(decision.action)}">
@@ -1001,6 +1162,86 @@
         ${renderItems(decision.cautions, "Nothing important to review.")}
       </div>
 
+      <details class="deep" open>
+        <summary>Deep analysis</summary>
+        <div class="deep-content">
+          <div class="section" style="margin-top:0;border-top:0;padding-top:0">
+            <h4>Match score breakdown</h4>
+            ${renderScoreBreakdown(match)}
+          </div>
+
+          <div class="section">
+            <h4>Role + experience</h4>
+            ${renderCoreCompatibility(match, job)}
+          </div>
+
+          <div class="section">
+            <h4>Hard blockers</h4>
+            ${renderItems(blockers, "No hard blockers found.")}
+          </div>
+
+          <div class="section">
+            <h4>Strong signals</h4>
+            ${renderItems(strengths, "No strong positive signals yet.")}
+          </div>
+
+          <div class="section">
+            <h4>Gaps</h4>
+            ${renderItems(gaps, "No major gaps identified.")}
+          </div>
+
+          <div class="section">
+            <h4>Needs review</h4>
+            ${renderItems(reviewItems, "Nothing additional to review.")}
+          </div>
+
+          <div class="section">
+            <h4>Explicit requirements</h4>
+            ${renderTextValues(explicitRequirements, "No explicit must-have statements identified.")}
+          </div>
+
+          <div class="section">
+            <h4>Explicit constraints</h4>
+            ${renderTextValues(explicitDisqualifiers, "No explicit disqualifiers identified.")}
+          </div>
+
+          <div class="section">
+            <h4>Puter AI interpretation</h4>
+            <div class="kv">
+              <div>
+                <span>Role family</span>
+                <strong>${escapeHtml(ai.roleFamily || "Unknown")}</strong>
+              </div>
+              <div>
+                <span>Seniority</span>
+                <strong>${escapeHtml(ai.seniority || "Unknown")}</strong>
+              </div>
+              <div>
+                <span>Domain</span>
+                <strong>${escapeHtml(ai.domain || "Unknown")}</strong>
+              </div>
+              <div>
+                <span>Employment type</span>
+                <strong>${escapeHtml(ai.employmentType || job.employmentType || "Unknown")}</strong>
+              </div>
+            </div>
+            <div class="ai-summary" style="margin-top:8px">
+              ${escapeHtml(ai.summary || "AI summary not available.")}
+            </div>
+          </div>
+
+          <div class="section">
+            <h4>Responsibilities</h4>
+            ${renderTextValues(
+              ai.responsibilities?.length
+                ? ai.responsibilities
+                : job.responsibilities,
+              "No responsibilities were structured."
+            )}
+          </div>
+        </div>
+      </details>
+
       <div class="legend">
         <span><i class="dot green"></i>matched required</span>
         <span><i class="dot red"></i>missing required</span>
@@ -1010,12 +1251,11 @@
 
       <div class="buttons">
         <button class="btn primary" data-action="back" type="button">← Back to Job List</button>
-        <button class="btn" data-action="refresh" type="button">Refresh</button>
-        <button class="btn full" data-action="full-report" type="button">Open Full Analysis</button>
+        <button class="btn" data-action="refresh" type="button">Refresh analysis</button>
       </div>
 
       <div class="note">
-        Match % ranks compatibility. APPLY / REVIEW FIRST / SKIP still takes precedence when JobPilot finds a blocker or unresolved mandatory requirement.
+        Full deep analysis now stays on this job page. Match % ranks compatibility; APPLY / REVIEW FIRST / SKIP takes precedence when a blocker or unresolved mandatory requirement exists.
       </div>
     `;
 
@@ -1035,13 +1275,6 @@
       .querySelector('[data-action="retry"]')
       ?.addEventListener("click", () => analyzeCurrent(false));
 
-    shadow
-      .querySelector('[data-action="full-report"]')
-      ?.addEventListener("click", () => {
-        chrome.runtime.sendMessage({
-          type: "jobpilot:open-full-match"
-        });
-      });
   }
 
   async function backToList() {
