@@ -46,6 +46,7 @@ async function injectJobPilotIntoNaukri(tabId, url, reason = "background") {
         "portals/naukri/listing.js",
         "portals/naukri/detail.js",
         "portals/naukri/adapter.js",
+        "core/relevance-gate.js",
         "content/portal-runtime.js"
       ]
     });
