@@ -249,6 +249,8 @@
 
   function verifySearch(session, native) {
     const params = new URLSearchParams(location.search);
+    const keywordParam = params.get("k") || "";
+    const locationParam = params.get("l") || "";
     const experienceParam = params.get("experience") || "";
     const ageParam = params.get("jobAge") || "";
     const cityParams = params.getAll("cityTypeGid").filter(Boolean);
@@ -257,53 +259,60 @@
     const locationDom = findInputValue("location");
 
     const checks = [];
+    const requestedKeyword = session.keywords || session.primaryRole || "";
 
     checks.push(
       makeCheck(
-        "Search role",
-        session.keywords || session.primaryRole || "",
-        pathContainsSearch(session)
-          ? location.pathname
-          : keywordDom || "Not found",
-        pathContainsSearch(session)
+        "Search keywords",
+        requestedKeyword,
+        keywordParam || keywordDom || location.pathname,
+        keywordParam && norm(keywordParam) === norm(requestedKeyword)
           ? "verified"
-          : keywordDom &&
-              norm(keywordDom) === norm(session.keywords || session.primaryRole)
+          : keywordDom && norm(keywordDom) === norm(requestedKeyword)
             ? "verified"
-            : "unverified",
-        pathContainsSearch(session)
-          ? "URL path"
+            : pathContainsSearch(session)
+              ? "verified"
+              : "unverified",
+        keywordParam
+          ? "URL k"
           : keywordDom
             ? "Page input"
-            : "None"
+            : pathContainsSearch(session)
+              ? "URL path"
+              : "None"
       )
     );
 
     if (Array.isArray(session.locations) && session.locations.length) {
+      const requestedLocations = session.locations.join(", ");
       checks.push(
         makeCheck(
-          "Primary location",
-          session.locations[0],
-          pathContainsPrimaryLocation(session)
-            ? location.pathname
-            : locationDom || "Not found",
-          pathContainsPrimaryLocation(session)
+          "Location",
+          requestedLocations,
+          locationParam || locationDom || location.pathname,
+          locationParam && norm(locationParam) === norm(requestedLocations)
             ? "verified"
             : locationDom &&
-                norm(locationDom).includes(norm(session.locations[0]))
+                session.locations.every((item) =>
+                  norm(locationDom).includes(norm(item))
+                )
               ? "verified"
-              : "unverified",
-          pathContainsPrimaryLocation(session)
-            ? "URL path"
+              : pathContainsPrimaryLocation(session) && session.locations.length === 1
+                ? "verified"
+                : "unverified",
+          locationParam
+            ? "URL l"
             : locationDom
               ? "Page input"
-              : "None"
+              : pathContainsPrimaryLocation(session)
+                ? "URL path"
+                : "None"
         )
       );
     } else {
       checks.push(
         makeCheck(
-          "Primary location",
+          "Location",
           "No restriction",
           "Not requested",
           "neutral",
