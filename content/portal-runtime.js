@@ -261,19 +261,27 @@
     if (data.pageType === "listing") {
       const stats = data.stats || {};
 
+      const relevance = data.relevanceStats || {
+        relevant: 0,
+        review: 0,
+        filtered: 0
+      };
+
       html +=
         '<div class="jpp-metrics">' +
-          '<div><strong>' + Number(stats.detected || 0) + '</strong><span>Detected</span></div>' +
-          '<div><strong>' + Number(stats.normalized || 0) + '</strong><span>Normalized</span></div>' +
-          '<div><strong>' + Math.max(0, Number(stats.detected || 0) - Number(stats.normalized || 0)) + '</strong><span>Failed</span></div>' +
+          '<div><strong>' + Number(stats.detected || 0) + '</strong><span>Extracted</span></div>' +
+          '<div><strong>' + Number(relevance.relevant || 0) + '</strong><span>Relevant</span></div>' +
+          '<div><strong>' + Number(relevance.filtered || 0) + '</strong><span>Filtered</span></div>' +
         '</div>' +
         '<div class="jpp-levels">' +
-          '<span>HIGH ' + Number(stats.high || 0) + '</span>' +
-          '<span>MEDIUM ' + Number(stats.medium || 0) + '</span>' +
-          '<span>LOW ' + Number(stats.low || 0) + '</span>' +
+          '<span>RELEVANT ' + Number(relevance.relevant || 0) + '</span>' +
+          '<span>REVIEW ' + Number(relevance.review || 0) + '</span>' +
+          '<span>FILTERED ' + Number(relevance.filtered || 0) + '</span>' +
         '</div>';
 
-      const sample = (data.jobs || []).slice(0, 3);
+      const sample = (data.jobs || [])
+        .filter((job) => job.relevance?.status !== "filtered")
+        .slice(0, 3);
 
       if (sample.length) {
         html +=
@@ -285,7 +293,7 @@
                   '<b>' + escapeHtml(job.title || "Untitled") + '</b>' +
                   '<span>' + escapeHtml(job.company || "Company unknown") + '</span>' +
                   '<em class="jpp-' + confidenceClass(confidence.level) + '">' +
-                    escapeHtml("Extraction " + (confidence.level || "LOW")) +
+                    escapeHtml((job.relevance?.status || "review").toUpperCase()) +
                   '</em>' +
                 '</div>'
               );
@@ -340,6 +348,15 @@
       await publishConnection(adapter, pageType);
 
       const data = captureWithAdapter(adapter, pageType);
+
+      if (data.pageType === "listing" && globalThis.JobPilotRelevanceGate) {
+        const prefResult = await chrome.storage.local.get("jobpilot.stage2.preferences");
+        const preferences = prefResult["jobpilot.stage2.preferences"] || {};
+        const annotated = globalThis.JobPilotRelevanceGate.annotateJobs(data.jobs, preferences);
+        data.jobs = annotated.jobs;
+        data.relevanceStats = annotated.stats;
+      }
+
       render(data);
       await persistCapture(data);
     } catch (error) {
