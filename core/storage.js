@@ -1319,7 +1319,7 @@ function appliedJobKey(job) {
 
   const url = String(job?.canonicalUrl || "")
     .split("#")[0]
-    .replace(//+$/, "")
+    .replace(/\/+$/, "")
     .toLowerCase();
 
   if (url) return url;
