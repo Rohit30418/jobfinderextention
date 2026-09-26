@@ -299,3 +299,41 @@ AI does not override portal facts
 ```
 
 The Stage 5 result is saved on the normalized job and is recalculated when the profile, preferences, captured job or Puter AI analysis changes.
+
+
+### Application decision
+
+Stage 5 now includes a deterministic application action on top of the deep-match verdict:
+
+- `APPLY`
+- `REVIEW FIRST`
+- `SKIP`
+
+This is intentionally separate from match quality.
+
+Example:
+
+```text
+Deep Match: STRONG FIT
+Application Decision: REVIEW FIRST
+Reason: TypeScript is identified as a required skill but is missing from the saved profile.
+```
+
+Decision rules:
+
+```text
+hard blocker
+→ SKIP
+
+no hard blocker + important unresolved requirement/gap
+→ REVIEW FIRST
+
+no hard blocker + role compatible + experience acceptable
++ all identified required skills covered
++ location not contradicted + reliable evidence
+→ APPLY
+```
+
+Preferred-skill gaps and unscored salary alone do not automatically stop an `APPLY` decision.
+
+JobPilot never auto-applies and never prevents the user from opening a job after `SKIP`. The decision is an explainable workflow aid, not an automatic application action.
