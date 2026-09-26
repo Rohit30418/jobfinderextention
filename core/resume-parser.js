@@ -12,7 +12,7 @@ async function parsePdf(file) {
   globalThis.pdfjsLib.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL("vendor/pdf.worker.min.js");
 
   const data = new Uint8Array(await file.arrayBuffer());
-  const task = globalThis.pdfjsLib.getDocument({ data });
+  const task = globalThis.pdfjsLib.getDocument({ data, isEvalSupported: false });
   const pdf = await task.promise;
   const pages = [];
 
