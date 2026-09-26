@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "JobPilot - Universal Job Portal Assistant",
-  "version": "1.6.0",
-  "description": "JobPilot 1.6: persistent Skill Vault, automatic gap capture, add/remove/dismiss skill controls, AI matching, and safe backup/restore.",
+  "version": "1.6.1",
+  "description": "JobPilot 1.6.1: persistent Skill Vault plus applied-job tracking with CSV/JSON export and detail-page Mark Applied.",
   "permissions": [
     "storage",
     "unlimitedStorage",
