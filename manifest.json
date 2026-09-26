@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "JobPilot - Universal Job Portal Assistant",
-  "version": "1.4.1",
-  "description": "JobPilot 1.4.1: portal-specific injection and dedicated listing/detail adapters for Naukri, Foundit, LinkedIn Jobs, Indeed and Hirist.",
+  "version": "1.4.2",
+  "description": "JobPilot 1.4.2: stricter role-family filtering and AI/deep-match-aware recommended job list across supported portals.",
   "permissions": [
     "storage",
     "unlimitedStorage",
