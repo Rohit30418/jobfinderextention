@@ -13,13 +13,13 @@ import { evaluateDeepMatch } from "./core/match-engine.js";
 const SETUP_PAGE = "onboarding/onboarding.html";
 const PREFERENCES_PAGE = "preferences/preferences.html";
 const NAUKRI_PAGE = "stage3/naukri.html";
-const EXTRACTOR_PAGE = "stage4/extractor.html";
-const MATCH_PAGE = "stage5/match.html";
+const JOB_LIST_PAGE = "stage6/list.html";
 
 const STATE_KEY = "jobpilot.stage1.state";
 const PREFERENCES_KEY = "jobpilot.stage2.preferences";
 const NAUKRI_SEARCH_KEY = "jobpilot.stage3.naukriSearch";
 const PORTAL_CAPTURE_KEY = "jobpilot.stage4.portalCapture";
+const LISTING_CONTEXT_KEY = "jobpilot.stage6.listingContext";
 const INJECTION_STATUS_KEY = "jobpilot.naukri.injectionStatus";
 
 const NAUKRI_HOST_RE = /^https:\/\/(?:[^/]+\.)?naukri\.com\//i;
@@ -239,17 +239,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
-  if (message?.type === "jobpilot:open-full-match") {
-    openPage(MATCH_PAGE);
-    sendResponse({ ok: true });
-    return false;
-  }
-
-  if (message?.type === "jobpilot:open-stage4") {
-    openPage(EXTRACTOR_PAGE);
-    sendResponse({ ok: true });
-    return false;
-  }
 
   return false;
 });
@@ -306,7 +295,8 @@ chrome.action.onClicked.addListener(async (tab) => {
     STATE_KEY,
     PREFERENCES_KEY,
     NAUKRI_SEARCH_KEY,
-    PORTAL_CAPTURE_KEY
+    PORTAL_CAPTURE_KEY,
+    LISTING_CONTEXT_KEY
   ]);
 
   const hasProfile = Boolean(
@@ -325,14 +315,11 @@ chrome.action.onClicked.addListener(async (tab) => {
   const search = result[NAUKRI_SEARCH_KEY];
   const hasSearch = Boolean(search && search.createdAt);
 
-  const capture = result[PORTAL_CAPTURE_KEY];
-  const hasExtraction = Boolean(
-    capture &&
-    capture.capturedAt &&
-    (
-      capture.pageType === "listing" ||
-      capture.pageType === "detail"
-    )
+  const listingContext = result[LISTING_CONTEXT_KEY];
+  const hasListing = Boolean(
+    listingContext &&
+    Array.isArray(listingContext.jobs) &&
+    listingContext.jobs.length
   );
 
   if (!hasProfile) {
@@ -345,23 +332,12 @@ chrome.action.onClicked.addListener(async (tab) => {
     return;
   }
 
-  if (!hasSearch) {
-    openPage(NAUKRI_PAGE);
+  if (hasListing) {
+    openPage(JOB_LIST_PAGE);
     return;
   }
 
-  const hasDeepMatch = Boolean(
-    capture &&
-    capture.pageType === "detail" &&
-    capture.detail &&
-    capture.detail.deepMatch
-  );
-
-  openPage(
-    hasDeepMatch
-      ? MATCH_PAGE
-      : hasExtraction
-        ? EXTRACTOR_PAGE
-        : NAUKRI_PAGE
-  );
+  // Search setup is the only extension page needed before a list exists.
+  // Detail analysis stays on the portal website itself.
+  openPage(NAUKRI_PAGE);
 });
