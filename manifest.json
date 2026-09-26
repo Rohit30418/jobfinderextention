@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "JobPilot - Universal Job Portal Assistant",
-  "version": "0.8.0",
-  "description": "Stage 5 deep match: deterministic blockers, role fit, skill coverage, experience/location checks, gaps and evidence confidence.",
+  "version": "0.8.1",
+  "description": "Stage 5 application decision: deterministic APPLY / REVIEW FIRST / SKIP on top of evidence-based deep match.",
   "permissions": [
     "storage",
     "unlimitedStorage",
