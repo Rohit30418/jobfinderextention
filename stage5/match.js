@@ -332,6 +332,13 @@ async function calculateAndSave() {
       currentJob
     );
 
+    match.inputs = {
+      profileUpdatedAt: state.updatedAt || null,
+      preferencesUpdatedAt: preferences.updatedAt || null,
+      jobCapturedAt: currentJob.capturedAt || null,
+      aiAnalyzedAt: currentJob.aiAnalyzedAt || null
+    };
+
     await saveJobDeepMatch(
       currentJob.key,
       match
@@ -413,7 +420,16 @@ async function initialize() {
 
   const existing = currentJob.deepMatch;
 
-  if (existing) {
+  const existingFresh = Boolean(
+    existing &&
+    existing.version === 1 &&
+    existing.inputs?.profileUpdatedAt === (state.updatedAt || null) &&
+    existing.inputs?.preferencesUpdatedAt === (preferences.updatedAt || null) &&
+    existing.inputs?.jobCapturedAt === (currentJob.capturedAt || null) &&
+    existing.inputs?.aiAnalyzedAt === (currentJob.aiAnalyzedAt || null)
+  );
+
+  if (existingFresh) {
     renderMatch(existing, currentJob);
   } else {
     await calculateAndSave();
