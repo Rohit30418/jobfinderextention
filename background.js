@@ -35,7 +35,6 @@ async function injectJobPilotIntoNaukri(tabId, url, reason = "background") {
     await chrome.scripting.insertCSS({
       target: { tabId },
       files: [
-        "content/naukri-detector.css",
         "content/portal-runtime.css"
       ]
     });
@@ -43,7 +42,6 @@ async function injectJobPilotIntoNaukri(tabId, url, reason = "background") {
     await chrome.scripting.executeScript({
       target: { tabId },
       files: [
-        "content/naukri-detector.js",
         "core/portal-engine.js",
         "portals/naukri/listing.js",
         "portals/naukri/detail.js",
