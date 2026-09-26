@@ -9,7 +9,9 @@ function clean(value) {
     .replace(/vue\.?js/g, "vue")
     .replace(/angular\.?js/g, "angular")
     .replace(/java\s*script/g, "javascript")
+    .replace(/\bjs\b/g, "javascript")
     .replace(/type\s*script/g, "typescript")
+    .replace(/\bts\b/g, "typescript")
     .replace(/restful/g, "rest")
     .replace(/\bapis\b/g, "api")
     .replace(/redux toolkit/g, "redux")
@@ -170,18 +172,24 @@ function skillMatch(candidateSkillList, jobSkillList) {
       const candidateTokens = tokens(candidate.normalized);
       const jobTokens = tokens(normalized);
 
-      if (jobTokens.length === 1 && candidateTokens.includes(jobTokens[0])) {
+      const candidateSet = new Set(candidateTokens);
+      const jobSet = new Set(jobTokens);
+
+      if (
+        jobTokens.length &&
+        jobTokens.every((token) => candidateSet.has(token))
+      ) {
         return true;
       }
 
-      if (candidateTokens.length === 1 && jobTokens.includes(candidateTokens[0])) {
+      if (
+        candidateTokens.length &&
+        candidateTokens.every((token) => jobSet.has(token))
+      ) {
         return true;
       }
 
-      return (
-        candidate.normalized.includes(normalized) ||
-        normalized.includes(candidate.normalized)
-      );
+      return false;
     });
 
     (hit ? matched : missing).push(skill);
@@ -628,6 +636,17 @@ export function evaluateDeepMatch(profile, preferences, job) {
     });
   }
 
+  if (preferences?.minimumSalary !== null && preferences?.minimumSalary !== undefined) {
+    review.push({
+      code: "salary-not-scored",
+      label: "Minimum salary is not scored in Stage 5 v1",
+      detail:
+        job?.salaryText
+          ? "Portal salary: " + job.salaryText + ". Universal salary normalization is not enabled yet."
+          : "The job did not expose a reliable salary."
+    });
+  }
+
   const explicitRequirements = unique(
     job?.aiAnalysis?.mustHaveRequirements || job?.requirementStatements || [],
     30
@@ -658,7 +677,8 @@ export function evaluateDeepMatch(profile, preferences, job) {
   } else if (
     role.compatible &&
     experience.candidateStatus !== "below" &&
-    (requiredCoverage === null || requiredCoverage >= 0.75) &&
+    requiredCoverage !== null &&
+    requiredCoverage >= 0.75 &&
     gaps.length <= 1
   ) {
     verdict = "STRONG FIT";
