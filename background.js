@@ -335,20 +335,28 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }
 
         const jobs = Array.isArray(message.jobs)
-          ? message.jobs.slice(0, 30)
+          ? message.jobs.slice(0, 120)
           : [];
 
         if (!jobs.length) {
           throw new Error("No captured jobs are available to rank.");
         }
 
-        const rankings = await analyzeJobBatchForCandidate(
-          state.profile,
-          preferences,
-          jobs
-        );
+        const rankings = [];
+        const batchSize = 20;
 
-        await saveJobAiRankings(rankings);
+        for (let index = 0; index < jobs.length; index += batchSize) {
+          const batch = jobs.slice(index, index + batchSize);
+
+          const batchRankings = await analyzeJobBatchForCandidate(
+            state.profile,
+            preferences,
+            batch
+          );
+
+          rankings.push(...batchRankings);
+          await saveJobAiRankings(batchRankings);
+        }
 
         sendResponse({
           ok: true,
