@@ -254,3 +254,48 @@ https://rohit30418.github.io/jobfinderextention/puter-auth.html
 GitHub Pages must use **GitHub Actions** as the publishing source for the repository. This is a one-time repository setting if Pages has not been enabled before.
 
 The bridge itself does not persist the Puter token. It sends the result back to the exact JobPilot popup opener, while the extension validates the bridge origin, popup window, and a per-attempt random state before accepting the token.
+
+
+## Stage 5 — Deep Match
+
+Stage 5 compares one normalized detail job against:
+
+- the saved Stage 1 candidate profile
+- Stage 2 preferences
+- verified Stage 4 portal facts
+- optional Puter AI JD enrichment
+
+It produces one of:
+
+- `STRONG FIT`
+- `POSSIBLE FIT`
+- `WEAK FIT`
+- `REVIEW`
+- `BLOCKED`
+
+Stage 5 v1 intentionally does **not** display a candidate/job percentage.
+
+The engine keeps separate evidence buckets for:
+
+- hard blockers
+- strengths
+- gaps
+- unknown/review items
+- required skills
+- preferred skills
+- experience
+- role family
+- location
+- work mode
+- employment type
+
+Important false-positive guards include:
+
+```text
+Java != JavaScript
+generic "Developer" / "Engineer" words do not create a role match
+unknown fields do not count as positive evidence
+AI does not override portal facts
+```
+
+The Stage 5 result is saved on the normalized job and is recalculated when the profile, preferences, captured job or Puter AI analysis changes.
