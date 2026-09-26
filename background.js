@@ -5,9 +5,13 @@ import {
   getPreferences,
   getState,
   saveJobAiAnalysis,
+  saveJobAiRankings,
   saveJobDeepMatch
 } from "./core/storage.js";
-import { analyzeJobWithAi } from "./core/puter-client.js";
+import {
+  analyzeJobBatchForCandidate,
+  analyzeJobWithAi
+} from "./core/puter-client.js";
 import { evaluateDeepMatch } from "./core/match-engine.js";
 
 const SETUP_PAGE = "onboarding/onboarding.html";
@@ -314,6 +318,54 @@ async function injectJobPilotIntoPortal(tabId, url, reason = "background") {
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message?.type === "jobpilot:rank-list-ai") {
+    (async () => {
+      try {
+        const [state, preferences] = await Promise.all([
+          getState(),
+          getPreferences()
+        ]);
+
+        if (!state?.profile) {
+          throw new Error("Save your Stage 1 profile first.");
+        }
+
+        if (!preferences?.updatedAt) {
+          throw new Error("Save your Stage 2 preferences first.");
+        }
+
+        const jobs = Array.isArray(message.jobs)
+          ? message.jobs.slice(0, 30)
+          : [];
+
+        if (!jobs.length) {
+          throw new Error("No captured jobs are available to rank.");
+        }
+
+        const rankings = await analyzeJobBatchForCandidate(
+          state.profile,
+          preferences,
+          jobs
+        );
+
+        await saveJobAiRankings(rankings);
+
+        sendResponse({
+          ok: true,
+          rankings,
+          count: rankings.length
+        });
+      } catch (error) {
+        sendResponse({
+          ok: false,
+          error: error?.message || String(error)
+        });
+      }
+    })();
+
+    return true;
+  }
+
   if (message?.type === "jobpilot:inline-analyze") {
     (async () => {
       try {
