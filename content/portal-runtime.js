@@ -366,6 +366,8 @@
   }, 900);
 
   const observer = new MutationObserver((mutations) => {
+    cleanupLegacyOverlays();
+
     const onlyOwn = mutations.every((mutation) => {
       const target = mutation.target instanceof Element
         ? mutation.target
