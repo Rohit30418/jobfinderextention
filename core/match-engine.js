@@ -152,20 +152,52 @@ function candidateSkills(profile) {
   return unique(items, 160);
 }
 
-function skillMatch(candidateSkillList, jobSkillList) {
+function skillMatch(candidateSkillList, jobSkillList, semanticMatches = []) {
   const candidateNormalized = candidateSkillList.map((skill) => ({
     raw: skill,
     normalized: clean(skill)
   }));
 
+  const semantic = (Array.isArray(semanticMatches) ? semanticMatches : [])
+    .map((item) => ({
+      ...item,
+      requirementNormalized: clean(item?.requirement)
+    }))
+    .filter((item) => item.requirementNormalized);
+
   const matched = [];
+  const exact = [];
+  const inferred = [];
+  const partial = [];
   const missing = [];
+  const evidence = {};
+
+  function semanticFor(skill) {
+    const normalized = clean(skill);
+    if (!normalized) return null;
+
+    return semantic.find((item) => {
+      if (item.requirementNormalized === normalized) return true;
+
+      const a = tokens(item.requirementNormalized);
+      const b = tokens(normalized);
+      if (!a.length || !b.length) return false;
+
+      const aSet = new Set(a);
+      const bSet = new Set(b);
+
+      return (
+        a.every((token) => bSet.has(token)) ||
+        b.every((token) => aSet.has(token))
+      );
+    }) || null;
+  }
 
   for (const skill of unique(jobSkillList, 80)) {
     const normalized = clean(skill);
     if (!normalized) continue;
 
-    const hit = candidateNormalized.some((candidate) => {
+    const directHit = candidateNormalized.some((candidate) => {
       if (!candidate.normalized) return false;
       if (candidate.normalized === normalized) return true;
 
@@ -192,10 +224,62 @@ function skillMatch(candidateSkillList, jobSkillList) {
       return false;
     });
 
-    (hit ? matched : missing).push(skill);
+    if (directHit) {
+      matched.push(skill);
+      exact.push(skill);
+      evidence[skill] = {
+        status: "EXACT",
+        evidence: [],
+        explanation: "Matched directly against saved candidate skills."
+      };
+      continue;
+    }
+
+    const semanticHit = semanticFor(skill);
+    const status = String(semanticHit?.status || "").toUpperCase();
+
+    if (status === "EXACT") {
+      matched.push(skill);
+      exact.push(skill);
+    } else if (status === "INFERRED") {
+      matched.push(skill);
+      inferred.push(skill);
+    } else if (status === "PARTIAL") {
+      partial.push(skill);
+    } else {
+      missing.push(skill);
+    }
+
+    evidence[skill] = semanticHit
+      ? {
+          status: status || "MISSING",
+          evidence: Array.isArray(semanticHit.evidence)
+            ? semanticHit.evidence
+            : [],
+          explanation: String(semanticHit.explanation || "")
+        }
+      : {
+          status: "MISSING",
+          evidence: [],
+          explanation: "No supporting candidate evidence was found."
+        };
   }
 
-  return { matched, missing };
+  const total = exact.length + inferred.length + partial.length + missing.length;
+  const weightedMatched =
+    exact.length +
+    inferred.length +
+    partial.length * 0.5;
+
+  return {
+    matched,
+    exact,
+    inferred,
+    partial,
+    missing,
+    evidence,
+    weightedCoverage: total > 0 ? weightedMatched / total : null
+  };
 }
 
 function roleCompatibility(profile, preferences, job) {
@@ -502,7 +586,11 @@ function buildMatchScore({
     assessed: requiredSkills.length > 0,
     ratio:
       requiredSkills.length > 0
-        ? required.matched.length / requiredSkills.length
+        ? (
+            Number.isFinite(required.weightedCoverage)
+              ? required.weightedCoverage
+              : required.matched.length / requiredSkills.length
+          )
         : 0,
     detail:
       requiredSkills.length > 0
@@ -546,7 +634,11 @@ function buildMatchScore({
     assessed: preferredSkills.length > 0,
     ratio:
       preferredSkills.length > 0
-        ? preferred.matched.length / preferredSkills.length
+        ? (
+            Number.isFinite(preferred.weightedCoverage)
+              ? preferred.weightedCoverage
+              : preferred.matched.length / preferredSkills.length
+          )
         : 0,
     detail:
       preferredSkills.length > 0
@@ -921,8 +1013,20 @@ export function evaluateDeepMatch(profile, preferences, job) {
       : job?.preferredSkills || []
   );
 
-  const required = skillMatch(candidateSkillList, requiredSkills);
-  const preferred = skillMatch(candidateSkillList, preferredSkills);
+  const semanticMatches =
+    job?.aiAnalysis?.candidateRequirementMatches || [];
+
+  const required = skillMatch(
+    candidateSkillList,
+    requiredSkills,
+    semanticMatches
+  );
+
+  const preferred = skillMatch(
+    candidateSkillList,
+    preferredSkills,
+    semanticMatches
+  );
 
   const role = roleCompatibility(profile, preferences, job);
   const experience = experienceCheck(profile, preferences, job);
@@ -1119,7 +1223,13 @@ export function evaluateDeepMatch(profile, preferences, job) {
   const requiredTotal = requiredSkills.length;
   const requiredMatched = required.matched.length;
   const requiredCoverage =
-    requiredTotal > 0 ? requiredMatched / requiredTotal : null;
+    requiredTotal > 0
+      ? (
+          Number.isFinite(required.weightedCoverage)
+            ? required.weightedCoverage
+            : requiredMatched / requiredTotal
+        )
+      : null;
 
   let verdict = "REVIEW";
 
@@ -1198,13 +1308,22 @@ export function evaluateDeepMatch(profile, preferences, job) {
       required: {
         all: requiredSkills,
         matched: required.matched,
+        exact: required.exact,
+        inferred: required.inferred,
+        partial: required.partial,
         missing: required.missing,
+        evidence: required.evidence,
         coverage: requiredCoverage
       },
       preferred: {
         all: preferredSkills,
         matched: preferred.matched,
-        missing: preferred.missing
+        exact: preferred.exact,
+        inferred: preferred.inferred,
+        partial: preferred.partial,
+        missing: preferred.missing,
+        evidence: preferred.evidence,
+        coverage: preferred.weightedCoverage
       }
     },
 
