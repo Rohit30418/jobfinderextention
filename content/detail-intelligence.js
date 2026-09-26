@@ -86,14 +86,52 @@
   }
 
   function detailRoot() {
-    const selectors = [
-      ".dang-inner-html",
-      ".jobDescription",
-      "[class*='jobDescription']",
-      "[class*='job-desc']"
+    const host = location.hostname.toLowerCase();
+
+    const portalSelectors =
+      host.includes("linkedin.com")
+        ? [
+            ".jobs-description__content",
+            ".jobs-box__html-content",
+            ".show-more-less-html__markup",
+            ".description__text"
+          ]
+        : host.includes("indeed.com")
+          ? [
+              "#jobDescriptionText",
+              ".jobsearch-jobDescriptionText",
+              "[class*='jobDescription']"
+            ]
+          : host.includes("foundit.in")
+            ? [
+                "[class*='job-description']",
+                "[class*='jobDescription']",
+                "[class*='jd-desc']",
+                "[class*='description']"
+              ]
+            : host.includes("hirist.tech")
+              ? [
+                  "[class*='job-description']",
+                  "[class*='jobDescription']",
+                  "[class*='description']"
+                ]
+              : [
+                  ".dang-inner-html",
+                  ".jobDescription",
+                  "[class*='jobDescription']",
+                  "[class*='job-desc']"
+                ];
+
+    const fallbackSelectors = [
+      "[itemprop='description']",
+      "[data-testid*='jobDescription']",
+      "[data-testid*='job-description']"
     ];
 
-    for (const selector of selectors) {
+    for (const selector of [
+      ...portalSelectors,
+      ...fallbackSelectors
+    ]) {
       try {
         const node = document.querySelector(selector);
         if (node) return node;
@@ -1282,9 +1320,19 @@
       const result = await chrome.storage.local.get(
         LISTING_CONTEXT_KEY
       );
-      const context = result[LISTING_CONTEXT_KEY];
 
-      if (context?.sourceUrl) {
+      const context = result[LISTING_CONTEXT_KEY];
+      const currentPortal =
+        latestResult?.job?.portal || "";
+
+      if (
+        context?.sourceUrl &&
+        (
+          !currentPortal ||
+          !context.portal ||
+          context.portal === currentPortal
+        )
+      ) {
         location.href = context.sourceUrl;
         return;
       }
