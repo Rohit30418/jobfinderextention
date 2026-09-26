@@ -173,8 +173,30 @@
       ...(data.detail ? [data.detail] : [])
     ];
 
+    let cacheAfterUpdate = null;
+
     if (allJobs.length) {
-      await updateCache(allJobs);
+      cacheAfterUpdate = await updateCache(allJobs);
+    }
+
+    if (data.detail && cacheAfterUpdate) {
+      const existingKey = findExistingJobKey(
+        cacheAfterUpdate,
+        data.detail
+      );
+
+      const cachedDetail =
+        existingKey && cacheAfterUpdate[existingKey]
+          ? cacheAfterUpdate[existingKey]
+          : null;
+
+      if (cachedDetail?.aiAnalysis) {
+        data.detail = {
+          ...data.detail,
+          aiAnalysis: cachedDetail.aiAnalysis,
+          aiAnalyzedAt: cachedDetail.aiAnalyzedAt || null
+        };
+      }
     }
 
     await chrome.storage.local.set({
