@@ -11,6 +11,7 @@
   const CAPTURE_KEY = "jobpilot.stage4.portalCapture";
   const CACHE_KEY = "jobpilot.jobs.cache";
   const LISTING_CONTEXT_KEY = "jobpilot.stage6.listingContext";
+  const LISTING_CONTEXTS_KEY = "jobpilot.stage6.listingContexts";
   const CONNECTION_KEY = "jobpilot.stage4.connection";
   const ROOT_ID = "jobpilot-portal-stage4";
   const MAX_CACHE = 300;
@@ -219,7 +220,7 @@
     };
 
     if (data.pageType === "listing") {
-      nextStorage[LISTING_CONTEXT_KEY] = {
+      const listingContext = {
         version: 1,
         portal: data.portal || "",
         portalName: data.portalName || data.portal || "",
@@ -231,6 +232,35 @@
           filtered: 0
         },
         capturedAt
+      };
+
+      nextStorage[LISTING_CONTEXT_KEY] = listingContext;
+
+      const existing = await chrome.storage.local.get(
+        LISTING_CONTEXTS_KEY
+      );
+
+      const contexts =
+        existing[LISTING_CONTEXTS_KEY] &&
+        typeof existing[LISTING_CONTEXTS_KEY] === "object"
+          ? existing[LISTING_CONTEXTS_KEY]
+          : {
+              version: 1,
+              portals: {},
+              updatedAt: null
+            };
+
+      const portalKey =
+        String(data.portal || "unknown").trim() ||
+        "unknown";
+
+      nextStorage[LISTING_CONTEXTS_KEY] = {
+        version: 1,
+        portals: {
+          ...(contexts.portals || {}),
+          [portalKey]: listingContext
+        },
+        updatedAt: capturedAt
       };
     }
 
