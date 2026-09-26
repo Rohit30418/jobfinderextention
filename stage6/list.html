@@ -41,6 +41,7 @@
         <div><strong id="reviewCount">0</strong><span>Review</span></div>
         <div><strong id="filteredCount">0</strong><span>Filtered</span></div>
         <div><strong id="analyzedCount">0</strong><span>Deep analyzed</span></div>
+        <div><strong id="appliedCount">0</strong><span>Applied</span></div>
       </div>
 
       <div class="portal-sources" id="portalSources"></div>
@@ -74,6 +75,22 @@
         If you genuinely have a recurring skill but it is missing from your saved profile/resume, surface it with real evidence.
         If you do not have it, treat it as a learning target — do not add skills you cannot support.
       </div>
+    </section>
+
+    <section class="panel applied-panel">
+      <div class="summary-head">
+        <div>
+          <div class="kicker">APPLICATION TRACKER</div>
+          <h2>Your applied jobs</h2>
+          <p id="appliedSummary">Mark jobs as applied and export the history anytime.</p>
+        </div>
+        <div class="applied-head-actions">
+          <div class="status" id="appliedStatus">0 applied</div>
+          <button class="btn ghost" id="exportAppliedCsvBtn" type="button">Export Applied CSV</button>
+          <button class="btn ghost" id="exportAppliedJsonBtn" type="button">Export Applied JSON</button>
+        </div>
+      </div>
+      <div id="appliedList" class="applied-list"></div>
     </section>
 
     <section class="panel skill-vault-panel">
