@@ -2,6 +2,7 @@ const SETUP_PAGE = "onboarding/onboarding.html";
 const PREFERENCES_PAGE = "preferences/preferences.html";
 const NAUKRI_PAGE = "stage3/naukri.html";
 const EXTRACTOR_PAGE = "stage4/extractor.html";
+const MATCH_PAGE = "stage5/match.html";
 
 const STATE_KEY = "jobpilot.stage1.state";
 const PREFERENCES_KEY = "jobpilot.stage2.preferences";
@@ -170,5 +171,18 @@ chrome.action.onClicked.addListener(async (tab) => {
     return;
   }
 
-  openPage(hasExtraction ? EXTRACTOR_PAGE : NAUKRI_PAGE);
+  const hasDeepMatch = Boolean(
+    capture &&
+    capture.pageType === "detail" &&
+    capture.detail &&
+    capture.detail.deepMatch
+  );
+
+  openPage(
+    hasDeepMatch
+      ? MATCH_PAGE
+      : hasExtraction
+        ? EXTRACTOR_PAGE
+        : NAUKRI_PAGE
+  );
 });
