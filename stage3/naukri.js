@@ -306,10 +306,12 @@ async function refreshDiagnostics() {
   const spec = buildSearchSpec();
   const connectionResult = await chrome.storage.local.get([
     "jobpilot.stage3.connection",
-    "jobpilot.stage4.connection"
+    "jobpilot.stage4.connection",
+    "jobpilot.naukri.injectionStatus"
   ]);
   const stage3Connection = connectionResult["jobpilot.stage3.connection"];
   const stage4Connection = connectionResult["jobpilot.stage4.connection"];
+  const injectionStatus = connectionResult["jobpilot.naukri.injectionStatus"];
 
   const diagnostics = [
     ["Stage 1 profile", Boolean(profile), profile ? "Ready" : "Missing"],
@@ -366,6 +368,15 @@ async function refreshDiagnostics() {
       "Stage 4 extractor script",
       Boolean(stage4Connection && stage4Connection.status === "connected"),
       stage4Connection ? "Connected · " + stage4Connection.url : "Not connected to a Naukri tab"
+    ],
+    [
+      "Injection attempt",
+      Boolean(injectionStatus && injectionStatus.ok === true),
+      injectionStatus
+        ? injectionStatus.ok
+          ? "PASS · " + injectionStatus.reason
+          : "FAILED · " + injectionStatus.reason + " · " + (injectionStatus.error || "Unknown error")
+        : "No injection attempt recorded"
     ],
     [
       "Scoring / AI",
