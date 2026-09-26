@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "JobPilot - Universal Job Portal Assistant",
-  "version": "1.4.2",
-  "description": "JobPilot 1.4.2: stricter role-family filtering and AI/deep-match-aware recommended job list across supported portals.",
+  "version": "1.5.0",
+  "description": "JobPilot 1.5: AI-first job ranking, semantic role matching and deep apply decisions across Naukri, Foundit, LinkedIn Jobs, Indeed and Hirist.",
   "permissions": [
     "storage",
     "unlimitedStorage",
