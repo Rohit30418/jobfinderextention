@@ -109,6 +109,65 @@
     return preferred.some((location) => jobLocation.includes(clean(location)));
   }
 
+  function detectRoleConflict(titleValue, targetRoles, priorityKeywords) {
+    const titleText = clean(titleValue);
+    const targetText = clean([...(targetRoles || []), ...(priorityKeywords || [])].join(" "));
+    const titleTokenSet = new Set(tokens(titleText));
+
+    const wantsFrontend =
+      /\bfrontend\b|\breact\b|\bjavascript\b|\btypescript\b|\bui\b/.test(targetText);
+
+    if (!wantsFrontend) return null;
+
+    const frontendEvidence =
+      /\bfrontend\b|\breact\b|\bjavascript\b|\btypescript\b|\bui\b|\bnext\b/.test(titleText);
+
+    const fullstackEvidence = /\bfullstack\b/.test(titleText);
+
+    const incompatible = [
+      ["java", "Java"],
+      ["spring", "Spring"],
+      ["android", "Android"],
+      ["dotnet", ".NET"],
+      ["c#", "C#"],
+      ["php", "PHP"],
+      ["laravel", "Laravel"],
+      ["python", "Python"],
+      ["django", "Django"],
+      ["devops", "DevOps"],
+      ["data", "Data"],
+      ["qa", "QA"],
+      ["tester", "Testing"]
+    ];
+
+    const hits = incompatible
+      .filter(([token]) => titleTokenSet.has(token))
+      .map(([, label]) => label);
+
+    const backendOnly =
+      titleTokenSet.has("backend") &&
+      !frontendEvidence &&
+      !fullstackEvidence;
+
+    if (backendOnly) hits.push("Backend");
+
+    if (!hits.length) return null;
+
+    // A mixed title such as "Java + React Fullstack Developer" should be
+    // reviewed, not automatically discarded.
+    if (frontendEvidence || fullstackEvidence) {
+      return {
+        severity: "review",
+        hits: [...new Set(hits)]
+      };
+    }
+
+    return {
+      severity: "filtered",
+      hits: [...new Set(hits)]
+    };
+  }
+
   function evaluate(job, preferences = {}) {
     const targetRoles = list(preferences.targetRoles);
     const priorityKeywords = list(preferences.priorityKeywords);
@@ -148,6 +207,12 @@
     const roleSignalWeak =
       priorityAnyHits.length > 0;
 
+    const roleConflict = detectRoleConflict(
+      job.title,
+      targetRoles,
+      priorityKeywords
+    );
+
     const exp = experienceOverlaps(job, preferences);
     const location = locationCompatible(job, preferences);
     const postedDays = parsePostedDays(job.postedAge);
@@ -177,6 +242,36 @@
       reasons.push("Excluded keyword appears outside title: " + excludedAnyHits.join(", "));
     }
 
+    if (roleConflict?.severity === "filtered") {
+      return {
+        status: "filtered",
+        reasonCode: "role-family-conflict",
+        reasons: [
+          "Role-family conflict in title: " + roleConflict.hits.join(", ")
+        ],
+        signals: {
+          exactRoleHits,
+          roleTokenHits,
+          priorityTitleHits,
+          priorityAnyHits,
+          roleConflict,
+          exp,
+          location,
+          freshnessOkay
+        }
+      };
+    }
+
+    if (
+      roleConflict?.severity === "review" &&
+      exactRoleHits.length === 0
+    ) {
+      reasons.push(
+        "Mixed role-family title needs review: " +
+        roleConflict.hits.join(", ")
+      );
+    }
+
     if (preferences.strictExperience === true && exp === false) {
       return {
         status: "filtered",
@@ -204,7 +299,7 @@
       };
     }
 
-    if (roleSignalStrong) {
+    if (roleSignalStrong && roleConflict?.severity !== "review") {
       return {
         status: "relevant",
         reasonCode: "role-match",
@@ -250,6 +345,7 @@
     evaluate,
     annotateJobs,
     clean,
-    roleDomainTokens
+    roleDomainTokens,
+    detectRoleConflict
   };
 })();
