@@ -13,7 +13,7 @@
     return "";
   }
 
-  function allTexts(root, selectors, limit = 40) {
+  function allTexts(root, selectors, limit = 50) {
     const output = [];
 
     for (const selector of selectors) {
@@ -21,8 +21,8 @@
       try { nodes = Array.from(root.querySelectorAll(selector)); } catch (_) {}
 
       for (const node of nodes) {
-        const value = engine.clean(node.textContent || node.innerText || "", 200);
-        if (!value || value.length > 120) continue;
+        const value = engine.clean(node.textContent || node.innerText || "", 240);
+        if (!value || value.length > 160) continue;
         if (!output.includes(value)) output.push(value);
         if (output.length >= limit) return output;
       }
@@ -59,9 +59,24 @@
 
   function stripHtml(value) {
     if (!value) return "";
+
     try {
       const doc = new DOMParser().parseFromString(String(value), "text/html");
-      return engine.clean(doc.body?.innerText || doc.body?.textContent || "", 30000);
+
+      // Preserve useful section/bullet boundaries before normalization.
+      doc.querySelectorAll("br").forEach((node) => node.replaceWith("\n"));
+      doc.querySelectorAll("li").forEach((node) => {
+        node.insertAdjacentText("afterbegin", "• ");
+        node.insertAdjacentText("beforeend", "\n");
+      });
+      doc.querySelectorAll("p,h1,h2,h3,h4,h5,h6,div").forEach((node) => {
+        node.insertAdjacentText("beforeend", "\n");
+      });
+
+      return engine.clean(
+        doc.body?.innerText || doc.body?.textContent || "",
+        30000
+      );
     } catch (_) {
       return engine.clean(String(value).replace(/<[^>]+>/g, " "), 30000);
     }
@@ -75,12 +90,13 @@
       const address = item?.address || item;
       if (!address || typeof address !== "object") continue;
 
-      const text = engine.unique([
+      const pieces = engine.unique([
         address.addressLocality,
         address.addressRegion,
         address.addressCountry?.name || address.addressCountry
-      ], 6).join(", ");
+      ], 6).filter((item) => !/^[-–—]+$/.test(item));
 
+      const text = pieces.join(", ");
       if (text) output.push(text);
     }
 
@@ -109,6 +125,135 @@
     return engine.clean([currency, value].filter(Boolean).join(" "), 300);
   }
 
+  function identifierFromUrl(url) {
+    const digits = String(url || "").match(/\d{7,}/g);
+    return digits?.[digits.length - 1] || "";
+  }
+
+  function meaningfulLocation(value) {
+    const text = engine.clean(value, 500);
+    if (!text) return false;
+    if (/^[-–—,\s]+$/.test(text)) return false;
+    return /[a-z]/i.test(text);
+  }
+
+  function meaningfulSalary(value) {
+    const text = engine.clean(value, 300);
+    if (!text) return false;
+
+    // Prefer salary strings containing an amount/range over "INR P.A.".
+    return /\d/.test(text) || /not disclosed/i.test(text);
+  }
+
+  function chooseBetter(primary, fallback, validator) {
+    const first = engine.clean(primary, 30000);
+    const second = engine.clean(fallback, 30000);
+
+    if (validator(first)) return first;
+    if (validator(second)) return second;
+    return first || second;
+  }
+
+  function linesFromDescription(description) {
+    return String(description || "")
+      .split(/\n+/)
+      .map((line) =>
+        engine.clean(
+          line
+            .replace(/^[•●▪◦*\-–—]+\s*/, "")
+            .replace(/^\d+[.)]\s*/, ""),
+          1200
+        )
+      )
+      .filter(Boolean);
+  }
+
+  function likelySentenceItems(description) {
+    const lines = linesFromDescription(description);
+    const output = [];
+
+    for (const line of lines) {
+      if (line.length < 12 || line.length > 700) continue;
+
+      const pieces = line
+        .split(/(?<=[.!?;])\s+(?=[A-Z0-9])/)
+        .map((piece) => engine.clean(piece, 700))
+        .filter((piece) => piece.length >= 12);
+
+      output.push(...pieces);
+    }
+
+    return engine.unique(output, 100);
+  }
+
+  function extractResponsibilities(description) {
+    const items = likelySentenceItems(description);
+
+    const actionPattern =
+      /\b(develop|build|design|implement|maintain|create|collaborate|work with|integrate|optimi[sz]e|debug|test|review|deliver|manage|lead|support|write|participate|ensure|own|architect|troubleshoot|deploy)\b/i;
+
+    return engine.unique(
+      items.filter((item) =>
+        actionPattern.test(item) &&
+        !/\b(required|must have|should have|qualification|candidate should|experience in|proficien|knowledge of)\b/i.test(item)
+      ),
+      25
+    );
+  }
+
+  function extractRequirementStatements(description) {
+    const items = likelySentenceItems(description);
+
+    return engine.unique(
+      items.filter((item) =>
+        /\b(required|must have|must possess|should have|required skills?|requirements?|qualification|candidate should|minimum .* years?|experience (?:in|with)|proficien(?:t|cy)|strong knowledge|hands[- ]on|expertise in)\b/i.test(item)
+      ),
+      30
+    );
+  }
+
+  function extractPreferredStatements(description) {
+    const items = likelySentenceItems(description);
+
+    return engine.unique(
+      items.filter((item) =>
+        /\b(preferred|good to have|nice to have|plus|advantage|desirable)\b/i.test(item)
+      ),
+      20
+    );
+  }
+
+  function skillsMentionedInStatements(skills, statements) {
+    const haystack = statements.join(" ").toLowerCase();
+
+    return engine.unique(
+      (skills || []).filter((skill) => {
+        const value = engine.clean(skill, 100).toLowerCase();
+        return value.length >= 2 && haystack.includes(value);
+      }),
+      30
+    );
+  }
+
+  function inferWorkMode(description, locationText) {
+    const text = (description + " " + locationText).toLowerCase();
+
+    if (/\bhybrid\b/.test(text)) return "Hybrid";
+    if (/\bwork from home\b|\bremote\b|\bwfh\b/.test(text)) return "Remote";
+    if (/\bwork from office\b|\bon[- ]site\b|\bonsite\b/.test(text)) return "On-site";
+    return "";
+  }
+
+  function educationFromDescription(description) {
+    const lines = likelySentenceItems(description);
+
+    const matches = lines.filter((item) =>
+      /\b(b\.?e\.?|b\.?tech|m\.?tech|bachelor|master|degree|bca|mca|bsc|msc|computer science|engineering graduate|graduate degree)\b/i.test(item)
+    );
+
+    return engine.unique(matches, 8).join(" | ");
+  }
+
   function detect() {
     return location.pathname.toLowerCase().includes("job-listings-");
   }
@@ -117,104 +262,207 @@
     const json = jsonLdJob();
 
     const dom = {
-      title: textOf(document, [".jd-header-title", "[class*='jd-header-title']", "h1"], 350),
+      title: textOf(document, [
+        ".jd-header-title",
+        "[class*='jd-header-title']",
+        "h1"
+      ], 350),
+
       company: textOf(document, [
         ".jd-header-comp-name",
         ".jd-header-comp-name a",
         "[class*='comp-name']",
         "[class*='company-name']"
       ], 300),
+
       experienceText: textOf(document, [
         ".exp",
         "[class*='experience']",
-        "[class*='exp-wrap']"
+        "[class*='exp-wrap']",
+        "[class*='expwdth']"
       ], 250),
+
       location: textOf(document, [
         ".loc",
         "[class*='location']",
-        "[class*='loc-wrap']"
+        "[class*='loc-wrap']",
+        "[class*='locWdth']"
       ], 500),
+
       salaryText: textOf(document, [
         ".salary",
         "[class*='salary']",
-        "[class*='sal-wrap']"
+        "[class*='sal-wrap']",
+        ".sal"
       ], 300),
+
       description: textOf(document, [
         ".dang-inner-html",
         ".jobDescription",
         "[class*='jobDescription']",
         "[class*='job-desc']"
       ], 30000),
+
       skills: engine.unique(
         allTexts(document, [
           ".key-skill .chip",
           ".key-skill a",
           "[class*='key-skill'] a",
           "[class*='key-skill'] li",
-          "[class*='skills'] li"
-        ], 40),
-        40
+          "[class*='skills'] li",
+          "[class*='skills'] a"
+        ], 50),
+        50
       ),
+
       postedAge: textOf(document, [
         ".jd-stats",
         "[class*='jd-stats']",
-        "[class*='posted']"
-      ], 300)
+        "[class*='posted']",
+        "[class*='post-day']"
+      ], 300),
+
+      employmentType: textOf(document, [
+        "[class*='employment']",
+        "[class*='job-type']"
+      ], 250)
     };
 
     const jsonSkills = engine.unique(
       Array.isArray(json?.skills)
         ? json.skills
         : String(json?.skills || json?.qualifications || "").split(/[,;|]/),
-      40
+      50
+    );
+
+    const allSkills = engine.unique(
+      [...jsonSkills, ...dom.skills],
+      50
+    );
+
+    const jsonDescription = stripHtml(json?.description);
+    const fullDescription = jsonDescription || dom.description;
+
+    const jsonLocationText = jsonLocation(json?.jobLocation);
+    const finalLocation = chooseBetter(
+      jsonLocationText,
+      dom.location,
+      meaningfulLocation
+    );
+
+    const jsonSalaryText = jsonSalary(json?.baseSalary);
+    const finalSalary = chooseBetter(
+      jsonSalaryText,
+      dom.salaryText,
+      meaningfulSalary
     );
 
     const canonicalUrl = engine.absoluteUrl(json?.url || location.href);
-    const identifier = engine.clean(json?.identifier?.value, 160);
+    const identifier =
+      engine.clean(json?.identifier?.value, 160) ||
+      identifierFromUrl(canonicalUrl);
+
+    const requirementStatements = extractRequirementStatements(fullDescription);
+    const preferredStatements = extractPreferredStatements(fullDescription);
+    const responsibilities = extractResponsibilities(fullDescription);
+
+    const requiredSkills = skillsMentionedInStatements(
+      allSkills,
+      requirementStatements
+    );
+
+    const preferredSkills = skillsMentionedInStatements(
+      allSkills,
+      preferredStatements
+    );
+
+    const explicitEducation =
+      engine.clean(
+        typeof json?.educationRequirements === "string"
+          ? json.educationRequirements
+          : json?.educationRequirements?.credentialCategory ||
+            json?.educationRequirements?.name ||
+            "",
+        1000
+      );
+
+    const education = explicitEducation || educationFromDescription(fullDescription);
+
+    const employmentType = Array.isArray(json?.employmentType)
+      ? json.employmentType.join(", ")
+      : engine.clean(json?.employmentType, 250) || dom.employmentType;
+
+    const workMode = inferWorkMode(fullDescription, finalLocation);
+
+    const jsonExperience =
+      engine.clean(
+        typeof json?.experienceRequirements === "string"
+          ? json.experienceRequirements
+          : json?.experienceRequirements?.monthsOfExperience
+            ? json.experienceRequirements.monthsOfExperience + " months"
+            : "",
+        300
+      );
 
     return {
-      method: json ? "json-ld+dom" : "dom-detail",
+      method: json ? "json-ld+detail-dom" : "detail-dom",
       job: {
         portalJobId: identifier,
         canonicalUrl,
+
         title: engine.clean(json?.title, 350) || dom.title,
         company: engine.clean(json?.hiringOrganization?.name, 300) || dom.company,
-        experienceText:
-          engine.clean(
-            typeof json?.experienceRequirements === "string"
-              ? json.experienceRequirements
-              : "",
-            300
-          ) || dom.experienceText,
-        location: jsonLocation(json?.jobLocation) || dom.location,
-        salaryText: jsonSalary(json?.baseSalary) || dom.salaryText,
-        skills: jsonSkills.length ? jsonSkills : dom.skills,
-        description: stripHtml(json?.description) || dom.description,
+        experienceText: jsonExperience || dom.experienceText,
+        location: finalLocation,
+        salaryText: finalSalary,
+
+        skills: allSkills,
+        description: fullDescription,
+        responsibilities,
+        requiredSkills,
+        preferredSkills,
+
+        requirementStatements,
+        preferredStatements,
+
         postedAge: dom.postedAge,
         datePosted: engine.clean(json?.datePosted, 180),
-        employmentType: Array.isArray(json?.employmentType)
-          ? json.employmentType.join(", ")
-          : engine.clean(json?.employmentType, 250),
-        education:
-          engine.clean(
-            typeof json?.educationRequirements === "string"
-              ? json.educationRequirements
-              : json?.educationRequirements?.credentialCategory ||
-                json?.educationRequirements?.name ||
-                "",
-            1000
-          ),
-        captureMethod: json ? "json-ld+dom" : "dom-detail",
+        employmentType,
+        education,
+        workMode,
+
+        captureMethod: json ? "json-ld+detail-dom" : "detail-dom",
+
         sources: {
           title: json?.title ? "json-ld" : dom.title ? "detail-dom" : "",
           company: json?.hiringOrganization?.name ? "json-ld" : dom.company ? "detail-dom" : "",
-          experienceText: json?.experienceRequirements ? "json-ld" : dom.experienceText ? "detail-dom" : "",
-          location: json?.jobLocation ? "json-ld" : dom.location ? "detail-dom" : "",
-          salaryText: json?.baseSalary ? "json-ld" : dom.salaryText ? "detail-dom" : "",
-          skills: jsonSkills.length ? "json-ld" : dom.skills.length ? "detail-dom" : "",
-          description: json?.description ? "json-ld" : dom.description ? "detail-dom" : "",
+          experienceText: jsonExperience ? "json-ld" : dom.experienceText ? "detail-dom" : "",
+          location:
+            meaningfulLocation(jsonLocationText) ? "json-ld" :
+            meaningfulLocation(dom.location) ? "detail-dom" : "",
+          salaryText:
+            meaningfulSalary(jsonSalaryText) ? "json-ld" :
+            meaningfulSalary(dom.salaryText) ? "detail-dom" : "",
+          skills:
+            jsonSkills.length && dom.skills.length ? "json-ld+detail-dom" :
+            jsonSkills.length ? "json-ld" :
+            dom.skills.length ? "detail-dom" : "",
+          description: jsonDescription ? "json-ld" : dom.description ? "detail-dom" : "",
+          responsibilities: responsibilities.length ? "jd-parser" : "",
+          requiredSkills: requiredSkills.length ? "jd-parser" : "",
+          preferredSkills: preferredSkills.length ? "jd-parser" : "",
+          education:
+            explicitEducation ? "json-ld" :
+            education ? "jd-parser" : "",
+          employmentType:
+            json?.employmentType ? "json-ld" :
+            dom.employmentType ? "detail-dom" : "",
+          workMode: workMode ? "jd-parser" : "",
           datePosted: json?.datePosted ? "json-ld" : "",
-          postedAge: dom.postedAge ? "detail-dom" : ""
+          postedAge: dom.postedAge ? "detail-dom" : "",
+          portalJobId:
+            json?.identifier?.value ? "json-ld" :
+            identifier ? "url" : ""
         }
       }
     };
@@ -223,6 +471,6 @@
   globalThis.JobPilotNaukriDetail = {
     detect,
     capture,
-    version: "1"
+    version: "2"
   };
 })();
