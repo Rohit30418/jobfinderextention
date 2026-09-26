@@ -384,7 +384,13 @@
             '</div>'
           ).join("") +
         '</div>' +
-        '<div class="jpp-note">Detail enrichment only. Matching and AI analysis are disabled.</div>';
+        '<div class="jpp-note">' +
+          'Enriched: ' +
+          Number(job.requiredSkills?.length || 0) + ' required skill(s) · ' +
+          Number(job.preferredSkills?.length || 0) + ' preferred skill(s) · ' +
+          Number(job.responsibilities?.length || 0) + ' responsibility item(s).' +
+        '</div>' +
+        '<div class="jpp-note">Stage 4C enrichment only. Matching and AI analysis are disabled.</div>';
     } else {
       html += '<div class="jpp-note jpp-warn">This portal page is not recognized as a listing or job-detail page.</div>';
     }
