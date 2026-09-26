@@ -607,6 +607,16 @@ function buildMatchScore({
         value: 79,
         reason: "Required skills are not clear enough"
       });
+    } else if (required.missing.length > 0) {
+      caps.push({
+        value:
+          required.matched.length / requiredSkills.length < 0.5
+            ? 59
+            : required.matched.length / requiredSkills.length < 0.75
+              ? 74
+              : 84,
+        reason: "One or more identified required skills are missing"
+      });
     }
 
     if (!role.compatible) {
