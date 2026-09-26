@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "JobPilot - Universal Job Portal Assistant",
-  "version": "1.2.0",
-  "description": "JobPilot 1.2: combined multi-portal job feed plus persistent 7-day profile-gap intelligence from deep-analyzed jobs.",
+  "version": "1.3.0",
+  "description": "JobPilot 1.3: universal Stage 3 search hub for Naukri, Foundit, LinkedIn Jobs, Indeed and Hirist.",
   "permissions": [
     "storage",
     "unlimitedStorage",
