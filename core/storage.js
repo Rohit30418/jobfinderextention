@@ -11,6 +11,7 @@ export const JOB_CACHE_KEY = "jobpilot.jobs.cache";
 export const LISTING_CONTEXT_KEY = "jobpilot.stage6.listingContext";
 export const LISTING_CONTEXTS_KEY = "jobpilot.stage6.listingContexts";
 export const GAP_HISTORY_KEY = "jobpilot.insights.gapHistory";
+export const SKILL_VAULT_KEY = "jobpilot.skills.vault";
 
 export function emptyState() {
   return {
@@ -529,6 +530,12 @@ export async function saveJobDeepMatch(jobKey, deepMatch) {
       gapJob,
       deepMatch
     );
+
+    await saveMissingSkillsToVault(
+      cacheKey || requestedKey,
+      gapJob,
+      deepMatch
+    );
   }
 
   return capture.detail || cache[cacheKey] || null;
@@ -888,4 +895,346 @@ export async function saveJobAiRankings(rankings) {
 
   await chrome.storage.local.set({ [JOB_CACHE_KEY]: cache });
   return cache;
+}
+
+
+export function emptySkillVault() {
+  return {
+    version: 1,
+    items: {},
+    updatedAt: null
+  };
+}
+
+function skillVaultKey(value) {
+  return String(value || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+}
+
+function compactSkillVault(vault) {
+  const source = vault && typeof vault === "object"
+    ? vault
+    : emptySkillVault();
+
+  const items = Object.values(source.items || {})
+    .filter((item) => item?.skill)
+    .sort((a, b) =>
+      String(b.lastSeenAt || "").localeCompare(
+        String(a.lastSeenAt || "")
+      )
+    )
+    .slice(0, 200);
+
+  return {
+    version: 1,
+    items: Object.fromEntries(
+      items.map((item) => [
+        skillVaultKey(item.skill),
+        {
+          skill: item.skill,
+          status: item.status || "missing",
+          kind: item.kind || "required",
+          sourceKeys: Array.isArray(item.sourceKeys)
+            ? item.sourceKeys.slice(0, 40)
+            : [],
+          portals: Array.isArray(item.portals)
+            ? item.portals.slice(0, 10)
+            : [],
+          firstSeenAt: item.firstSeenAt || null,
+          lastSeenAt: item.lastSeenAt || null,
+          addedAt: item.addedAt || null,
+          dismissedAt: item.dismissedAt || null,
+          removedAt: item.removedAt || null,
+          manual: item.manual === true
+        }
+      ])
+    ),
+    updatedAt: source.updatedAt || new Date().toISOString()
+  };
+}
+
+async function persistSkillVault(vault) {
+  const compact = compactSkillVault({
+    ...vault,
+    updatedAt: new Date().toISOString()
+  });
+
+  await chrome.storage.local.set({
+    [SKILL_VAULT_KEY]: compact
+  });
+
+  try {
+    await chrome.storage.sync.set({
+      [SKILL_VAULT_KEY]: compact
+    });
+  } catch (_) {
+    // Chrome Sync may be unavailable or quota-limited.
+    // Local storage remains authoritative.
+  }
+
+  return compact;
+}
+
+export async function getSkillVault() {
+  const localResult = await chrome.storage.local.get(SKILL_VAULT_KEY);
+  const localValue = localResult[SKILL_VAULT_KEY];
+
+  if (
+    localValue &&
+    typeof localValue === "object" &&
+    Object.keys(localValue.items || {}).length
+  ) {
+    return {
+      ...emptySkillVault(),
+      ...localValue,
+      items: localValue.items || {}
+    };
+  }
+
+  try {
+    const syncResult = await chrome.storage.sync.get(SKILL_VAULT_KEY);
+    const syncValue = syncResult[SKILL_VAULT_KEY];
+
+    if (syncValue && typeof syncValue === "object") {
+      const restored = {
+        ...emptySkillVault(),
+        ...syncValue,
+        items: syncValue.items || {}
+      };
+
+      await chrome.storage.local.set({
+        [SKILL_VAULT_KEY]: restored
+      });
+
+      return restored;
+    }
+  } catch (_) {}
+
+  return emptySkillVault();
+}
+
+export async function saveMissingSkillsToVault(jobKey, job, deepMatch) {
+  if (!deepMatch) return null;
+
+  const vault = await getSkillVault();
+  const now = new Date().toISOString();
+  const portal = String(job?.portal || deepMatch?.portal || "");
+  const sourceKey = String(
+    jobKey ||
+    job?.key ||
+    job?.portalJobId ||
+    job?.canonicalUrl ||
+    ""
+  );
+
+  const required = uniqueGapValues(
+    deepMatch.skills?.required?.missing || []
+  );
+
+  const preferred = uniqueGapValues(
+    deepMatch.skills?.preferred?.missing || []
+  );
+
+  const upsert = (skill, kind) => {
+    const key = skillVaultKey(skill);
+    if (!key) return;
+
+    const previous = vault.items[key] || null;
+
+    const sourceKeys = uniqueGapValues([
+      ...(previous?.sourceKeys || []),
+      sourceKey
+    ]).filter(Boolean);
+
+    const portals = uniqueGapValues([
+      ...(previous?.portals || []),
+      portal
+    ]).filter(Boolean);
+
+    vault.items[key] = {
+      skill,
+      status:
+        previous?.status === "added" ||
+        previous?.status === "dismissed"
+          ? previous.status
+          : "missing",
+      kind:
+        previous?.kind === "required" || kind === "required"
+          ? "required"
+          : "preferred",
+      sourceKeys,
+      portals,
+      firstSeenAt: previous?.firstSeenAt || now,
+      lastSeenAt: now,
+      addedAt: previous?.addedAt || null,
+      dismissedAt: previous?.dismissedAt || null,
+      removedAt: previous?.removedAt || null,
+      manual: previous?.manual === true
+    };
+  };
+
+  required.forEach((skill) => upsert(skill, "required"));
+  preferred.forEach((skill) => upsert(skill, "preferred"));
+
+  return persistSkillVault(vault);
+}
+
+export async function addSkillToProfile(skill) {
+  const value = String(skill || "").trim().replace(/\s+/g, " ");
+  if (!value) throw new Error("Skill is required.");
+
+  const [state, vault] = await Promise.all([
+    getState(),
+    getSkillVault()
+  ]);
+
+  if (!state?.profile) {
+    throw new Error("Save your profile first.");
+  }
+
+  const skills = uniqueGapValues([
+    ...(state.profile.skills || []),
+    value
+  ]);
+
+  const nextState = {
+    ...state,
+    profile: {
+      ...state.profile,
+      skills
+    }
+  };
+
+  await setState(nextState);
+
+  const key = skillVaultKey(value);
+  const previous = vault.items[key] || {};
+  const now = new Date().toISOString();
+
+  vault.items[key] = {
+    skill: value,
+    status: "added",
+    kind: previous.kind || "required",
+    sourceKeys: previous.sourceKeys || [],
+    portals: previous.portals || [],
+    firstSeenAt: previous.firstSeenAt || now,
+    lastSeenAt: previous.lastSeenAt || now,
+    addedAt: now,
+    dismissedAt: null,
+    removedAt: previous.removedAt || null,
+    manual: true
+  };
+
+  await persistSkillVault(vault);
+  return nextState.profile;
+}
+
+export async function removeSkillFromProfile(skill) {
+  const value = String(skill || "").trim().replace(/\s+/g, " ");
+  if (!value) throw new Error("Skill is required.");
+
+  const [state, vault] = await Promise.all([
+    getState(),
+    getSkillVault()
+  ]);
+
+  if (!state?.profile) {
+    throw new Error("Save your profile first.");
+  }
+
+  const key = skillVaultKey(value);
+
+  const skills = (state.profile.skills || []).filter(
+    (item) => skillVaultKey(item) !== key
+  );
+
+  const nextState = {
+    ...state,
+    profile: {
+      ...state.profile,
+      skills
+    }
+  };
+
+  await setState(nextState);
+
+  const previous = vault.items[key] || {};
+  const now = new Date().toISOString();
+
+  vault.items[key] = {
+    skill: previous.skill || value,
+    status:
+      Array.isArray(previous.sourceKeys) && previous.sourceKeys.length
+        ? "missing"
+        : "dismissed",
+    kind: previous.kind || "required",
+    sourceKeys: previous.sourceKeys || [],
+    portals: previous.portals || [],
+    firstSeenAt: previous.firstSeenAt || now,
+    lastSeenAt: previous.lastSeenAt || now,
+    addedAt: previous.addedAt || null,
+    dismissedAt:
+      Array.isArray(previous.sourceKeys) && previous.sourceKeys.length
+        ? null
+        : now,
+    removedAt: now,
+    manual: previous.manual === true
+  };
+
+  await persistSkillVault(vault);
+  return nextState.profile;
+}
+
+export async function dismissSkillFromVault(skill) {
+  const value = String(skill || "").trim().replace(/\s+/g, " ");
+  const key = skillVaultKey(value);
+  if (!key) throw new Error("Skill is required.");
+
+  const vault = await getSkillVault();
+  const previous = vault.items[key] || {};
+  const now = new Date().toISOString();
+
+  vault.items[key] = {
+    skill: previous.skill || value,
+    status: "dismissed",
+    kind: previous.kind || "required",
+    sourceKeys: previous.sourceKeys || [],
+    portals: previous.portals || [],
+    firstSeenAt: previous.firstSeenAt || now,
+    lastSeenAt: previous.lastSeenAt || now,
+    addedAt: previous.addedAt || null,
+    dismissedAt: now,
+    removedAt: previous.removedAt || null,
+    manual: previous.manual === true
+  };
+
+  return persistSkillVault(vault);
+}
+
+export async function restoreSkillInVault(skill) {
+  const value = String(skill || "").trim().replace(/\s+/g, " ");
+  const key = skillVaultKey(value);
+  if (!key) throw new Error("Skill is required.");
+
+  const vault = await getSkillVault();
+  const previous = vault.items[key] || {};
+  const now = new Date().toISOString();
+
+  vault.items[key] = {
+    skill: previous.skill || value,
+    status: "missing",
+    kind: previous.kind || "required",
+    sourceKeys: previous.sourceKeys || [],
+    portals: previous.portals || [],
+    firstSeenAt: previous.firstSeenAt || now,
+    lastSeenAt: previous.lastSeenAt || now,
+    addedAt: previous.addedAt || null,
+    dismissedAt: null,
+    removedAt: previous.removedAt || null,
+    manual: previous.manual === true
+  };
+
+  return persistSkillVault(vault);
 }
