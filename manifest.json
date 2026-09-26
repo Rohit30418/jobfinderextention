@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "JobPilot - Universal Job Portal Assistant",
-  "version": "0.6.2",
-  "description": "Stage 4C compatibility fix: both current and legacy detail extractors wait for Naukri to finish rendering.",
+  "version": "0.6.3",
+  "description": "Stage 4C: in-place detail polling plus categorical READY/PARTIAL extraction status; no misleading extraction percentages.",
   "permissions": [
     "storage",
     "unlimitedStorage",
