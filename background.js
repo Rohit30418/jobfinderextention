@@ -212,10 +212,21 @@ async function buildInlineIntelligence(incomingJob, forceAi = false) {
   let aiStatus = "not-connected";
 
   if (token && aiAuthorized) {
-    aiStatus = job.aiAnalysis && !forceAi ? "cached" : "analyzing";
+    const semanticReady =
+      job.aiAnalysis?.analysisVersion >= 2 &&
+      Array.isArray(job.aiAnalysis?.candidateRequirementMatches);
 
-    if (!job.aiAnalysis || forceAi) {
-      const analysis = await analyzeJobWithAi(job);
+    aiStatus =
+      job.aiAnalysis && semanticReady && !forceAi
+        ? "cached"
+        : "analyzing";
+
+    if (!job.aiAnalysis || !semanticReady || forceAi) {
+      const analysis = await analyzeJobWithAi(
+        job,
+        state.profile,
+        preferences
+      );
       job = {
         ...job,
         aiAnalysis: analysis,
