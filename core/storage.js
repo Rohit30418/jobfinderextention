@@ -12,6 +12,7 @@ export const LISTING_CONTEXT_KEY = "jobpilot.stage6.listingContext";
 export const LISTING_CONTEXTS_KEY = "jobpilot.stage6.listingContexts";
 export const GAP_HISTORY_KEY = "jobpilot.insights.gapHistory";
 export const SKILL_VAULT_KEY = "jobpilot.skills.vault";
+export const APPLIED_JOBS_KEY = "jobpilot.jobs.applied";
 
 export function emptyState() {
   return {
@@ -1251,7 +1252,8 @@ const JOBPILOT_BACKUP_KEYS = [
   LISTING_CONTEXT_KEY,
   LISTING_CONTEXTS_KEY,
   GAP_HISTORY_KEY,
-  SKILL_VAULT_KEY
+  SKILL_VAULT_KEY,
+  APPLIED_JOBS_KEY
 ];
 
 export async function exportJobPilotBackup() {
@@ -1297,4 +1299,181 @@ export async function importJobPilotBackup(payload) {
   }
 
   return true;
+}
+
+
+export function emptyAppliedJobs() {
+  return {
+    version: 1,
+    items: {},
+    updatedAt: null
+  };
+}
+
+function appliedJobKey(job) {
+  if (job?.key) return String(job.key);
+
+  if (job?.portal && job?.portalJobId) {
+    return String(job.portal) + ":" + String(job.portalJobId);
+  }
+
+  const url = String(job?.canonicalUrl || "")
+    .split("#")[0]
+    .replace(//+$/, "")
+    .toLowerCase();
+
+  if (url) return url;
+
+  return [
+    String(job?.portal || ""),
+    String(job?.company || ""),
+    String(job?.title || "")
+  ].join("::").toLowerCase();
+}
+
+export async function getAppliedJobs() {
+  const result = await chrome.storage.local.get(APPLIED_JOBS_KEY);
+  const value = result[APPLIED_JOBS_KEY];
+
+  return value && typeof value === "object"
+    ? {
+        ...emptyAppliedJobs(),
+        ...value,
+        items:
+          value.items && typeof value.items === "object"
+            ? value.items
+            : {}
+      }
+    : emptyAppliedJobs();
+}
+
+export async function markJobApplied(job, options = {}) {
+  if (!job) {
+    throw new Error("Job data is required.");
+  }
+
+  const store = await getAppliedJobs();
+  const key = appliedJobKey(job);
+  const now = new Date().toISOString();
+  const previous = store.items[key] || null;
+
+  const deepScore = Number.isFinite(job?.deepMatch?.matchScore?.score)
+    ? job.deepMatch.matchScore.score
+    : null;
+
+  const aiScore = Number.isFinite(job?.aiRanking?.fitScore)
+    ? job.aiRanking.fitScore
+    : null;
+
+  store.items[key] = {
+    key,
+    portal: String(job.portal || ""),
+    portalName: String(job.portalName || job.portal || ""),
+    portalJobId: String(job.portalJobId || ""),
+    title: String(job.title || ""),
+    company: String(job.company || ""),
+    canonicalUrl: String(job.canonicalUrl || ""),
+    location: String(job.location || ""),
+    experienceText: String(job.experienceText || ""),
+    salaryText: String(job.salaryText || ""),
+    postedAge: String(job.postedAge || ""),
+    skills: uniqueGapValues(job.skills || []).slice(0, 40),
+
+    matchScore: deepScore,
+    aiFitScore: aiScore,
+    decision:
+      String(
+        job?.deepMatch?.applyDecision?.action ||
+        job?.aiRanking?.decision ||
+        ""
+      ),
+    verdict: String(job?.deepMatch?.verdict || ""),
+    roleFamily: String(
+      job?.deepMatch?.source?.roleFamily ||
+      job?.aiAnalysis?.roleFamily ||
+      job?.aiRanking?.roleFamily ||
+      ""
+    ),
+
+    status: "applied",
+    applicationSource: String(options.source || previous?.applicationSource || ""),
+    appliedAt: previous?.appliedAt || now,
+    updatedAt: now,
+    note: String(options.note || previous?.note || "")
+  };
+
+  store.updatedAt = now;
+
+  await chrome.storage.local.set({
+    [APPLIED_JOBS_KEY]: store
+  });
+
+  return store.items[key];
+}
+
+export async function unmarkJobApplied(jobOrKey) {
+  const store = await getAppliedJobs();
+
+  const key =
+    typeof jobOrKey === "string"
+      ? jobOrKey
+      : appliedJobKey(jobOrKey);
+
+  if (!key || !store.items[key]) {
+    return false;
+  }
+
+  delete store.items[key];
+  store.updatedAt = new Date().toISOString();
+
+  await chrome.storage.local.set({
+    [APPLIED_JOBS_KEY]: store
+  });
+
+  return true;
+}
+
+export async function isJobApplied(job) {
+  const store = await getAppliedJobs();
+  const key = appliedJobKey(job);
+  return Boolean(key && store.items[key]);
+}
+
+export async function updateAppliedJobNote(jobOrKey, note) {
+  const store = await getAppliedJobs();
+
+  const key =
+    typeof jobOrKey === "string"
+      ? jobOrKey
+      : appliedJobKey(jobOrKey);
+
+  if (!key || !store.items[key]) {
+    throw new Error("Applied job was not found.");
+  }
+
+  store.items[key] = {
+    ...store.items[key],
+    note: String(note || ""),
+    updatedAt: new Date().toISOString()
+  };
+
+  store.updatedAt = new Date().toISOString();
+
+  await chrome.storage.local.set({
+    [APPLIED_JOBS_KEY]: store
+  });
+
+  return store.items[key];
+}
+
+export async function exportAppliedJobsData() {
+  const store = await getAppliedJobs();
+
+  return Object.values(store.items || {})
+    .filter((item) => item?.status === "applied")
+    .sort((a, b) =>
+      String(b.appliedAt || "").localeCompare(
+        String(a.appliedAt || "")
+      )
+    );
 }
