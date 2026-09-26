@@ -1238,3 +1238,63 @@ export async function restoreSkillInVault(skill) {
 
   return persistSkillVault(vault);
 }
+
+
+const JOBPILOT_BACKUP_KEYS = [
+  STATE_KEY,
+  PREFERENCES_KEY,
+  NAUKRI_SEARCH_KEY,
+  UNIVERSAL_SEARCH_KEY,
+  NAUKRI_NATIVE_FILTERS_KEY,
+  PORTAL_CAPTURE_KEY,
+  JOB_CACHE_KEY,
+  LISTING_CONTEXT_KEY,
+  LISTING_CONTEXTS_KEY,
+  GAP_HISTORY_KEY,
+  SKILL_VAULT_KEY
+];
+
+export async function exportJobPilotBackup() {
+  const data = await chrome.storage.local.get(JOBPILOT_BACKUP_KEYS);
+
+  return {
+    type: "jobpilot-backup",
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    data
+  };
+}
+
+export async function importJobPilotBackup(payload) {
+  if (
+    !payload ||
+    payload.type !== "jobpilot-backup" ||
+    !payload.data ||
+    typeof payload.data !== "object"
+  ) {
+    throw new Error("This is not a valid JobPilot backup.");
+  }
+
+  const allowed = {};
+  for (const key of JOBPILOT_BACKUP_KEYS) {
+    if (Object.prototype.hasOwnProperty.call(payload.data, key)) {
+      allowed[key] = payload.data[key];
+    }
+  }
+
+  if (!Object.keys(allowed).length) {
+    throw new Error("The backup does not contain restorable JobPilot data.");
+  }
+
+  await chrome.storage.local.set(allowed);
+
+  if (allowed[SKILL_VAULT_KEY]) {
+    try {
+      await chrome.storage.sync.set({
+        [SKILL_VAULT_KEY]: compactSkillVault(allowed[SKILL_VAULT_KEY])
+      });
+    } catch (_) {}
+  }
+
+  return true;
+}
