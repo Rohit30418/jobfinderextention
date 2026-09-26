@@ -76,6 +76,32 @@
       </div>
     </section>
 
+    <section class="panel skill-vault-panel">
+      <div class="summary-head">
+        <div>
+          <div class="kicker">PERSISTENT SKILL VAULT</div>
+          <h2>Skills JobPilot keeps learning from jobs</h2>
+          <p>
+            Missing skills are saved automatically. Add only skills you can genuinely support with your work or projects.
+          </p>
+        </div>
+        <div class="status" id="skillVaultStatus">0 saved</div>
+      </div>
+
+      <div class="vault-tabs">
+        <button class="filter active" data-vault-mode="missing" type="button">Missing <span id="vaultMissingCount">0</span></button>
+        <button class="filter" data-vault-mode="added" type="button">My Skills <span id="vaultAddedCount">0</span></button>
+        <button class="filter" data-vault-mode="dismissed" type="button">Dismissed <span id="vaultDismissedCount">0</span></button>
+      </div>
+
+      <div id="skillVaultList" class="skill-vault-list"></div>
+
+      <div class="profile-guidance">
+        <strong>Persistent behavior:</strong>
+        removing a skill from My Skills does not erase its history. If jobs still require it, JobPilot moves it back to Missing.
+      </div>
+    </section>
+
     <section class="toolbar panel">
       <div class="portal-filter-wrap">
         <span class="filter-label">Portal</span>
