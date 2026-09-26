@@ -34,6 +34,9 @@ const els = {
   hero: $(".hero-result"),
   verdict: $("#verdict"),
   verdictSummary: $("#verdictSummary"),
+  matchScore: $("#matchScore"),
+  matchScoreLabel: $("#matchScoreLabel"),
+  matchScoreFill: $("#matchScoreFill"),
   confidence: $("#confidence"),
   confidenceMeta: $("#confidenceMeta"),
 
@@ -254,6 +257,14 @@ function renderMatch(match, job) {
   els.verdict.textContent = match.verdict;
   els.verdictSummary.textContent = verdictSummary(match);
 
+  const score = match.matchScore?.score;
+  els.matchScore.textContent =
+    Number.isFinite(score) ? score + "%" : "--%";
+  els.matchScoreLabel.textContent =
+    match.matchScore?.label || "Insufficient data";
+  els.matchScoreFill.style.width =
+    Number.isFinite(score) ? score + "%" : "0%";
+
   els.confidence.textContent = match.confidence.level;
   els.confidenceMeta.textContent =
     match.confidence.evidence +
@@ -369,8 +380,10 @@ async function renderDiagnostics() {
     ],
     [
       "Match percentage",
-      true,
-      "Intentionally not used in Stage 5 v1"
+      Number.isFinite(currentMatch?.matchScore?.score),
+      Number.isFinite(currentMatch?.matchScore?.score)
+        ? currentMatch.matchScore.score + "% · " + currentMatch.matchScore.label
+        : "Insufficient evidence"
     ]
   ];
 
@@ -485,7 +498,7 @@ async function initialize() {
 
   const existingFresh = Boolean(
     existing &&
-    existing.version === 2 &&
+    existing.version === 3 &&
     existing.inputs?.profileUpdatedAt === (state.updatedAt || null) &&
     existing.inputs?.preferencesUpdatedAt === (preferences.updatedAt || null) &&
     existing.inputs?.jobCapturedAt === (currentJob.capturedAt || null) &&
