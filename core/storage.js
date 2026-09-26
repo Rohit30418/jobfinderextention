@@ -279,26 +279,54 @@ export async function saveJobAiAnalysis(jobKey, analysis) {
       ? result[PORTAL_CAPTURE_KEY]
       : emptyPortalCapture();
 
-  const key = String(jobKey || capture.detail?.key || "").trim();
+  const detail = capture.detail || null;
+  const requestedKey = String(jobKey || detail?.key || "").trim();
 
-  if (!key) {
+  if (!requestedKey && !detail) {
     throw new Error("No current detail job is available for AI enrichment.");
+  }
+
+  let cacheKey = requestedKey;
+
+  if (!cache[cacheKey] && detail) {
+    const detailUrl = String(detail.canonicalUrl || "").split("?")[0].replace(/\/+$/, "");
+    const detailId = String(detail.portalJobId || "");
+
+    for (const [key, item] of Object.entries(cache)) {
+      if (!item || item.portal !== detail.portal) continue;
+
+      const sameId =
+        detailId &&
+        item.portalJobId &&
+        String(item.portalJobId) === detailId;
+
+      const itemUrl = String(item.canonicalUrl || "").split("?")[0].replace(/\/+$/, "");
+      const sameUrl =
+        detailUrl &&
+        itemUrl &&
+        itemUrl.toLowerCase() === detailUrl.toLowerCase();
+
+      if (sameId || sameUrl) {
+        cacheKey = key;
+        break;
+      }
+    }
   }
 
   const analyzedAt =
     analysis?.analyzedAt || new Date().toISOString();
 
-  if (cache[key]) {
-    cache[key] = {
-      ...cache[key],
+  if (cache[cacheKey]) {
+    cache[cacheKey] = {
+      ...cache[cacheKey],
       aiAnalysis: analysis || null,
       aiAnalyzedAt: analyzedAt
     };
   }
 
-  if (capture.detail && capture.detail.key === key) {
+  if (detail) {
     capture.detail = {
-      ...capture.detail,
+      ...detail,
       aiAnalysis: analysis || null,
       aiAnalyzedAt: analyzedAt
     };
@@ -309,5 +337,5 @@ export async function saveJobAiAnalysis(jobKey, analysis) {
     [PORTAL_CAPTURE_KEY]: capture
   });
 
-  return capture.detail || cache[key] || null;
+  return capture.detail || cache[cacheKey] || null;
 }
