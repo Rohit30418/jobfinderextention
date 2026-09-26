@@ -85,7 +85,12 @@
             Missing skills are saved automatically. Add only skills you can genuinely support with your work or projects.
           </p>
         </div>
-        <div class="status" id="skillVaultStatus">0 saved</div>
+        <div class="vault-head-actions">
+          <div class="status" id="skillVaultStatus">0 saved</div>
+          <button class="btn ghost" id="exportBackupBtn" type="button">Export Backup</button>
+          <button class="btn ghost" id="importBackupBtn" type="button">Restore Backup</button>
+          <input id="importBackupInput" type="file" accept="application/json,.json" hidden>
+        </div>
       </div>
 
       <div class="vault-tabs">
