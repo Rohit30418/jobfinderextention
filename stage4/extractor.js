@@ -29,6 +29,10 @@ const els = {
   detailConfidence: $("#detailConfidence"),
   detailGrid: $("#detailGrid"),
   detailDescription: $("#detailDescription"),
+  detailRequiredSkills: $("#detailRequiredSkills"),
+  detailPreferredSkills: $("#detailPreferredSkills"),
+  detailResponsibilities: $("#detailResponsibilities"),
+  detailRequirements: $("#detailRequirements"),
   detailSources: $("#detailSources"),
   emptyPanel: $("#emptyPanel"),
   diagnosticsGrid: $("#diagnosticsGrid"),
@@ -211,6 +215,29 @@ function renderDetail(job) {
     '</div>'
   ).join("");
 
+  const renderSkillList = (element, values) => {
+    if (!element) return;
+    const list = Array.isArray(values) ? values.filter(Boolean) : [];
+    element.innerHTML = list.length
+      ? list.map((value) =>
+          '<span class="skill">' + escapeHtml(value) + '</span>'
+        ).join("")
+      : '<span class="unknown">Unknown</span>';
+  };
+
+  renderSkillList(els.detailRequiredSkills, job.requiredSkills);
+  renderSkillList(els.detailPreferredSkills, job.preferredSkills);
+
+  els.detailResponsibilities.textContent =
+    job.responsibilities?.length
+      ? job.responsibilities.map((item) => "• " + item).join("\n")
+      : "Unknown";
+
+  els.detailRequirements.textContent =
+    job.requirementStatements?.length
+      ? job.requirementStatements.map((item) => "• " + item).join("\n")
+      : "Unknown";
+
   els.detailDescription.textContent = job.description || "Unknown";
 
   const sources = job.sources || {};
@@ -243,6 +270,16 @@ async function renderDiagnostics() {
     ["Page type", data.pageType === "listing" || data.pageType === "detail", data.pageType || "unknown"],
     ["Capture method", data.captureMethod && data.captureMethod !== "none", data.captureMethod || "none"],
     ["Normalized jobs", Number(data.stats?.normalized || 0) > 0, Number(data.stats?.normalized || 0) + " current"],
+    [
+      "Detail enrichment",
+      data.pageType !== "detail" || Boolean(data.detail?.status?.detailLoaded),
+      data.pageType === "detail"
+        ? (
+            (data.detail?.requiredSkills?.length || 0) + " required skill(s) · " +
+            (data.detail?.responsibilities?.length || 0) + " responsibility item(s)"
+          )
+        : "Waiting for job-detail page"
+    ],
     ["Job cache", Object.keys(cache).length > 0, Object.keys(cache).length + " cached"],
     ["Match scoring", true, "Disabled"],
     ["AI job analysis", true, "Disabled"]
