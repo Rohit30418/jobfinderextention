@@ -1,0 +1,29 @@
+#jobpilot-naukri-stage3{
+  position:fixed!important;top:88px!important;right:18px!important;z-index:2147483647!important;
+  width:330px!important;max-height:calc(100vh - 112px)!important;overflow:auto!important;
+  background:#0a0f16!important;color:#eef3fb!important;border:1px solid #2a394d!important;
+  border-radius:14px!important;box-shadow:0 18px 55px rgba(0,0,0,.42)!important;
+  font-family:Inter,Arial,sans-serif!important;font-size:12px!important;line-height:1.4!important
+}
+#jobpilot-naukri-stage3 *{box-sizing:border-box!important}
+#jobpilot-naukri-stage3 .jp-head{display:flex!important;justify-content:space-between!important;align-items:center!important;gap:10px!important;padding:12px 13px!important;border-bottom:1px solid #263248!important;background:#0e151f!important;position:sticky!important;top:0!important}
+#jobpilot-naukri-stage3 .jp-head div{display:grid!important;gap:2px!important}
+#jobpilot-naukri-stage3 .jp-head span{color:#77f2a1!important;font-size:10px!important;font-weight:800!important;letter-spacing:.12em!important}
+#jobpilot-naukri-stage3 .jp-head strong{font-size:13px!important;color:#f1f5fb!important}
+#jobpilot-naukri-stage3 .jp-close{border:0!important;background:transparent!important;color:#8fa0b6!important;font-size:21px!important;line-height:1!important;padding:2px 5px!important;cursor:pointer!important}
+#jobpilot-naukri-stage3 .jp-body{padding:12px!important}
+#jobpilot-naukri-stage3 .jp-page,#jobpilot-naukri-stage3 .jp-count{display:flex!important;justify-content:space-between!important;gap:12px!important;padding:8px 0!important;border-bottom:1px solid #202b3a!important}
+#jobpilot-naukri-stage3 .jp-page span,#jobpilot-naukri-stage3 .jp-count span{color:#8fa0b6!important}
+#jobpilot-naukri-stage3 .jp-page b,#jobpilot-naukri-stage3 .jp-count b{color:#dfe7f2!important;text-align:right!important}
+#jobpilot-naukri-stage3 .jp-checks{display:grid!important;gap:8px!important;margin-top:10px!important}
+#jobpilot-naukri-stage3 .jp-check{border:1px solid #263248!important;border-radius:10px!important;padding:9px!important;background:#0e151f!important}
+#jobpilot-naukri-stage3 .jp-check-top{display:grid!important;grid-template-columns:18px 1fr auto!important;gap:6px!important;align-items:center!important}
+#jobpilot-naukri-stage3 .jp-check-top strong{color:#e6edf6!important}
+#jobpilot-naukri-stage3 .jp-check-top em{font-style:normal!important;color:#718197!important;font-size:10px!important}
+#jobpilot-naukri-stage3 .jp-icon{display:grid!important;place-items:center!important;width:17px!important;height:17px!important;border-radius:50%!important;background:#1d2937!important;color:#a8b4c5!important;font-weight:900!important}
+#jobpilot-naukri-stage3 .jp-verified .jp-icon{background:#173726!important;color:#77f2a1!important}
+#jobpilot-naukri-stage3 .jp-unverified .jp-icon{background:#412f19!important;color:#ffc76a!important}
+#jobpilot-naukri-stage3 .jp-values{display:grid!important;gap:3px!important;margin-top:7px!important;color:#8fa0b6!important;font-size:11px!important;overflow-wrap:anywhere!important}
+#jobpilot-naukri-stage3 .jp-note{margin-top:10px!important;padding:9px 10px!important;border:1px solid #263248!important;border-radius:9px!important;color:#9fadbf!important;background:#101821!important}
+#jobpilot-naukri-stage3 .jp-note.jp-warn{border-color:#5b4728!important;background:#211b12!important;color:#e8c98b!important}
+#jobpilot-naukri-stage3 .jp-note.jp-ok{border-color:#225238!important;background:#101f17!important;color:#a7e9bd!important}
