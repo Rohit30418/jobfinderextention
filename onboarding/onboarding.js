@@ -29,6 +29,14 @@ let currentValidation = null;
 let currentParser = null;
 let existingState = null;
 let profileSource = "manual";
+let extractionRunId = 0;
+let extractionState = {
+  selected: false,
+  status: "waiting",
+  detail: "No file selected",
+  parser: "",
+  error: ""
+};
 
 const els = {
   resumeFile: $("#resumeFile"),
@@ -306,34 +314,59 @@ async function refreshDiagnostics() {
   const token = await getPuterToken();
   const authorized = await getAiAuthorized();
 
+  const liveWords = currentValidation && currentValidation.metrics
+    ? currentValidation.metrics.wordCount
+    : 0;
+
+  const liveQuality = currentValidation
+    ? (currentValidation.passed ? "PASS " : "FAIL ") + currentValidation.score + "/100"
+    : "Not checked";
+
   const diagnostics = [
-    ["PDF.js", Boolean(globalThis.pdfjsLib), globalThis.pdfjsLib ? "Loaded" : "Missing"],
-    ["Profile storage", true, state.profile ? "Profile saved" : "No saved profile"],
+    ["PDF.js library", Boolean(globalThis.pdfjsLib), globalThis.pdfjsLib ? "Loaded" : "Missing"],
     [
-      "Resume text",
-      Boolean(state.resume && state.resume.text),
-      state.resume && state.resume.text
-        ? state.resume.wordCount + " words"
-        : "Not saved"
+      "Resume selected",
+      extractionState.selected,
+      extractionState.selected && selectedFile ? fileSummary(selectedFile) : "No file selected"
     ],
     [
-      "Original file",
+      "Extraction",
+      extractionState.status === "success",
+      extractionState.status === "running"
+        ? "Reading..."
+        : extractionState.status === "failed"
+          ? "FAILED · " + extractionState.error
+          : extractionState.status === "success"
+            ? extractionState.detail
+            : "Waiting"
+    ],
+    [
+      "Live resume text",
+      Boolean(currentText),
+      currentText ? liveWords + " words" : "Not extracted"
+    ],
+    [
+      "Live quality gate",
+      Boolean(currentValidation && currentValidation.passed),
+      liveQuality
+    ],
+    ["Chrome storage", true, state.profile ? "Saved profile found" : "Ready · no saved profile"],
+    [
+      "Saved original file",
       Boolean(storedFile) || Boolean(state.resume && state.resume.source === "paste"),
       storedFile
         ? storedFile.name
         : state.resume && state.resume.source === "paste"
-          ? "Pasted text"
-          : "None"
+          ? "Pasted text profile"
+          : "Not saved"
     ],
     [
-      "Quality gate",
-      Boolean(state.resume && state.resume.validation && state.resume.validation.passed),
-      state.resume && state.resume.validation
-        ? state.resume.validation.score + "/100"
-        : "Not checked"
+      "Saved profile",
+      Boolean(state.profile),
+      state.profile ? "Profile saved" : "Not saved"
     ],
-    ["Puter", Boolean(token), token ? "Connected" : "Not connected"],
-    ["AI permission", authorized, authorized ? "Authorized" : "Not authorized"],
+    ["Puter", Boolean(token), token ? "Connected" : "Optional · not connected"],
+    ["AI permission", authorized, authorized ? "Authorized" : "Optional · not authorized"],
     [
       "Stage 1",
       Boolean(
@@ -351,7 +384,7 @@ async function refreshDiagnostics() {
       '<div class="diag ' +
       (item[1] ? "pass" : "fail") +
       '"><strong>' +
-      (item[1] ? "PASS" : "WAIT") +
+      (item[1] ? "PASS" : (item[0].startsWith("Puter") || item[0].startsWith("AI permission") ? "OPTIONAL" : "WAIT")) +
       '</strong><span>' +
       escapeHtml(item[0] + ": " + item[2]) +
       "</span></div>"
@@ -383,7 +416,117 @@ async function loadExisting() {
   await refreshDiagnostics();
 }
 
-els.resumeFile.addEventListener("change", () => {
+async function extractSelectedFile() {
+  if (!selectedFile) {
+    setMessage(els.parseMessage, "Choose a resume file first.", "error");
+    extractionState = {
+      selected: false,
+      status: "waiting",
+      detail: "No file selected",
+      parser: "",
+      error: ""
+    };
+    await refreshDiagnostics();
+    return;
+  }
+
+  const runId = ++extractionRunId;
+  const fileAtStart = selectedFile;
+
+  currentText = "";
+  currentValidation = null;
+  currentParser = null;
+
+  extractionState = {
+    selected: true,
+    status: "running",
+    detail: fileSummary(fileAtStart),
+    parser: "",
+    error: ""
+  };
+
+  els.parseFileBtn.disabled = true;
+  els.parseFileBtn.textContent = "Extracting...";
+  els.resumeSourceStatus.textContent = "Reading...";
+  setMessage(
+    els.parseMessage,
+    "Reading " + fileAtStart.name + " with the local resume parser..."
+  );
+  await refreshDiagnostics();
+
+  try {
+    const parsed = await parseResumeFile(fileAtStart);
+
+    if (runId !== extractionRunId || fileAtStart !== selectedFile) {
+      return;
+    }
+
+    currentParser = parsed.parser;
+    const normalized = normalizeResumeText(parsed.text);
+    const result = validateResumeText(normalized);
+
+    renderValidation(result);
+
+    extractionState = {
+      selected: true,
+      status: "success",
+      detail:
+        parsed.parser +
+        " · " +
+        result.metrics.wordCount +
+        " words" +
+        (parsed.details && parsed.details.pages ? " · " + parsed.details.pages + " page(s)" : ""),
+      parser: parsed.parser,
+      error: ""
+    };
+
+    els.resumeSourceStatus.textContent = result.passed
+      ? "Extracted"
+      : "Needs review";
+
+    setStep(2);
+  } catch (error) {
+    if (runId !== extractionRunId) {
+      return;
+    }
+
+    const message = error && error.message
+      ? error.message
+      : "Resume extraction failed.";
+
+    currentParser = null;
+    currentText = "";
+    currentValidation = null;
+
+    extractionState = {
+      selected: true,
+      status: "failed",
+      detail: fileSummary(fileAtStart),
+      parser: "",
+      error: message
+    };
+
+    els.resumeSourceStatus.textContent = "Failed";
+    setMessage(
+      els.parseMessage,
+      message + " You can retry or use Paste Resume Text.",
+      "error"
+    );
+    await refreshDiagnostics();
+  } finally {
+    if (runId === extractionRunId) {
+      els.parseFileBtn.disabled = false;
+      els.parseFileBtn.textContent =
+        extractionState.status === "failed"
+          ? "Retry extraction"
+          : "Extract resume";
+    }
+  }
+}
+
+els.resumeFile.addEventListener("change", async () => {
+  extractionRunId += 1;
+
   selectedFile =
     els.resumeFile.files && els.resumeFile.files[0]
       ? els.resumeFile.files[0]
@@ -391,51 +534,23 @@ els.resumeFile.addEventListener("change", () => {
 
   els.selectedFile.textContent = fileSummary(selectedFile);
   setMessage(els.parseMessage, "");
-});
 
-els.parseFileBtn.addEventListener("click", async () => {
-  if (!selectedFile) {
-    setMessage(els.parseMessage, "Choose a resume file first.", "error");
-    return;
-  }
+  extractionState = {
+    selected: Boolean(selectedFile),
+    status: selectedFile ? "waiting" : "waiting",
+    detail: selectedFile ? fileSummary(selectedFile) : "No file selected",
+    parser: "",
+    error: ""
+  };
 
-  els.parseFileBtn.disabled = true;
-  els.resumeSourceStatus.textContent = "Reading...";
-  setMessage(els.parseMessage, "Extracting resume locally...");
+  await refreshDiagnostics();
 
-  try {
-    const parsed = await parseResumeFile(selectedFile);
-    currentParser = parsed.parser;
-
-    const normalized = normalizeResumeText(parsed.text);
-    const result = validateResumeText(normalized);
-
-    renderValidation(result);
-    els.resumeSourceStatus.textContent = parsed.parser;
-
-    setMessage(
-      els.parseMessage,
-      result.passed
-        ? "Resume extracted. Review exactly what JobPilot read."
-        : "Extraction completed, but the quality gate rejected the text. Edit it or paste clean resume text.",
-      result.passed ? "success" : "error"
-    );
-
-    setStep(2);
-  } catch (error) {
-    currentParser = null;
-    els.resumeSourceStatus.textContent = "Failed";
-
-    setMessage(
-      els.parseMessage,
-      (error && error.message ? error.message : "Resume extraction failed.") +
-        " You can use Paste Resume Text instead.",
-      "error"
-    );
-  } finally {
-    els.parseFileBtn.disabled = false;
+  if (selectedFile) {
+    await extractSelectedFile();
   }
 });
+
+els.parseFileBtn.addEventListener("click", extractSelectedFile);
 
 els.usePasteBtn.addEventListener("click", () => {
   selectedFile = null;
@@ -578,10 +693,18 @@ els.reviewProfileBtn.addEventListener("click", () => {
 els.editProfileBtn.addEventListener("click", () => setStep(3));
 
 els.replaceResumeBtn.addEventListener("click", () => {
+  extractionRunId += 1;
   selectedFile = null;
   currentText = "";
   currentValidation = null;
   currentParser = null;
+  extractionState = {
+    selected: false,
+    status: "waiting",
+    detail: "No file selected",
+    parser: "",
+    error: ""
+  };
 
   els.resumeFile.value = "";
   els.selectedFile.textContent = "No file selected.";
