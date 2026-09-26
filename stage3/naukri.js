@@ -147,12 +147,20 @@ function buildSearchSpec() {
 
   const params = new URLSearchParams();
 
-  if (fresh.jobAge) {
-    params.set("jobAge", fresh.jobAge);
+  // Naukri's real search URLs keep explicit query state even when the
+  // same role/location are represented in the SEO-friendly path.
+  params.set("k", keywords);
+
+  if (locations.length) {
+    params.set("l", locations.join(", "));
   }
 
   if (nativeExperienceValue) {
     params.set("experience", nativeExperienceValue);
+  }
+
+  if (fresh.jobAge) {
+    params.set("jobAge", fresh.jobAge);
   }
 
   cityTypeGids.forEach((gid) => params.append("cityTypeGid", gid));
@@ -312,7 +320,7 @@ async function refreshDiagnostics() {
     [
       "URL pattern",
       true,
-      "SEO path + native Naukri query params"
+      "SEO path + k/l + native Naukri filter params"
     ],
     [
       "Freshness",
