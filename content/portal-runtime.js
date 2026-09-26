@@ -190,11 +190,21 @@
           ? cacheAfterUpdate[existingKey]
           : null;
 
-      if (cachedDetail?.aiAnalysis) {
+      if (cachedDetail?.aiAnalysis || cachedDetail?.deepMatch) {
         data.detail = {
           ...data.detail,
-          aiAnalysis: cachedDetail.aiAnalysis,
-          aiAnalyzedAt: cachedDetail.aiAnalyzedAt || null
+          ...(cachedDetail.aiAnalysis
+            ? {
+                aiAnalysis: cachedDetail.aiAnalysis,
+                aiAnalyzedAt: cachedDetail.aiAnalyzedAt || null
+              }
+            : {}),
+          ...(cachedDetail.deepMatch
+            ? {
+                deepMatch: cachedDetail.deepMatch,
+                deepMatchedAt: cachedDetail.deepMatchedAt || null
+              }
+            : {})
         };
       }
     }
