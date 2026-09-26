@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "JobPilot - Profile, Preferences & Naukri Search",
-  "version": "0.3.2",
-  "description": "Stage 3 Naukri search now mirrors real SEO-path + k/l query URL behavior and learned native filters.",
+  "name": "JobPilot - Naukri Job Extractor",
+  "version": "0.4.0",
+  "description": "Stages 1-4: candidate profile, job preferences, Naukri search verification and structured Naukri job extraction.",
   "permissions": [
     "storage",
     "unlimitedStorage"
@@ -29,10 +29,12 @@
         "https://www.naukri.com/*"
       ],
       "js": [
-        "content/naukri-detector.js"
+        "content/naukri-detector.js",
+        "content/naukri-extractor.js"
       ],
       "css": [
-        "content/naukri-detector.css"
+        "content/naukri-detector.css",
+        "content/naukri-extractor.css"
       ],
       "run_at": "document_idle"
     }
