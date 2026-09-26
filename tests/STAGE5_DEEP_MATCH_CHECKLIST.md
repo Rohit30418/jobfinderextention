@@ -32,7 +32,7 @@ Stage 5 compares one captured detail job against the saved Stage 1 profile and S
 - [ ] Deterministic Stage 4 required skills are fallback.
 - [ ] Required matched and missing skills are shown separately.
 - [ ] Preferred matched and missing skills are shown separately.
-- [ ] Common aliases such as React.js/React, JavaScript/JS-style normalization, Redux Toolkit/Redux, RESTful/REST are normalized.
+- [ ] Common aliases such as React.js/React, JS/JavaScript, TS/TypeScript, Redux Toolkit/Redux, RESTful/REST are normalized.
 - [ ] Missing skills are evidence gaps, not invented blockers.
 
 ## Experience and preferences
@@ -57,7 +57,7 @@ Allowed Stage 5 v1 verdicts:
 Rules:
 
 - [ ] Any hard blocker produces BLOCKED.
-- [ ] STRONG FIT requires role compatibility, no below-minimum experience, strong required-skill coverage or unknown required skills, and very few gaps.
+- [ ] STRONG FIT requires role compatibility, no below-minimum experience, at least 75% identified required-skill coverage, and very few gaps.
 - [ ] POSSIBLE FIT requires role compatibility and useful required-skill coverage.
 - [ ] No numeric candidate/job match percentage is shown in Stage 5 v1.
 
@@ -86,3 +86,6 @@ Rules:
 - [ ] Explicit must-have requirements are visible.
 - [ ] Explicit AI/JD constraints are visible.
 - [ ] Toolbar opens Stage 5 after a deep match exists.
+
+- [ ] Java does not match JavaScript by substring.
+- [ ] A saved minimum-salary preference is surfaced as not scored until universal salary normalization exists.
