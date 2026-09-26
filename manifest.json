@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "JobPilot - Naukri Job Extractor",
-  "version": "0.4.1",
-  "description": "Stage 4 structured Naukri extraction with reliable content-script injection diagnostics.",
+  "version": "0.4.2",
+  "description": "Stage 4 structured Naukri extraction with support for both naukri.com and www.naukri.com.",
   "permissions": [
     "storage",
     "unlimitedStorage",
@@ -12,6 +12,7 @@
   "host_permissions": [
     "https://api.puter.com/*",
     "https://puter.com/*",
+    "https://naukri.com/*",
     "https://www.naukri.com/*"
   ],
   "background": {
@@ -28,6 +29,7 @@
   "content_scripts": [
     {
       "matches": [
+        "https://naukri.com/*",
         "https://www.naukri.com/*"
       ],
       "js": [
