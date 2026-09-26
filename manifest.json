@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "JobPilot - Universal Job Portal Assistant",
-  "version": "0.5.2",
-  "description": "Universal portal capture with deterministic quick relevance filtering for listing pages.",
+  "version": "0.6.0",
+  "description": "Stage 4C: universal detail-page enrichment with Naukri JSON-LD/detail DOM capture and cached job enrichment.",
   "permissions": [
     "storage",
     "unlimitedStorage",
