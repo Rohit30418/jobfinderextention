@@ -43,6 +43,8 @@ const els = {
   reviewCount: $("#reviewCount"),
   filteredCount: $("#filteredCount"),
   analyzedCount: $("#analyzedCount"),
+  aiRankBtn: $("#aiRankBtn"),
+  aiRankStatus: $("#aiRankStatus"),
   openSourceBtn: $("#openSourceBtn"),
   portalSources: $("#portalSources"),
   portalFilters: $("#portalFilters"),
@@ -159,6 +161,7 @@ function allCapturedJobs() {
           "",
         listingCapturedAt: context.capturedAt || null,
         aiAnalysis: cached?.aiAnalysis || null,
+        aiRanking: cached?.aiRanking || null,
         deepMatch: cached?.deepMatch || null
       });
     }
@@ -168,27 +171,52 @@ function allCapturedJobs() {
 }
 
 function decisionRank(job) {
-  const action = job.deepMatch?.applyDecision?.action;
+  const deepAction = job.deepMatch?.applyDecision?.action;
+  const aiAction = job.aiRanking?.decision;
 
-  if (action === "APPLY") return 0;
-  if (action === "REVIEW FIRST") return 1;
-  if (!job.deepMatch && job.relevance?.status === "relevant") {
-    return 2;
+  if (deepAction === "APPLY") return 0;
+  if (aiAction === "APPLY") return 1;
+  if (deepAction === "REVIEW FIRST") return 2;
+  if (aiAction === "REVIEW") return 3;
+  if (!job.deepMatch && !job.aiRanking && job.relevance?.status === "relevant") {
+    return 4;
   }
-  if (!job.deepMatch && job.relevance?.status === "review") {
-    return 3;
+  if (!job.deepMatch && !job.aiRanking && job.relevance?.status === "review") {
+    return 5;
   }
-  if (action === "SKIP") return 5;
+  if (deepAction === "SKIP" || aiAction === "SKIP") return 7;
 
-  return 4;
+  return 6;
 }
 
 function score(job) {
-  const value = job.deepMatch?.matchScore?.score;
-  return Number.isFinite(value) ? value : -1;
+  const deep = job.deepMatch?.matchScore?.score;
+  if (Number.isFinite(deep)) return deep;
+
+  const ai = job.aiRanking?.fitScore;
+  return Number.isFinite(ai) ? ai : -1;
 }
 
 function visible(job) {
+  const aiDecision = job.aiRanking?.decision;
+
+  if (aiDecision) {
+    const cls =
+      aiDecision === "APPLY"
+        ? "apply"
+        : aiDecision === "SKIP"
+          ? "skip"
+          : "review";
+
+    return (
+      '<span class="badge ' +
+      cls +
+      '">AI ' +
+      escapeHtml(aiDecision) +
+      "</span>"
+    );
+  }
+
   const status = job.relevance?.status || "review";
   const analyzed = Boolean(job.deepMatch);
 
@@ -203,18 +231,25 @@ function visible(job) {
   if (mode === "review") return status === "review";
   if (mode === "analyzed") return analyzed;
   if (mode === "recommended") {
-    const decision = job.deepMatch?.applyDecision?.action;
+    const deepDecision = job.deepMatch?.applyDecision?.action;
+    const aiDecision = job.aiRanking?.decision;
 
-    if (decision === "APPLY" || decision === "REVIEW FIRST") {
+    if (deepDecision === "APPLY" || deepDecision === "REVIEW FIRST") {
       return true;
     }
 
-    if (decision === "SKIP") {
+    if (deepDecision === "SKIP") {
       return false;
     }
 
-    // Before deep analysis, Recommended stays strict.
-    // Uncertain jobs remain available under the Review tab.
+    if (aiDecision === "APPLY" || aiDecision === "REVIEW") {
+      return true;
+    }
+
+    if (aiDecision === "SKIP") {
+      return false;
+    }
+
     return status === "relevant";
   }
 
@@ -537,10 +572,16 @@ function renderJobs() {
 
   els.jobList.innerHTML = jobs.map((job) => {
     const matchScore =
-      job.deepMatch?.matchScore?.score;
+      Number.isFinite(job.deepMatch?.matchScore?.score)
+        ? job.deepMatch.matchScore.score
+        : Number.isFinite(job.aiRanking?.fitScore)
+          ? job.aiRanking.fitScore
+          : null;
 
     const reasons =
-      job.relevance?.reasons || [];
+      job.aiRanking?.reasons?.length
+        ? job.aiRanking.reasons
+        : job.relevance?.reasons || [];
 
     const portalName =
       portalMeta(job.portal).name ||
@@ -571,7 +612,8 @@ function renderJobs() {
               Number.isFinite(matchScore)
                 ? '<span class="badge score">' +
                   matchScore +
-                  "% MATCH</span>"
+                  (job.deepMatch ? "% MATCH" : "% AI FIT") +
+                  "</span>"
                 : ""
             ) +
           "</div>" +
@@ -609,7 +651,9 @@ function renderJobs() {
             (
               job.deepMatch
                 ? "Deep analysis saved from the portal page."
-                : "Open the job for full JobPilot analysis."
+                : job.aiRanking?.summary
+                  ? job.aiRanking.summary
+                  : "Open the job for full JobPilot analysis."
             )
           ) +
         "</div>" +
@@ -619,7 +663,9 @@ function renderJobs() {
             (
               job.deepMatch
                 ? "Previously deep analyzed"
-                : "Deep analysis runs on the portal page"
+                : job.aiRanking
+                  ? "AI ranked · open for full JD analysis"
+                  : "Deep analysis runs on the portal page"
             ) +
           "</span>" +
           '<a class="open" href="' +
@@ -664,6 +710,18 @@ function renderHeader() {
 
   els.openSourceBtn.disabled =
     !latestContext?.sourceUrl;
+
+  const aiRanked = all.filter((job) => job.aiRanking).length;
+  if (els.aiRankStatus) {
+    els.aiRankStatus.textContent =
+      aiRanked
+        ? aiRanked + " job" + (aiRanked === 1 ? "" : "s") + " AI-ranked. Recommended is sorted by fit."
+        : "AI ranking has not run yet.";
+  }
+
+  if (els.aiRankBtn) {
+    els.aiRankBtn.disabled = !all.length;
+  }
 }
 
 function render() {
@@ -684,6 +742,57 @@ async function load() {
 
   render();
 }
+
+els.aiRankBtn?.addEventListener("click", async () => {
+  const jobs = allCapturedJobs()
+    .filter((job) => job.relevance?.status !== "filtered")
+    .slice(0, 30)
+    .map((job) => ({
+      key: job.key,
+      portal: job.portal,
+      title: job.title,
+      company: job.company,
+      location: job.location,
+      experienceText: job.experienceText,
+      salaryText: job.salaryText,
+      skills: job.skills || [],
+      snippet: job.snippet || "",
+      postedAge: job.postedAge || ""
+    }));
+
+  if (!jobs.length) return;
+
+  els.aiRankBtn.disabled = true;
+  els.aiRankBtn.textContent = "AI Ranking…";
+  if (els.aiRankStatus) {
+    els.aiRankStatus.textContent = "AI is comparing captured jobs with your saved profile and preferences.";
+  }
+
+  try {
+    const response = await chrome.runtime.sendMessage({
+      type: "jobpilot:rank-list-ai",
+      jobs
+    });
+
+    if (!response?.ok) {
+      throw new Error(response?.error || "AI ranking failed.");
+    }
+
+    if (els.aiRankStatus) {
+      els.aiRankStatus.textContent =
+        "AI ranked " + Number(response.count || 0) + " jobs. Best fits are now first.";
+    }
+
+    await load();
+  } catch (error) {
+    if (els.aiRankStatus) {
+      els.aiRankStatus.textContent = error?.message || String(error);
+    }
+  } finally {
+    els.aiRankBtn.disabled = false;
+    els.aiRankBtn.textContent = "AI Rank Jobs";
+  }
+});
 
 els.openSourceBtn.addEventListener(
   "click",
