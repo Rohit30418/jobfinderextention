@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "JobPilot - Universal Job Portal Assistant",
-  "version": "0.6.0",
-  "description": "Stage 4C: universal detail-page enrichment with Naukri JSON-LD/detail DOM capture and cached job enrichment.",
+  "version": "0.6.1",
+  "description": "Stage 4C detail readiness gate: wait for dynamic portal content before saving or displaying detail captures.",
   "permissions": [
     "storage",
     "unlimitedStorage",
