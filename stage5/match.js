@@ -39,6 +39,8 @@ const els = {
   matchScoreFill: $("#matchScoreFill"),
   confidence: $("#confidence"),
   confidenceMeta: $("#confidenceMeta"),
+  scoreBreakdown: $("#scoreBreakdown"),
+  scoreAssessedWeight: $("#scoreAssessedWeight"),
 
   blockerCount: $("#blockerCount"),
   strengthCount: $("#strengthCount"),
@@ -264,6 +266,23 @@ function renderMatch(match, job) {
     match.matchScore?.label || "Insufficient data";
   els.matchScoreFill.style.width =
     Number.isFinite(score) ? score + "%" : "0%";
+
+  const scoreComponents = match.matchScore?.components || [];
+  els.scoreAssessedWeight.textContent =
+    (match.matchScore?.assessedWeight || 0) + " weighted evidence";
+  els.scoreBreakdown.innerHTML = scoreComponents.length
+    ? scoreComponents.map((component) =>
+        '<div class="detail-field">' +
+          '<div class="label">' + escapeHtml(component.label) + '</div>' +
+          '<div class="value">' +
+            escapeHtml(
+              component.points + "/" + component.weight +
+              " · " + component.detail
+            ) +
+          '</div>' +
+        '</div>'
+      ).join("")
+    : '<div class="empty">Not enough evidence to calculate a score breakdown.</div>';
 
   els.confidence.textContent = match.confidence.level;
   els.confidenceMeta.textContent =
