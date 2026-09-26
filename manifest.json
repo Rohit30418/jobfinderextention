@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "JobPilot - Universal Job Portal Assistant",
-  "version": "1.4.0",
-  "description": "JobPilot 1.4: dedicated portal adapters for Naukri, Foundit, LinkedIn Jobs, Indeed and Hirist.",
+  "version": "1.4.1",
+  "description": "JobPilot 1.4.1: portal-specific injection and dedicated listing/detail adapters for Naukri, Foundit, LinkedIn Jobs, Indeed and Hirist.",
   "permissions": [
     "storage",
     "unlimitedStorage",
@@ -24,7 +24,10 @@
     "https://in.indeed.com/*",
     "https://*.indeed.com/*",
     "https://hirist.tech/*",
-    "https://www.hirist.tech/*"
+    "https://www.hirist.tech/*",
+    "https://www.linkedin.com/*",
+    "https://linkedin.com/*",
+    "https://www.indeed.com/*"
   ],
   "background": {
     "service_worker": "background.js",
