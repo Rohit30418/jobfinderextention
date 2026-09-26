@@ -369,7 +369,7 @@ async function forceConnectToNaukri() {
     });
 
     setConnectionMessage(
-      "Connected to: " + target.url + ". Return to that Naukri tab; Stage 3 and Stage 4 overlays should now be visible.",
+      "Connected to: " + target.url + ". Return to that Naukri tab. Listing capture runs on search pages and full JobPilot analysis runs directly on detail pages.",
       "success"
     );
 
@@ -483,9 +483,9 @@ async function refreshDiagnostics() {
         : "No injection attempt recorded"
     ],
     [
-      "Scoring / AI",
+      "Detail intelligence",
       true,
-      "Disabled in Stage 3"
+      "Match %, Puter AI and APPLY / REVIEW / SKIP run on the portal detail page"
     ]
   ];
 
