@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "JobPilot - Universal Job Portal Assistant",
-  "version": "0.9.0",
-  "description": "Inline detail intelligence: APPLY / REVIEW / SKIP, Puter AI, deep match, JD highlights and back-to-list directly on job pages.",
+  "version": "0.9.1",
+  "description": "Inline job intelligence with explainable match %, evidence confidence, APPLY / REVIEW FIRST / SKIP, Puter AI and JD highlighting.",
   "permissions": [
     "storage",
     "unlimitedStorage",
