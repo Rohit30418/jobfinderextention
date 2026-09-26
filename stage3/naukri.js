@@ -352,7 +352,8 @@ async function forceConnectToNaukri() {
         "portals/naukri/detail.js",
         "portals/naukri/adapter.js",
         "core/relevance-gate.js",
-        "content/portal-runtime.js"
+        "content/portal-runtime.js",
+        "content/detail-intelligence.js"
       ]
     });
 
