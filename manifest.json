@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "JobPilot - Universal Job Portal Assistant",
-  "version": "1.5.1",
-  "description": "JobPilot 1.5.1: AI semantic evidence matching with exact, inferred, partial and missing requirement classification.",
+  "version": "1.5.2",
+  "description": "JobPilot 1.5.2: AI semantic evidence plus foundational frontend competency recognition.",
   "permissions": [
     "storage",
     "unlimitedStorage",
