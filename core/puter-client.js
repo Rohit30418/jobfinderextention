@@ -504,7 +504,7 @@ export async function analyzeJobWithAi(job, profile = null, preferences = null) 
     "requiredSkills and preferredSkills must be concise skill/capability labels, not full responsibility phrases.",
     "Normalize phrases into useful labels when the JD supports them. Examples: 'build responsive and interactive web applications' -> 'Responsive Design'; 'optimize metadata/search visibility' -> 'SEO'; 'review pull requests and maintain quality' -> 'Code Review'.",
     "Do not turn generic outcomes such as 'web applications', 'code quality', or 'reusable libraries' into standalone skills unless the JD clearly presents a specific capability requirement.",
-    "A technology merely mentioned in a responsibility is not automatically required."
+    "A technology merely mentioned in a responsibility is not automatically required.",
     "Disqualifiers must only contain explicit hard constraints such as mandatory years, mandatory degree, location/work-mode restriction, certification, notice period, citizenship, language, or other stated must-have condition.",
     "When CANDIDATE_DATA is provided, also evaluate every extracted required/preferred skill or capability against the candidate's actual evidence.",
     "For candidateRequirementMatches use these statuses only:",
