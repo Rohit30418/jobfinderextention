@@ -1112,14 +1112,26 @@
       cautions: []
     };
 
-    const requiredMatched =
-      match.skills?.required?.matched || [];
+    const requiredExact =
+      match.skills?.required?.exact || match.skills?.required?.matched || [];
+    const requiredInferred =
+      match.skills?.required?.inferred || [];
+    const requiredPartial =
+      match.skills?.required?.partial || [];
     const requiredMissing =
       match.skills?.required?.missing || [];
-    const preferredMatched =
-      match.skills?.preferred?.matched || [];
+
+    const preferredExact =
+      match.skills?.preferred?.exact || match.skills?.preferred?.matched || [];
+    const preferredInferred =
+      match.skills?.preferred?.inferred || [];
+    const preferredPartial =
+      match.skills?.preferred?.partial || [];
     const preferredMissing =
       match.skills?.preferred?.missing || [];
+
+    const semanticEvidence =
+      match.skills?.required?.evidence || {};
 
     const aiLabel =
       result.aiStatus === "completed"
@@ -1177,16 +1189,26 @@
       <div class="section">
         <h4>Required skills</h4>
         <div class="skills">
-          ${renderSkills(requiredMatched, "good")}
+          ${renderSkills(requiredExact, "good")}
+          ${renderSkills(requiredInferred, "info")}
+          ${renderSkills(requiredPartial, "warn")}
           ${renderSkills(requiredMissing, "bad")}
+        </div>
+        <div class="legend">
+          <span><i class="dot green"></i>Exact</span>
+          <span><i class="dot blue"></i>AI inferred</span>
+          <span><i class="dot amber"></i>Partial</span>
+          <span><i class="dot red"></i>Missing</span>
         </div>
       </div>
 
       <div class="section">
         <h4>Preferred / nice to have</h4>
         <div class="skills">
-          ${renderSkills(preferredMatched, "info")}
-          ${renderSkills(preferredMissing, "warn")}
+          ${renderSkills(preferredExact, "good")}
+          ${renderSkills(preferredInferred, "info")}
+          ${renderSkills(preferredPartial, "warn")}
+          ${renderSkills(preferredMissing, "bad")}
         </div>
       </div>
 
@@ -1221,6 +1243,39 @@
           <div class="section">
             <h4>Strong signals</h4>
             ${renderItems(strengths, "No strong positive signals yet.")}
+          </div>
+
+          <div class="section">
+            <h4>AI semantic evidence</h4>
+            ${
+              Object.entries(semanticEvidence)
+                .filter(([, value]) =>
+                  value &&
+                  ["INFERRED", "PARTIAL"].includes(String(value.status || "").toUpperCase())
+                )
+                .slice(0, 12)
+                .map(([requirement, value]) =>
+                  '<div class="item">' +
+                    '<strong>' +
+                      escapeHtml(requirement) +
+                      ' · ' +
+                      escapeHtml(String(value.status || "").toUpperCase()) +
+                    '</strong>' +
+                    '<span>' +
+                      escapeHtml(
+                        value.explanation ||
+                        (
+                          Array.isArray(value.evidence) && value.evidence.length
+                            ? "Evidence: " + value.evidence.join(", ")
+                            : "Semantic evidence found in the saved profile."
+                        )
+                      ) +
+                    '</span>' +
+                  '</div>'
+                )
+                .join("") ||
+              '<div class="item"><span>No inferred or partial semantic matches for this job.</span></div>'
+            }
           </div>
 
           <div class="section">
