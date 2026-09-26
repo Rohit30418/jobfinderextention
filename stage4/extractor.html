@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>JobPilot - Stage 4 Naukri Extractor</title>
+  <title>JobPilot - Stage 4 Portal Capture</title>
   <link rel="stylesheet" href="extractor.css">
 </head>
 <body>
@@ -11,8 +11,8 @@
     <header class="topbar">
       <div>
         <div class="eyebrow">JOBPILOT / STAGE 4</div>
-        <h1>Naukri job extraction.</h1>
-        <p class="lede">Inspect the structured job data JobPilot actually read. Extraction confidence is not a job-match score.</p>
+        <h1>Universal portal capture.</h1>
+        <p class="lede">Inspect the normalized job data captured from any supported portal. Listing and detail pages use separate adapters.</p>
       </div>
       <div class="top-actions">
         <a class="btn ghost" href="../stage3/naukri.html">Back to Stage 3</a>
@@ -40,7 +40,7 @@
       </div>
 
       <div class="actions">
-        <button class="btn" id="openSourceBtn" type="button">Open source Naukri page</button>
+        <button class="btn" id="openSourceBtn" type="button">Open source portal page</button>
         <button class="btn" id="refreshBtn" type="button">Refresh extraction</button>
         <button class="btn danger" id="clearBtn" type="button">Clear Stage 4 data</button>
       </div>
@@ -55,7 +55,7 @@
       <div class="panel-heading">
         <div>
           <div class="kicker">SEARCH RESULTS</div>
-          <h2>Structured Naukri job cards</h2>
+          <h2>Normalized listing jobs</h2>
         </div>
         <div class="status-chip" id="cardCountChip">0 jobs</div>
       </div>
@@ -83,8 +83,8 @@
 
     <section class="panel hidden" id="emptyPanel">
       <div class="empty">
-        <strong>No extractable Naukri job data yet.</strong>
-        <span>Open a Naukri search-results page or an individual job page. Stage 4 runs automatically on naukri.com.</span>
+        <strong>No normalized portal data yet.</strong>
+        <span>Open a supported portal listing page or an individual job-detail page. Stage 4 runs through the matching portal adapter.</span>
       </div>
     </section>
 
