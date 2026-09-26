@@ -10,6 +10,7 @@
 
   const CAPTURE_KEY = "jobpilot.stage4.portalCapture";
   const CACHE_KEY = "jobpilot.jobs.cache";
+  const LISTING_CONTEXT_KEY = "jobpilot.stage6.listingContext";
   const CONNECTION_KEY = "jobpilot.stage4.connection";
   const ROOT_ID = "jobpilot-portal-stage4";
   const MAX_CACHE = 300;
@@ -209,12 +210,31 @@
       }
     }
 
-    await chrome.storage.local.set({
+    const capturedAt = new Date().toISOString();
+    const nextStorage = {
       [CAPTURE_KEY]: {
         ...data,
-        capturedAt: new Date().toISOString()
+        capturedAt
       }
-    });
+    };
+
+    if (data.pageType === "listing") {
+      nextStorage[LISTING_CONTEXT_KEY] = {
+        version: 1,
+        portal: data.portal || "",
+        portalName: data.portalName || data.portal || "",
+        sourceUrl: data.sourceUrl || location.href,
+        jobs: Array.isArray(data.jobs) ? data.jobs : [],
+        relevanceStats: data.relevanceStats || {
+          relevant: 0,
+          review: 0,
+          filtered: 0
+        },
+        capturedAt
+      };
+    }
+
+    await chrome.storage.local.set(nextStorage);
   }
 
   function statsFor(jobs, detected) {
