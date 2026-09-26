@@ -304,6 +304,12 @@ function fillFromPreferences() {
 async function refreshDiagnostics() {
   const saved = await getNaukriSearch();
   const spec = buildSearchSpec();
+  const connectionResult = await chrome.storage.local.get([
+    "jobpilot.stage3.connection",
+    "jobpilot.stage4.connection"
+  ]);
+  const stage3Connection = connectionResult["jobpilot.stage3.connection"];
+  const stage4Connection = connectionResult["jobpilot.stage4.connection"];
 
   const diagnostics = [
     ["Stage 1 profile", Boolean(profile), profile ? "Ready" : "Missing"],
@@ -350,6 +356,16 @@ async function refreshDiagnostics() {
       "Naukri session",
       Boolean(saved && saved.createdAt),
       saved && saved.createdAt ? "Stored" : "Not opened yet"
+    ],
+    [
+      "Stage 3 page script",
+      Boolean(stage3Connection && stage3Connection.status === "connected"),
+      stage3Connection ? "Connected · " + stage3Connection.url : "Not connected to a Naukri tab"
+    ],
+    [
+      "Stage 4 extractor script",
+      Boolean(stage4Connection && stage4Connection.status === "connected"),
+      stage4Connection ? "Connected · " + stage4Connection.url : "Not connected to a Naukri tab"
     ],
     [
       "Scoring / AI",
