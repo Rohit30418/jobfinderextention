@@ -17,6 +17,9 @@
   let lastSignature = "";
   let lastUrl = location.href;
   let closedForUrl = "";
+  let detailWaitUrl = "";
+  let detailWaitStartedAt = 0;
+  const DETAIL_WAIT_TIMEOUT_MS = 12000;
 
   function cleanupLegacyOverlays() {
     for (const selector of [
@@ -261,6 +264,10 @@
         sourceUrl: location.href,
         jobs: [],
         detail,
+        readiness: result?.readiness || {
+          ready: Boolean(detail),
+          reason: detail ? "detail-ready" : "waiting-for-detail"
+        },
         stats: statsFor(detail ? [detail] : [], detail ? 1 : 0)
       };
     }
@@ -310,6 +317,30 @@
       '<div class="jpp-row"><span>Portal</span><b>' + escapeHtml(portalName) + '</b></div>' +
       '<div class="jpp-row"><span>Page</span><b>' + escapeHtml(data.pageType) + '</b></div>' +
       '<div class="jpp-row"><span>Method</span><b>' + escapeHtml(data.captureMethod || "none") + '</b></div>';
+
+    if (
+      data.pageType === "detail" &&
+      data.readiness &&
+      data.readiness.ready === false
+    ) {
+      const reason = data.readiness.reason || "waiting-for-detail";
+      const signals = data.readiness.signals || {};
+      const readyCount = Object.values(signals).filter(Boolean).length;
+
+      html +=
+        '<div class="jpp-note">' +
+          '<strong>Waiting for job details…</strong><br>' +
+          'Naukri is still rendering this job. JobPilot will capture it automatically when the important fields are ready.' +
+        '</div>' +
+        '<div class="jpp-note">' +
+          'Readiness: ' + readyCount + '/' + Object.keys(signals).length +
+          ' signals · ' + escapeHtml(reason) +
+        '</div>' +
+        '<div class="jpp-note">Incomplete data is not being saved.</div>';
+
+      body.innerHTML = html;
+      return;
+    }
 
     if (data.pageType === "listing") {
       const stats = data.stats || {};
@@ -416,6 +447,29 @@
         data.relevanceStats = annotated.stats;
       }
 
+      if (
+        data.pageType === "detail" &&
+        data.readiness &&
+        data.readiness.ready === false
+      ) {
+        if (detailWaitUrl !== location.href) {
+          detailWaitUrl = location.href;
+          detailWaitStartedAt = Date.now();
+        }
+
+        const elapsed = Date.now() - detailWaitStartedAt;
+        render(data);
+
+        if (elapsed < DETAIL_WAIT_TIMEOUT_MS) {
+          schedule(700);
+        }
+
+        return;
+      }
+
+      detailWaitUrl = "";
+      detailWaitStartedAt = 0;
+
       render(data);
       await persistCapture(data);
     } catch (error) {
@@ -437,6 +491,8 @@
       lastUrl = location.href;
       lastSignature = "";
       closedForUrl = "";
+      detailWaitUrl = "";
+      detailWaitStartedAt = 0;
       schedule(300);
     }
   }, 900);
