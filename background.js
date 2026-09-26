@@ -70,7 +70,7 @@ chrome.action.onClicked.addListener(async () => {
   openPage(hasExtraction ? EXTRACTOR_PAGE : NAUKRI_PAGE);
 });
 
-const NAUKRI_HOST_RE = /^https:\/\/www\.naukri\.com\//i;
+const NAUKRI_HOST_RE = /^https:\/\/(?:www\.)?naukri\.com\//i;
 
 async function injectJobPilotIntoNaukri(tabId, url) {
   if (!tabId || !NAUKRI_HOST_RE.test(String(url || ""))) return;
@@ -105,7 +105,10 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 chrome.runtime.onStartup.addListener(async () => {
   try {
     const tabs = await chrome.tabs.query({
-      url: "https://www.naukri.com/*"
+      url: [
+        "https://naukri.com/*",
+        "https://www.naukri.com/*"
+      ]
     });
 
     for (const tab of tabs) {
