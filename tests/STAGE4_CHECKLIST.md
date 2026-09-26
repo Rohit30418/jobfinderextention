@@ -65,3 +65,18 @@ Stage 4 is extraction-only. No candidate matching, AI ranking, auto-apply or job
 - [ ] No match percentage is displayed.
 - [ ] No job is automatically hidden.
 - [ ] No application button is clicked.
+
+
+## Search-page classification regression
+
+For a URL like:
+
+`https://naukri.com/frontend-developer-jobs-in-noida?k=Frontend+Developer&l=Noida%2C+Gurugram%2C+Delhi&jobAge=3`
+
+- [ ] Stage 3 reports **Naukri search results**, not Individual job page.
+- [ ] Stage 4 reports **Search results**, not Job detail.
+- [ ] Result-card `job-desc` classes do not trigger detail-page mode.
+- [ ] Sidebar/filter text is never read as a single job's salary/title/location.
+- [ ] Stage 4 shows Detected / Parsed / Failed job-card counts.
+- [ ] Individual jobs are extracted from their own card containers only.
+- [ ] A real `/job-listings-...` URL still switches to Job detail mode.
