@@ -5,6 +5,8 @@ export const PREFERENCES_KEY = "jobpilot.stage2.preferences";
 export const NAUKRI_SEARCH_KEY = "jobpilot.stage3.naukriSearch";
 export const NAUKRI_NATIVE_FILTERS_KEY = "jobpilot.stage3.naukriNativeFilters";
 export const NAUKRI_EXTRACTION_KEY = "jobpilot.stage4.naukriExtraction";
+export const PORTAL_CAPTURE_KEY = "jobpilot.stage4.portalCapture";
+export const JOB_CACHE_KEY = "jobpilot.jobs.cache";
 
 export function emptyState() {
   return {
@@ -205,4 +207,57 @@ export async function setNaukriExtraction(extraction) {
 
 export async function clearNaukriExtraction() {
   await chrome.storage.local.remove(NAUKRI_EXTRACTION_KEY);
+}
+
+
+export function emptyPortalCapture() {
+  return {
+    version: 2,
+    portal: "",
+    portalName: "",
+    adapterVersion: "",
+    pageType: "unknown",
+    captureMethod: "none",
+    sourceUrl: "",
+    jobs: [],
+    detail: null,
+    stats: {
+      detected: 0,
+      normalized: 0,
+      high: 0,
+      medium: 0,
+      low: 0
+    },
+    capturedAt: null
+  };
+}
+
+export async function getPortalCapture() {
+  const result = await chrome.storage.local.get(PORTAL_CAPTURE_KEY);
+  return result[PORTAL_CAPTURE_KEY] || emptyPortalCapture();
+}
+
+export async function setPortalCapture(capture) {
+  const next = {
+    ...emptyPortalCapture(),
+    ...capture,
+    version: 2,
+    capturedAt: new Date().toISOString()
+  };
+  await chrome.storage.local.set({ [PORTAL_CAPTURE_KEY]: next });
+  return next;
+}
+
+export async function clearPortalCapture() {
+  await chrome.storage.local.remove(PORTAL_CAPTURE_KEY);
+}
+
+export async function getJobCache() {
+  const result = await chrome.storage.local.get(JOB_CACHE_KEY);
+  const value = result[JOB_CACHE_KEY];
+  return value && typeof value === "object" ? value : {};
+}
+
+export async function clearJobCache() {
+  await chrome.storage.local.remove(JOB_CACHE_KEY);
 }
