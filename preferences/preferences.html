@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>JobPilot - Stage 2 Preferences</title>
+  <link rel="stylesheet" href="preferences.css">
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <div>
+        <div class="eyebrow">JOBPILOT / STAGE 2</div>
+        <h1>Define the jobs you actually want.</h1>
+        <p class="lede">Your resume/profile stays untouched. These settings only control future job discovery and filtering.</p>
+      </div>
+      <div class="top-actions">
+        <a class="btn ghost" href="../onboarding/onboarding.html">Edit profile</a>
+        <span class="stage-chip">Search Preferences</span>
+      </div>
+    </header>
+
+    <section class="profile-card" id="profileGate">
+      <div>
+        <div class="kicker">SAVED PROFILE</div>
+        <h2 id="profileTitle">Checking profile...</h2>
+        <p id="profileMeta">JobPilot needs a saved Stage 1 profile before preferences can be configured.</p>
+      </div>
+      <div class="profile-status" id="profileStatus">Checking</div>
+    </section>
+
+    <main id="preferencesApp" class="hidden">
+      <section class="panel">
+        <div class="panel-heading">
+          <div>
+            <div class="kicker">SEARCH TARGET</div>
+            <h2>Roles, keywords and locations</h2>
+          </div>
+          <div class="status-chip" id="saveStatus">Not saved</div>
+        </div>
+
+        <div class="form-grid">
+          <label class="span-2">
+            <span>Target roles *</span>
+            <textarea id="targetRoles" rows="5" placeholder="Frontend Developer&#10;UI Developer&#10;React Developer"></textarea>
+            <small>One role per line or comma-separated. On first load, JobPilot copies the roles from Stage 1 if available.</small>
+          </label>
+
+          <label class="span-2">
+            <span>Priority keywords</span>
+            <textarea id="priorityKeywords" rows="5" placeholder="JavaScript&#10;React&#10;jQuery&#10;Responsive Design"></textarea>
+            <small>These are search/matching priorities. They do not modify your resume skills.</small>
+          </label>
+
+          <label class="span-2">
+            <span>Preferred locations</span>
+            <textarea id="preferredLocations" rows="4" placeholder="Noida&#10;Delhi NCR&#10;Gurugram&#10;Remote"></textarea>
+            <small>Leave empty if location should not restrict discovery later.</small>
+          </label>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading">
+          <div>
+            <div class="kicker">FILTERS</div>
+            <h2>Experience, freshness and job type</h2>
+          </div>
+        </div>
+
+        <div class="form-grid">
+          <div class="range-grid span-2">
+            <label>
+              <span>Minimum experience</span>
+              <input id="experienceMin" type="number" min="0" max="60" step="1" placeholder="e.g. 2">
+            </label>
+            <label>
+              <span>Maximum experience</span>
+              <input id="experienceMax" type="number" min="0" max="60" step="1" placeholder="e.g. 5">
+            </label>
+            <label>
+              <span>Freshness</span>
+              <select id="freshness">
+                <option value="24h">Last 24 hours</option>
+                <option value="3d">Last 3 days</option>
+                <option value="7d">Last 7 days</option>
+                <option value="14d">Last 14 days</option>
+                <option value="30d">Last 30 days</option>
+                <option value="any">Any time</option>
+              </select>
+            </label>
+          </div>
+
+          <fieldset>
+            <legend>Work mode</legend>
+            <label class="check"><input type="checkbox" name="workMode" value="Remote"> Remote</label>
+            <label class="check"><input type="checkbox" name="workMode" value="Hybrid"> Hybrid</label>
+            <label class="check"><input type="checkbox" name="workMode" value="On-site"> On-site</label>
+          </fieldset>
+
+          <fieldset>
+            <legend>Employment type</legend>
+            <label class="check"><input type="checkbox" name="employmentType" value="Full-time"> Full-time</label>
+            <label class="check"><input type="checkbox" name="employmentType" value="Part-time"> Part-time</label>
+            <label class="check"><input type="checkbox" name="employmentType" value="Contract"> Contract</label>
+            <label class="check"><input type="checkbox" name="employmentType" value="Internship"> Internship</label>
+          </fieldset>
+
+          <label class="span-2">
+            <span>Exclude title / role keywords</span>
+            <textarea id="excludedKeywords" rows="4" placeholder="Senior&#10;Lead&#10;Backend&#10;QA"></textarea>
+            <small>Later stages can flag or hide jobs whose title clearly contains these terms.</small>
+          </label>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading">
+          <div>
+            <div class="kicker">OPTIONAL</div>
+            <h2>Salary and filter behavior</h2>
+          </div>
+        </div>
+
+        <div class="form-grid">
+          <div class="salary-grid span-2">
+            <label>
+              <span>Minimum salary</span>
+              <input id="minimumSalary" type="number" min="0" step="0.1" placeholder="e.g. 8">
+            </label>
+            <label>
+              <span>Currency</span>
+              <select id="salaryCurrency">
+                <option value="INR">INR</option>
+                <option value="USD">USD</option>
+                <option value="GBP">GBP</option>
+                <option value="EUR">EUR</option>
+              </select>
+            </label>
+            <div class="salary-help">For INR, enter annual LPA-style numbers such as 8 or 10. Portal-specific conversion comes later.</div>
+          </div>
+
+          <fieldset class="span-2 behavior">
+            <legend>Future filtering behavior</legend>
+            <label class="check"><input id="strictFreshness" type="checkbox"> Enforce freshness when a portal/card exposes a posting date</label>
+            <label class="check"><input id="strictExperience" type="checkbox"> Strictly flag clear experience-range mismatches</label>
+            <label class="check"><input id="hideExcludedTitles" type="checkbox"> Hide/flag jobs with excluded title keywords</label>
+          </fieldset>
+        </div>
+
+        <div id="formMessage" class="message hidden"></div>
+
+        <div class="footer-actions">
+          <button class="btn danger" id="clearPreferencesBtn" type="button">Clear preferences</button>
+          <button class="btn primary" id="savePreferencesBtn" type="button">Save job preferences</button>
+        </div>
+      </section>
+
+      <section class="panel hidden" id="savedSummaryPanel">
+        <div class="panel-heading">
+          <div>
+            <div class="kicker">STAGE 2 READY</div>
+            <h2>Saved search configuration</h2>
+          </div>
+          <div class="status-chip ready">Saved</div>
+        </div>
+        <div class="summary-grid" id="savedSummary"></div>
+        <div class="next-stage">
+          <strong>Next stage:</strong> Naukri search URL generation + page detection only. No match scoring yet.
+        </div>
+      </section>
+
+      <details class="diagnostics">
+        <summary>Developer diagnostics</summary>
+        <div class="diag-grid" id="diagnosticsGrid"></div>
+        <button class="btn small" id="refreshDiagnosticsBtn" type="button">Refresh diagnostics</button>
+      </details>
+    </main>
+  </div>
+
+  <script type="module" src="preferences.js"></script>
+</body>
+</html>
