@@ -294,9 +294,11 @@
     if (!root) {
       root = document.createElement("aside");
       root.id = ROOT_ID;
+      const extensionVersion = chrome.runtime.getManifest().version;
+
       root.innerHTML = [
         '<div class="jpp-head">',
-        '  <div><span>JOBPILOT</span><strong>Portal capture</strong></div>',
+        '  <div><span>JOBPILOT · v' + escapeHtml(extensionVersion) + '</span><strong>Portal capture</strong></div>',
         '  <button class="jpp-close" type="button" aria-label="Close">×</button>',
         '</div>',
         '<div class="jpp-body"></div>'
