@@ -54,3 +54,24 @@ Stage 3 scope is intentionally limited to Naukri search generation, page-type de
 - [ ] Stage 2 preferences remain unchanged.
 - [ ] Puter AI is not called in Stage 3.
 - [ ] No automatic job applications or clicks occur.
+
+
+## Real Naukri URL regression examples
+
+These URL shapes must remain supported:
+
+- Freshness only:
+  `https://www.naukri.com/frontend-developer-jobs-in-noida?jobAge=3`
+- Naukri-native experience:
+  `https://www.naukri.com/frontend-developer-jobs-in-noida?jobAge=3&experience=22`
+- Repeated city filters:
+  `https://www.naukri.com/frontend-developer-jobs-in-noida?jobAge=3&experience=22&cityTypeGid=17&cityTypeGid=183`
+
+Rules:
+
+- [ ] Do not add redundant `k` when role already exists in the SEO path.
+- [ ] Do not add redundant `l` when the primary location already exists in the SEO path.
+- [ ] Do not invent an experience range such as `experience=2-5`.
+- [ ] Learn Naukri's native `experience` value from a real Naukri URL.
+- [ ] Preserve repeated `cityTypeGid` values with URLSearchParams.append.
+- [ ] Reuse learned experience/city values only for the same Stage 2 experience/location context.
