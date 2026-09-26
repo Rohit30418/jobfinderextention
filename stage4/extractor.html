@@ -110,6 +110,55 @@
         <summary>Extraction sources</summary>
         <div id="detailSources"></div>
       </details>
+
+      <div class="description-card" id="aiPanel">
+        <div class="panel-heading" style="margin-bottom:12px">
+          <div>
+            <div class="kicker">PUTER AI ENRICHMENT</div>
+            <h3 style="margin:4px 0 0">Understand the full JD</h3>
+            <p class="lede" style="margin-top:6px">
+              AI interprets the extracted job description. Verified portal facts remain unchanged.
+            </p>
+          </div>
+          <div class="status-chip" id="aiStatus">Not connected</div>
+        </div>
+
+        <div class="actions" style="justify-content:flex-start">
+          <button class="btn" id="connectPuterStage4Btn" type="button">Connect Puter</button>
+          <button class="btn" id="authorizePuterStage4Btn" type="button">Authorize AI</button>
+          <button class="btn primary" id="analyzeJobAiBtn" type="button">Analyze current job with AI</button>
+          <button class="btn" id="disconnectPuterStage4Btn" type="button">Disconnect</button>
+        </div>
+
+        <div class="notice hidden" id="aiMessage"></div>
+
+        <div class="detail-grid hidden" id="aiSummaryGrid"></div>
+
+        <div class="description-card hidden" id="aiRequiredCard">
+          <div class="field-label">AI required skills</div>
+          <div class="skills" id="aiRequiredSkills"></div>
+        </div>
+
+        <div class="description-card hidden" id="aiPreferredCard">
+          <div class="field-label">AI preferred skills</div>
+          <div class="skills" id="aiPreferredSkills"></div>
+        </div>
+
+        <div class="description-card hidden" id="aiMustHaveCard">
+          <div class="field-label">AI must-have requirements</div>
+          <div class="description-text" id="aiMustHave"></div>
+        </div>
+
+        <div class="description-card hidden" id="aiResponsibilitiesCard">
+          <div class="field-label">AI responsibilities</div>
+          <div class="description-text" id="aiResponsibilities"></div>
+        </div>
+
+        <div class="description-card hidden" id="aiDisqualifiersCard">
+          <div class="field-label">AI explicit disqualifiers</div>
+          <div class="description-text" id="aiDisqualifiers"></div>
+        </div>
+      </div>
     </section>
 
     <section class="panel hidden" id="emptyPanel">
