@@ -1,36 +1,72 @@
 # JobPilot
 
-JobPilot is being built in verified stages. This repository currently contains **Stage 1 only**.
+JobPilot is being built in verified stages.
 
-## Stage 1 goal
+The repository currently contains:
 
-Create a trustworthy, reusable candidate profile before any job search or scoring logic exists.
+- **Stage 1 — Candidate Profile**
+- **Stage 2 — Job Preferences**
+
+There is still **no job portal integration or match scoring** in this build.
+
+## Stage 1 — Candidate Profile
 
 Flow:
 
 1. Upload PDF / DOCX / TXT / MD, or paste resume text.
 2. Extract locally.
-3. Run a quality gate.
+3. Run a text-quality gate.
 4. Preview and edit exactly what JobPilot read.
 5. Optionally use Puter AI to structure the validated resume.
-6. Review and edit the candidate profile.
+6. Review/edit the candidate profile.
 7. Save the confirmed profile locally.
-8. Replace or delete the resume/profile at any time.
-9. Use Developer Diagnostics to see which layer is ready.
+8. Replace or delete the resume/profile.
+9. Use Developer Diagnostics to inspect each layer.
 
-## Intentionally not included yet
+Stage 1 stores **what the candidate has**.
 
-- Naukri
-- LinkedIn Jobs
-- Indeed
-- Foundit
-- Date filters
-- Job page detection
-- Job match percentages
-- Inline badges
-- Application tracking
+## Stage 2 — Job Preferences
 
-Those features come only after Stage 1 passes testing.
+Stage 2 stores **what jobs the candidate wants** without changing Stage 1.
+
+Preferences include:
+
+- target/search roles
+- priority keywords
+- preferred locations
+- minimum/maximum experience
+- work mode
+- employment type
+- posting freshness
+- excluded title/role keywords
+- optional minimum salary + currency
+- future strict-filter behavior
+
+On first use, Stage 2 copies target roles and keywords from the saved Stage 1 profile as editable starting suggestions.
+
+### Important separation
+
+```text
+Stage 1 profile = candidate evidence
+Stage 2 preferences = search intent
+```
+
+Clearing Stage 2 preferences does **not** delete the resume or Stage 1 profile.
+
+## Not included yet
+
+- Naukri integration
+- LinkedIn Jobs integration
+- Indeed integration
+- Foundit integration
+- portal URL generation
+- job page detection
+- job-card scoring
+- AI job analysis
+- inline badges
+- application tracking
+
+These come only after Stage 2 persistence and validation are stable.
 
 ## Install once
 
@@ -38,9 +74,14 @@ Run:
 
     git clone https://github.com/Rohit30418/jobfinderextention.git C:\JobPilot
 
-Then open chrome://extensions, enable Developer mode, choose Load unpacked, and select C:\JobPilot.
+Then:
 
-After that, do not uninstall/reinstall for every update.
+1. Open `chrome://extensions`
+2. Enable **Developer mode**
+3. Choose **Load unpacked**
+4. Select `C:\JobPilot`
+
+Do not uninstall/reinstall on each update.
 
 ## Update during development
 
@@ -49,32 +90,33 @@ Run:
     cd C:\JobPilot
     git pull
 
-Then go to chrome://extensions and press Reload on JobPilot.
+Then:
 
-## Stage 1 acceptance checklist
+`chrome://extensions` → JobPilot → **Reload**
 
-- [ ] PDF resume extracts readable text
-- [ ] DOCX resume extracts readable text
-- [ ] TXT/MD resume extracts readable text
-- [ ] Garbage/corrupt extraction is rejected
-- [ ] Pasted resume text works
-- [ ] Preview can be edited and revalidated
-- [ ] Puter connection works
-- [ ] Puter AI permission works
-- [ ] AI profile suggestions load
-- [ ] AI failure does not block manual profile setup
-- [ ] Manual edits override AI suggestions
-- [ ] Profile survives browser/extension reload
-- [ ] Original uploaded file is retained locally
-- [ ] Replace resume works
-- [ ] Delete resume/profile works
-- [ ] Diagnostics reflect the actual saved state
+The toolbar icon now behaves like this:
+
+```text
+No saved Stage 1 profile
+        ↓
+Open Stage 1
+
+Saved Stage 1 profile
+        ↓
+Open Stage 2 Preferences
+```
+
+## Acceptance checklists
+
+- Stage 1: `tests/STAGE1_CHECKLIST.md`
+- Stage 2: `tests/STAGE2_CHECKLIST.md`
 
 ## Privacy model
 
-The confirmed profile and validated resume text are stored in Chrome local extension storage.
-The original uploaded file is stored in IndexedDB.
+The confirmed Stage 1 profile, validated resume text and Stage 2 preferences are stored in Chrome extension local storage.
 
-Resume text is sent to Puter only when the user explicitly clicks Analyze resume with AI after connecting and authorizing Puter AI.
+The original uploaded resume file is stored in IndexedDB.
 
-See PRIVACY.md.
+Resume text is sent to Puter only when the user explicitly connects/authorizes Puter and clicks the AI analysis button.
+
+See `PRIVACY.md`.
