@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "JobPilot - Universal Job Portal Assistant",
-  "version": "1.0.0",
-  "description": "JobPilot 1.0: extension job list + full inline portal analysis with Match %, Puter AI, evidence, highlights and APPLY / REVIEW / SKIP.",
+  "version": "1.1.0",
+  "description": "JobPilot 1.1: Naukri, Foundit, LinkedIn Jobs, Indeed and Hirist with shared listing capture and full inline Match % + AI detail analysis.",
   "permissions": [
     "storage",
     "unlimitedStorage",
@@ -15,7 +15,14 @@
     "https://puter.com/*",
     "https://naukri.com/*",
     "https://www.naukri.com/*",
-    "https://*.naukri.com/*"
+    "https://*.naukri.com/*",
+    "https://foundit.in/*",
+    "https://www.foundit.in/*",
+    "https://*.linkedin.com/jobs/*",
+    "https://in.indeed.com/*",
+    "https://*.indeed.com/*",
+    "https://hirist.tech/*",
+    "https://www.hirist.tech/*"
   ],
   "background": {
     "service_worker": "background.js",
@@ -40,6 +47,29 @@
         "portals/naukri/listing.js",
         "portals/naukri/detail.js",
         "portals/naukri/adapter.js",
+        "core/relevance-gate.js",
+        "content/portal-runtime.js",
+        "content/detail-intelligence.js"
+      ],
+      "css": [
+        "content/portal-runtime.css"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://foundit.in/*",
+        "https://www.foundit.in/*",
+        "https://*.linkedin.com/jobs/*",
+        "https://in.indeed.com/*",
+        "https://*.indeed.com/*",
+        "https://hirist.tech/*",
+        "https://www.hirist.tech/*"
+      ],
+      "js": [
+        "core/portal-engine.js",
+        "portals/shared/configured-factory.js",
+        "portals/shared/configured-portals.js",
         "core/relevance-gate.js",
         "content/portal-runtime.js",
         "content/detail-intelligence.js"
