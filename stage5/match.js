@@ -74,6 +74,75 @@ let preferences = null;
 let capture = null;
 let currentJob = null;
 let currentMatch = null;
+let initializeTimer = null;
+let initializeInFlight = null;
+let lastRenderedSignature = "";
+
+function stableArray(value) {
+  return Array.isArray(value)
+    ? value.map((item) => String(item || "").trim()).filter(Boolean).sort()
+    : [];
+}
+
+function hashText(value) {
+  const text = String(value || "");
+  let hash = 2166136261;
+
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+
+  return (hash >>> 0).toString(16).padStart(8, "0");
+}
+
+function semanticJobPayload(job) {
+  const ai = job?.aiAnalysis || {};
+
+  return {
+    key: job?.key || "",
+    portal: job?.portal || "",
+    portalJobId: job?.portalJobId || "",
+    canonicalUrl: String(job?.canonicalUrl || "").split("?")[0],
+    title: job?.title || "",
+    company: job?.company || "",
+    experienceText: job?.experienceText || "",
+    experienceMin: job?.experienceMin ?? null,
+    experienceMax: job?.experienceMax ?? null,
+    location: job?.location || "",
+    workMode: job?.workMode || "",
+    employmentType: job?.employmentType || "",
+    requiredSkills: stableArray(job?.requiredSkills),
+    preferredSkills: stableArray(job?.preferredSkills),
+    descriptionHash: hashText(job?.description || ""),
+    ai: {
+      roleFamily: ai.roleFamily || "",
+      seniority: ai.seniority || "",
+      workMode: ai.workMode || "",
+      employmentType: ai.employmentType || "",
+      requiredSkills: stableArray(ai.requiredSkills),
+      preferredSkills: stableArray(ai.preferredSkills),
+      mustHaveRequirements: stableArray(ai.mustHaveRequirements),
+      disqualifiers: stableArray(ai.disqualifiers),
+      analyzedAt: job?.aiAnalyzedAt || ai.analyzedAt || null
+    }
+  };
+}
+
+function inputSignature(profileState, prefs, job) {
+  return hashText(
+    JSON.stringify({
+      profileUpdatedAt: profileState?.updatedAt || null,
+      preferencesUpdatedAt: prefs?.updatedAt || null,
+      job: semanticJobPayload(job)
+    })
+  );
+}
+
+function sameSemanticJob(a, b) {
+  return hashText(JSON.stringify(semanticJobPayload(a))) ===
+    hashText(JSON.stringify(semanticJobPayload(b)));
+}
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -414,11 +483,15 @@ async function renderDiagnostics() {
   ).join("");
 }
 
-async function calculateAndSave() {
+async function calculateAndSave(options = {}) {
   if (!state?.profile || !currentJob) return;
 
-  els.recalculateBtn.disabled = true;
-  els.recalculateBtn.textContent = "Calculating…";
+  const silent = options.silent === true;
+
+  if (!silent) {
+    els.recalculateBtn.disabled = true;
+    els.recalculateBtn.textContent = "Calculating…";
+  }
 
   try {
     const match = evaluateDeepMatch(
@@ -427,10 +500,16 @@ async function calculateAndSave() {
       currentJob
     );
 
+    const signature = inputSignature(
+      state,
+      preferences,
+      currentJob
+    );
+
     match.inputs = {
+      signature,
       profileUpdatedAt: state.updatedAt || null,
       preferencesUpdatedAt: preferences.updatedAt || null,
-      jobCapturedAt: currentJob.capturedAt || null,
       aiAnalyzedAt: currentJob.aiAnalyzedAt || null
     };
 
@@ -443,10 +522,15 @@ async function calculateAndSave() {
     currentJob = capture.detail || currentJob;
 
     renderMatch(match, currentJob);
-    setGateMessage(
-      "Deep match recalculated and saved on this job.",
-      "success"
-    );
+    lastRenderedSignature = match.inputs?.signature || "";
+
+    if (!silent) {
+      setGateMessage(
+        "Deep match recalculated and saved on this job.",
+        "success"
+      );
+    }
+
     await renderDiagnostics();
   } catch (error) {
     setGateMessage(
@@ -454,8 +538,10 @@ async function calculateAndSave() {
       "error"
     );
   } finally {
-    els.recalculateBtn.disabled = false;
-    els.recalculateBtn.textContent = "Recalculate deep match";
+    if (!silent) {
+      els.recalculateBtn.disabled = false;
+      els.recalculateBtn.textContent = "Recalculate deep match";
+    }
   }
 }
 
@@ -514,20 +600,27 @@ async function initialize() {
   els.openJobBtn.disabled = !currentJob.canonicalUrl;
 
   const existing = currentJob.deepMatch;
+  const signature = inputSignature(
+    state,
+    preferences,
+    currentJob
+  );
 
   const existingFresh = Boolean(
     existing &&
     existing.version === 3 &&
-    existing.inputs?.profileUpdatedAt === (state.updatedAt || null) &&
-    existing.inputs?.preferencesUpdatedAt === (preferences.updatedAt || null) &&
-    existing.inputs?.jobCapturedAt === (currentJob.capturedAt || null) &&
-    existing.inputs?.aiAnalyzedAt === (currentJob.aiAnalyzedAt || null)
+    existing.inputs?.signature === signature
   );
 
   if (existingFresh) {
-    renderMatch(existing, currentJob);
+    if (lastRenderedSignature !== signature) {
+      renderMatch(existing, currentJob);
+      lastRenderedSignature = signature;
+    }
   } else {
-    await calculateAndSave();
+    await calculateAndSave({
+      silent: Boolean(currentMatch)
+    });
   }
 
   await renderDiagnostics();
@@ -551,20 +644,58 @@ els.decisionOpenJobBtn?.addEventListener("click", async () => {
 
 els.recalculateBtn.addEventListener(
   "click",
-  calculateAndSave
+  () => calculateAndSave({ silent: false })
 );
 
+function scheduleInitialize(delay = 180) {
+  clearTimeout(initializeTimer);
+  initializeTimer = setTimeout(() => {
+    if (!initializeInFlight) {
+      initializeInFlight = initialize()
+        .catch(() => {})
+        .finally(() => {
+          initializeInFlight = null;
+        });
+    }
+  }, delay);
+}
+
 chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== "local") return;
+
   if (
-    area === "local" &&
-    (
-      changes["jobpilot.stage4.portalCapture"] ||
-      changes["jobpilot.stage1.state"] ||
-      changes["jobpilot.stage2.preferences"]
-    )
+    changes["jobpilot.stage1.state"] ||
+    changes["jobpilot.stage2.preferences"]
   ) {
-    initialize().catch(() => {});
+    scheduleInitialize();
+    return;
   }
+
+  const portalChange =
+    changes["jobpilot.stage4.portalCapture"];
+
+  if (!portalChange) return;
+
+  const oldDetail =
+    portalChange.oldValue?.pageType === "detail"
+      ? portalChange.oldValue.detail
+      : null;
+
+  const newDetail =
+    portalChange.newValue?.pageType === "detail"
+      ? portalChange.newValue.detail
+      : null;
+
+  // Ignore timestamp-only recaptures and our own deepMatch writes.
+  if (
+    oldDetail &&
+    newDetail &&
+    sameSemanticJob(oldDetail, newDetail)
+  ) {
+    return;
+  }
+
+  scheduleInitialize();
 });
 
 initialize().catch((error) => {
