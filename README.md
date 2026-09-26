@@ -218,3 +218,39 @@ It can prefill supported facts such as:
 - an initial target role based on the extracted current role
 
 The parser is evidence-first: missing or uncertain fields stay blank. Puter AI is optional and may be used only to refine the locally extracted profile after user review.
+
+
+### Puter HTTPS auth bridge
+
+JobPilot no longer asks Puter to authenticate directly from a `chrome-extension://` page.
+
+The supported flow is:
+
+```text
+JobPilot extension
+→ HTTPS bridge on GitHub Pages
+→ official Puter.js sign-in
+→ official Puter AI permission prompt
+→ authenticated result posted back only to the JobPilot window that opened the bridge
+→ token stored in chrome.storage.local
+```
+
+Bridge source:
+
+- `site/puter-auth.html`
+- `site/puter-auth.css`
+- `site/puter-auth.js`
+
+Deployment workflow:
+
+- `.github/workflows/puter-auth-pages.yml`
+
+Expected bridge URL:
+
+```text
+https://rohit30418.github.io/jobfinderextention/puter-auth.html
+```
+
+GitHub Pages must use **GitHub Actions** as the publishing source for the repository. This is a one-time repository setting if Pages has not been enabled before.
+
+The bridge itself does not persist the Puter token. It sends the result back to the exact JobPilot popup opener, while the extension validates the bridge origin, popup window, and a per-attempt random state before accepting the token.
