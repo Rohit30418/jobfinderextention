@@ -107,7 +107,7 @@ function renderJobs(jobs) {
             '<div class="job-company">' + escapeHtml(display(job.company)) + '</div>' +
           '</div>' +
           '<div class="confidence ' + confidenceClass(confidence.level) + '">' +
-            escapeHtml(confidence.level) + ' ' + Number(confidence.score || 0) + '/100' +
+            'Extraction ' + escapeHtml(confidence.level) +
           '</div>' +
         '</div>' +
         '<div class="job-meta">' +
@@ -155,7 +155,8 @@ function renderDetail(job) {
 
   els.detailTitle.textContent = job.title || "Normalized job detail";
   els.detailConfidence.textContent =
-    confidence.level + " " + Number(confidence.score || 0) + "/100";
+    "Extraction " + confidence.level + " · completeness " +
+    Number(confidence.score || 0) + "%";
   els.detailConfidence.className =
     "confidence-chip " + confidenceClass(confidence.level);
 
