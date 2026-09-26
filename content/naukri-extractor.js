@@ -134,30 +134,101 @@
     return digits ? digits[0] : "";
   }
 
-  function jobAnchors() {
-    const anchors = Array.from(
-      document.querySelectorAll(
-        'a[href*="/job-listings-"], a[href*="job-listings-"]'
-      )
-    );
+  function currentJobCards() {
+    const selectors = [
+      ".srp-jobtuple-wrapper > .cust-job-tuple",
+      ".srp-jobtuple-wrapper .cust-job-tuple",
+      ".cust-job-tuple",
+      ".srp-jobtuple-wrapper"
+    ];
 
     const seen = new Set();
-    const output = [];
+    const cards = [];
 
-    for (const anchor of anchors) {
-      const url = absoluteUrl(anchor.getAttribute("href") || anchor.href);
-      if (
-        !url ||
-        !/naukri\.com/i.test(url) ||
-        !/job-listings-/i.test(url)
-      ) {
-        continue;
+    for (const selector of selectors) {
+      let nodes = [];
+      try {
+        nodes = Array.from(document.querySelectorAll(selector));
+      } catch (_) {}
+
+      for (const node of nodes) {
+        if (!(node instanceof Element) || seen.has(node)) continue;
+
+        const titleAnchor = node.querySelector(
+          "h2 a.title, a.title, a[href*='job-listings']"
+        );
+
+        if (!titleAnchor) continue;
+
+        seen.add(node);
+        cards.push(node);
+
+        if (cards.length >= MAX_CARDS) {
+          return cards;
+        }
       }
+
+      if (cards.length) {
+        return cards;
+      }
+    }
+
+    return cards;
+  }
+
+  function titleAnchorFromCard(card) {
+    if (!(card instanceof Element)) return null;
+
+    return card.querySelector(
+      "h2 a.title, a.title, h2 a[href], h3 a[href], a[href*='job-listings']"
+    );
+  }
+
+  function jobAnchors() {
+    const output = [];
+    const seen = new Set();
+
+    // Preferred 2026 Naukri layout: one title link per structured result card.
+    for (const card of currentJobCards()) {
+      const anchor = titleAnchorFromCard(card);
+      if (!anchor) continue;
+
+      const url = absoluteUrl(anchor.getAttribute("href") || anchor.href);
+      if (!url || !/naukri\.com/i.test(url)) continue;
 
       const canonical = url.split("#")[0];
       if (seen.has(canonical)) continue;
+
       seen.add(canonical);
       output.push(anchor);
+
+      if (output.length >= MAX_CARDS) return output;
+    }
+
+    // Fallback for alternate/older layouts.
+    const anchors = Array.from(
+      document.querySelectorAll(
+        "h2 a.title, a.title, a[href*='/job-listings-'], a[href*='job-listings-']"
+      )
+    );
+
+    for (const anchor of anchors) {
+      const url = absoluteUrl(anchor.getAttribute("href") || anchor.href);
+      if (!url || !/naukri\.com/i.test(url)) continue;
+
+      const canonical = url.split("#")[0];
+      if (seen.has(canonical)) continue;
+
+      const nearby = anchor.closest(
+        ".cust-job-tuple, .srp-jobtuple-wrapper, [class*='jobTuple'], [class*='job-tuple'], article"
+      );
+
+      // Avoid unrelated navigation links that happen to have a title class.
+      if (!nearby && !/job-listings/i.test(url)) continue;
+
+      seen.add(canonical);
+      output.push(anchor);
+
       if (output.length >= MAX_CARDS) break;
     }
 
@@ -195,6 +266,7 @@
 
   function findCardRoot(anchor) {
     const directSelectors = [
+      ".cust-job-tuple",
       ".srp-jobtuple-wrapper",
       ".jobTuple",
       "[class*='jobTuple']",
@@ -246,6 +318,7 @@
       card,
       [
         ".expwdth",
+        ".row3 .expwdth",
         "[class*='expwdth']",
         "[class*='experience']",
         "[title*='experience' i]"
@@ -267,6 +340,7 @@
       card,
       [
         ".locWdth",
+        ".row3 .locWdth",
         "[class*='locWdth']",
         "[class*='location']",
         "[title*='location' i]"
@@ -280,6 +354,7 @@
       card,
       [
         ".sal",
+        ".row3 .sal",
         "[class*='salary']",
         "[class*='sal-wrap']",
         "[title*='salary' i]"
@@ -301,6 +376,7 @@
     const direct = firstText(
       card,
       [
+        ".job-post-day",
         ".job-post-day",
         "[class*='job-post-day']",
         "[class*='posted']",
@@ -745,8 +821,11 @@
     const anchors = jobAnchors();
     const params = new URLSearchParams(location.search);
 
+    const cardCount = currentJobCards().length;
+
     const strongSearchEvidence =
       /-jobs(?:-in-)?/.test(path) ||
+      cardCount >= 1 ||
       anchors.length >= 2 ||
       params.has("k") ||
       params.has("l") ||
