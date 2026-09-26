@@ -27,6 +27,9 @@
   let lastSignature = "";
   let lastUrl = location.href;
   let closedForUrl = "";
+  let detailWaitUrl = "";
+  let detailWaitStartedAt = 0;
+  const DETAIL_WAIT_TIMEOUT_MS = 15000;
 
   function clean(value, max = 5000) {
     return String(value || "")
@@ -863,18 +866,54 @@
 
     if (type === "job-detail") {
       const detail = extractDetail();
+
+      const readinessSignals = {
+        title: Boolean(detail.title),
+        company: Boolean(detail.company),
+        description: Boolean(detail.description && detail.description.length >= 80),
+        experience: Boolean(detail.experience),
+        location: Boolean(detail.location),
+        skills: Boolean(Array.isArray(detail.skills) && detail.skills.length),
+        posted: Boolean(detail.datePosted || detail.postedAge)
+      };
+
+      const secondaryReady = [
+        readinessSignals.company,
+        readinessSignals.experience,
+        readinessSignals.location,
+        readinessSignals.skills,
+        readinessSignals.posted
+      ].filter(Boolean).length;
+
+      const ready =
+        readinessSignals.title &&
+        readinessSignals.description &&
+        secondaryReady >= 2;
+
       return {
         version: 1,
         pageType: type,
         sourceUrl: location.href,
         cards: [],
         detail,
+        readiness: {
+          ready,
+          secondaryReady,
+          signals: readinessSignals,
+          reason: ready
+            ? "detail-ready"
+            : !readinessSignals.title
+              ? "waiting-for-title"
+              : !readinessSignals.description
+                ? "waiting-for-description"
+                : "waiting-for-core-fields"
+        },
         stats: {
           detected: 1,
-          parsed: detail.title && detail.jobUrl ? 1 : 0,
-          high: detail.extraction.level === "HIGH" ? 1 : 0,
-          medium: detail.extraction.level === "MEDIUM" ? 1 : 0,
-          low: detail.extraction.level === "LOW" ? 1 : 0
+          parsed: ready ? 1 : 0,
+          high: ready && detail.extraction.level === "HIGH" ? 1 : 0,
+          medium: ready && detail.extraction.level === "MEDIUM" ? 1 : 0,
+          low: ready && detail.extraction.level === "LOW" ? 1 : 0
         }
       };
     }
@@ -977,7 +1016,7 @@
       root.id = ROOT_ID;
       root.innerHTML = [
         '<div class="jp4-head">',
-        '  <div><span>JOBPILOT</span><strong>Stage 4 extraction</strong></div>',
+        '  <div><span>JOBPILOT · compatibility mode</span><strong>Stage 4 extraction</strong></div>',
         '  <button type="button" class="jp4-close" aria-label="Close">×</button>',
         '</div>',
         '<div class="jp4-body"></div>'
@@ -992,6 +1031,27 @@
     }
 
     const body = root.querySelector(".jp4-body");
+
+    if (
+      data.pageType === "job-detail" &&
+      data.readiness &&
+      data.readiness.ready === false
+    ) {
+      const signals = data.readiness.signals || {};
+      const readyCount = Object.values(signals).filter(Boolean).length;
+      const total = Object.keys(signals).length;
+
+      body.innerHTML =
+        '<div class="jp4-row"><span>Page</span><b>Job detail</b></div>' +
+        '<div class="jp4-note">' +
+          '<b>Waiting for job details…</b><br>' +
+          'Naukri is still rendering this job. JobPilot will capture it automatically when the important fields are ready.' +
+        '</div>' +
+        '<div class="jp4-note">Readiness: ' + readyCount + '/' + total +
+          ' · ' + escapeHtml(data.readiness.reason || "waiting") + '</div>' +
+        '<div class="jp4-note">Incomplete detail data is not being saved.</div>';
+      return;
+    }
 
     if (data.pageType === "search-results") {
       const failed = Math.max(0, data.stats.detected - data.stats.parsed);
@@ -1064,6 +1124,29 @@
   async function runExtraction() {
     try {
       const data = buildExtraction();
+
+      if (
+        data.pageType === "job-detail" &&
+        data.readiness &&
+        data.readiness.ready === false
+      ) {
+        if (detailWaitUrl !== location.href) {
+          detailWaitUrl = location.href;
+          detailWaitStartedAt = Date.now();
+        }
+
+        renderOverlay(data);
+
+        if (Date.now() - detailWaitStartedAt < DETAIL_WAIT_TIMEOUT_MS) {
+          scheduleExtraction(700);
+        }
+
+        return;
+      }
+
+      detailWaitUrl = "";
+      detailWaitStartedAt = 0;
+
       renderOverlay(data);
       await persist(data);
     } catch (error) {
@@ -1084,6 +1167,8 @@
       lastUrl = location.href;
       lastSignature = "";
       closedForUrl = "";
+      detailWaitUrl = "";
+      detailWaitStartedAt = 0;
       scheduleExtraction(350);
     }
   }, 900);
