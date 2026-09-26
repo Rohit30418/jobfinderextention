@@ -447,6 +447,223 @@ function evidenceConfidence(job, requiredSkills, role) {
   };
 }
 
+function buildApplyDecision({
+  verdict,
+  blockers,
+  strengths,
+  gaps,
+  review,
+  role,
+  experience,
+  location,
+  requiredSkills,
+  required,
+  requiredCoverage,
+  confidence,
+  explicitDisqualifiers
+}) {
+  const reasons = [];
+  const cautions = [];
+
+  if (blockers.length || verdict === "BLOCKED") {
+    for (const blocker of blockers.slice(0, 5)) {
+      reasons.push({
+        code: blocker.code || "hard-blocker",
+        label: blocker.label || "Hard blocker",
+        detail: blocker.detail || ""
+      });
+    }
+
+    return {
+      action: "SKIP",
+      tone: "danger",
+      headline: "Do not prioritize this application",
+      summary:
+        "JobPilot found a hard conflict with your saved profile or preferences.",
+      reasons,
+      cautions: [],
+      nextStep:
+        "Skip this job unless you intentionally want to override the blocker.",
+      confidence: confidence.level
+    };
+  }
+
+  if (!role.compatible) {
+    cautions.push({
+      code: "role-needs-review",
+      label: "Role alignment needs review",
+      detail: role.jobRole || "No strong target-role signal"
+    });
+  }
+
+  if (experience.candidateStatus === "below") {
+    cautions.push({
+      code: "experience-below",
+      label: "Experience is below the stated minimum",
+      detail:
+        experience.candidateYears + "y profile vs " +
+        experience.jobMin + "y minimum"
+    });
+  }
+
+  if (required.missing.length) {
+    cautions.push({
+      code: "required-skills-missing",
+      label: "Required skills are missing from the saved profile",
+      detail: required.missing.join(", ")
+    });
+  }
+
+  if (!requiredSkills.length) {
+    cautions.push({
+      code: "required-skills-unknown",
+      label: "Required skills are not clear enough",
+      detail: "Review the JD before applying."
+    });
+  }
+
+  if (location.status === "mismatch") {
+    cautions.push({
+      code: "location-mismatch",
+      label: "Location is outside your saved preferences",
+      detail: "Review commute/relocation/remote options."
+    });
+  }
+
+  if (location.status === "unknown") {
+    cautions.push({
+      code: "location-unknown",
+      label: "Location could not be verified",
+      detail: "Check the job page before applying."
+    });
+  }
+
+  for (const item of explicitDisqualifiers.slice(0, 5)) {
+    cautions.push({
+      code: "explicit-constraint",
+      label: "Explicit job constraint needs confirmation",
+      detail: item
+    });
+  }
+
+  if (confidence.level === "LOW") {
+    cautions.push({
+      code: "low-evidence",
+      label: "Evidence confidence is low",
+      detail: "JobPilot does not have enough reliable JD evidence yet."
+    });
+  }
+
+  const softReviewCodes = new Set([
+    "preferred-skills-missing",
+    "salary-not-scored",
+    "experience-above"
+  ]);
+
+  const nonSoftReview = review.filter(
+    (item) => !softReviewCodes.has(item.code)
+  );
+
+  const meaningfulGaps = gaps.filter(
+    (item) => item.code !== "preferred-skills-missing"
+  );
+
+  for (const item of meaningfulGaps.slice(0, 5)) {
+    if (!cautions.some((existing) => existing.code === item.code)) {
+      cautions.push({
+        code: item.code || "gap",
+        label: item.label || "Gap needs review",
+        detail: item.detail || ""
+      });
+    }
+  }
+
+  for (const item of nonSoftReview.slice(0, 5)) {
+    if (!cautions.some((existing) => existing.code === item.code)) {
+      cautions.push({
+        code: item.code || "review",
+        label: item.label || "Needs review",
+        detail: item.detail || ""
+      });
+    }
+  }
+
+  const applyReady =
+    role.compatible &&
+    experience.candidateStatus !== "below" &&
+    requiredSkills.length > 0 &&
+    required.missing.length === 0 &&
+    requiredCoverage !== null &&
+    requiredCoverage >= 0.75 &&
+    location.status !== "mismatch" &&
+    confidence.level !== "LOW" &&
+    explicitDisqualifiers.length === 0 &&
+    cautions.length === 0;
+
+  if (applyReady) {
+    reasons.push({
+      code: "role-compatible",
+      label: "Target role aligns",
+      detail: role.jobRole || "Compatible role family"
+    });
+
+    reasons.push({
+      code: "required-skills-covered",
+      label: "Identified required skills are covered",
+      detail:
+        required.matched.length + "/" +
+        requiredSkills.length + " matched"
+    });
+
+    if (experience.candidateStatus === "within") {
+      reasons.push({
+        code: "experience-compatible",
+        label: "Experience fits the stated range",
+        detail:
+          experience.candidateYears + " years candidate experience"
+      });
+    }
+
+    if (location.status === "match") {
+      reasons.push({
+        code: "location-compatible",
+        label: "Location matches your preference",
+        detail: location.matches.join(", ")
+      });
+    }
+
+    return {
+      action: "APPLY",
+      tone: "success",
+      headline: "Good candidate to apply",
+      summary:
+        "No hard blocker was found and the identified core requirements are covered.",
+      reasons,
+      cautions: review.filter((item) => softReviewCodes.has(item.code)),
+      nextStep:
+        "Review the company and application details, then apply if the role still interests you.",
+      confidence: confidence.level
+    };
+  }
+
+  return {
+    action: "REVIEW FIRST",
+    tone: "warning",
+    headline: "Check these points before applying",
+    summary:
+      "There is no confirmed hard blocker, but one or more important items need human review.",
+    reasons: strengths.slice(0, 4).map((item) => ({
+      code: item.code || "strength",
+      label: item.label || "Positive signal",
+      detail: item.detail || ""
+    })),
+    cautions: cautions.slice(0, 8),
+    nextStep:
+      "Verify the caution items on the job page. Apply if none of them is a true blocker for you.",
+    confidence: confidence.level
+  };
+}
+
 export function evaluateDeepMatch(profile, preferences, job) {
   if (!profile) {
     throw new Error("Stage 1 profile is required.");
@@ -697,8 +914,24 @@ export function evaluateDeepMatch(profile, preferences, job) {
 
   const confidence = evidenceConfidence(job, requiredSkills, role);
 
+  const applyDecision = buildApplyDecision({
+    verdict,
+    blockers,
+    strengths,
+    gaps,
+    review,
+    role,
+    experience,
+    location,
+    requiredSkills,
+    required,
+    requiredCoverage,
+    confidence,
+    explicitDisqualifiers
+  });
+
   return {
-    version: 1,
+    version: 2,
     jobKey: job.key || "",
     portal: job.portal || "",
     verdict,
@@ -732,6 +965,7 @@ export function evaluateDeepMatch(profile, preferences, job) {
 
     explicitRequirements,
     explicitDisqualifiers,
+    applyDecision,
 
     source: {
       aiEnriched: Boolean(job?.aiAnalysis),
