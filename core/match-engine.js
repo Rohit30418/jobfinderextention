@@ -11,6 +11,7 @@ function clean(value) {
     .replace(/java\s*script/g, "javascript")
     .replace(/type\s*script/g, "typescript")
     .replace(/restful/g, "rest")
+    .replace(/\bapis\b/g, "api")
     .replace(/redux toolkit/g, "redux")
     .replace(/html5/g, "html")
     .replace(/css3/g, "css")
