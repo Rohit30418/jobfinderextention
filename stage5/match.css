@@ -100,11 +100,23 @@ h3{font-size:13px;color:#cbd6e5;margin:0 0 10px}
 .hero-result[data-verdict="POSSIBLE FIT"] .verdict{color:#a9d4ff}
 .hero-result[data-verdict="WEAK FIT"] .verdict{color:var(--warn)}
 .hero-result[data-verdict="BLOCKED"] .verdict{color:var(--danger)}
-.confidence-card{
+.score-stack{
+  display:grid;gap:10px;min-width:210px
+}
+.match-score-card,.confidence-card{
   min-width:190px;border:1px solid var(--line);border-radius:14px;padding:14px;background:#0a1018
 }
+.match-score-card span,.match-score-card small,
 .confidence-card span,.confidence-card small{display:block;color:var(--muted)}
-.confidence-card strong{display:block;font-size:24px;margin:5px 0}
+.match-score-card strong,.confidence-card strong{display:block;font-size:24px;margin:5px 0}
+.match-score-card strong{font-size:34px;color:var(--accent)}
+.score-track{
+  height:7px;border-radius:999px;background:#172232;overflow:hidden;margin-top:10px
+}
+.score-fill{
+  height:100%;width:0;background:linear-gradient(90deg,var(--danger),var(--warn),var(--accent));
+  transition:width .25s ease
+}
 .metric-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:20px}
 .metric{border:1px solid var(--line);border-radius:13px;padding:14px;background:#0a1018}
 .metric strong,.metric span{display:block}
@@ -147,7 +159,7 @@ h3{font-size:13px;color:#cbd6e5;margin:0 0 10px}
   .topbar,.verdict-wrap,.decision-layout{display:block}
   .top-actions{justify-content:flex-start;margin-top:14px}
   .grid-2,.detail-grid,.metric-grid,.skill-columns,.diag-grid,.decision-columns{grid-template-columns:1fr 1fr}
-  .confidence-card,.decision-side{margin-top:16px}
+  .score-stack,.decision-side{margin-top:16px}
 }
 @media(max-width:560px){
   .shell{width:min(100% - 20px,1220px);padding-top:20px}
