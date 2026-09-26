@@ -7,97 +7,159 @@ import {
 } from "./storage.js";
 import { normalizeAiProfile } from "./profile-normalizer.js";
 
-const GUI_ORIGIN = "https://puter.com";
 const API_ORIGIN = "https://api.puter.com";
-const AI_PERMISSION = "driver:puter-chat-completion:complete";
+const BRIDGE_ORIGIN = "https://rohit30418.github.io";
+const BRIDGE_URL =
+  BRIDGE_ORIGIN + "/jobfinderextention/puter-auth.html";
 
 function popupFeatures(width, height) {
-  const left = Math.max(0, Math.round((screen.width - width) / 2));
-  const top = Math.max(0, Math.round((screen.height - height) / 2));
-  return "popup=yes,width=" + width + ",height=" + height + ",left=" + left + ",top=" + top;
+  const left = Math.max(
+    0,
+    Math.round((screen.width - width) / 2)
+  );
+  const top = Math.max(
+    0,
+    Math.round((screen.height - height) / 2)
+  );
+
+  return (
+    "popup=yes,width=" +
+    width +
+    ",height=" +
+    height +
+    ",left=" +
+    left +
+    ",top=" +
+    top
+  );
 }
 
-function waitForPopup(options) {
+function waitForBridge(options = {}) {
   return new Promise((resolve, reject) => {
-    const popup = window.open(options.url, options.name, popupFeatures(620, 720));
+    const state =
+      crypto.randomUUID() + "-" + crypto.randomUUID();
+
+    const url =
+      BRIDGE_URL +
+      "?state=" +
+      encodeURIComponent(state) +
+      "&request_auth=" +
+      (options.requestAuth === false ? "0" : "1");
+
+    const popup = window.open(
+      url,
+      "jobpilot-puter-bridge",
+      popupFeatures(680, 760)
+    );
 
     if (!popup) {
-      reject(new Error("The Puter popup was blocked by Chrome."));
+      reject(
+        new Error(
+          "Chrome blocked the JobPilot Puter bridge popup."
+        )
+      );
       return;
     }
 
     let settled = false;
 
-    const finish = (callback, value) => {
-      if (settled) return;
-      settled = true;
+    const cleanup = () => {
       clearInterval(closeWatcher);
       clearTimeout(timeout);
       window.removeEventListener("message", onMessage);
-      callback(value);
     };
 
-    const onMessage = (event) => {
-      if (event.origin !== GUI_ORIGIN) return;
-      if (event.source !== popup) return;
-
-      const result = options.isValidMessage(event.data || {});
-      if (!result) return;
+    const finish = (callback, value) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
 
       try {
         popup.close();
       } catch (_) {}
 
-      if (result.error) {
-        finish(reject, new Error(result.error));
-      } else {
-        finish(resolve, result.value);
+      callback(value);
+    };
+
+    const onMessage = (event) => {
+      if (event.origin !== BRIDGE_ORIGIN) return;
+      if (event.source !== popup) return;
+
+      const data = event.data || {};
+
+      if (
+        data.type !==
+        "jobpilot.puter.bridge.complete"
+      ) {
+        return;
       }
+
+      if (String(data.state) !== String(state)) {
+        return;
+      }
+
+      if (!data.token) {
+        finish(
+          reject,
+          new Error(
+            "The Puter bridge did not return an auth token."
+          )
+        );
+        return;
+      }
+
+      finish(resolve, {
+        token: String(data.token),
+        aiAuthorized:
+          data.aiAuthorized === true
+      });
     };
 
     window.addEventListener("message", onMessage);
 
     const closeWatcher = setInterval(() => {
       if (popup.closed) {
-        finish(reject, new Error("The Puter popup was closed before finishing."));
+        finish(
+          reject,
+          new Error(
+            "The JobPilot Puter bridge was closed before authentication finished."
+          )
+        );
       }
-    }, 250);
+    }, 300);
 
     const timeout = setTimeout(() => {
-      try {
-        popup.close();
-      } catch (_) {}
-      finish(reject, new Error("Puter did not respond in time."));
+      finish(
+        reject,
+        new Error(
+          "Puter authentication timed out. Try Connect Puter again."
+        )
+      );
     }, options.timeoutMs || 300000);
   });
 }
 
-export async function connectPuter() {
-  const msgId = crypto.randomUUID();
-  const url =
-    GUI_ORIGIN +
-    "/action/sign-in?embedded_in_popup=true&request_auth=true&msg_id=" +
-    encodeURIComponent(msgId);
-
-  const token = await waitForPopup({
-    url,
-    name: "jobpilot-puter-login",
-    isValidMessage(data) {
-      if (data.msg !== "puter.token" || String(data.msg_id) !== String(msgId)) {
-        return null;
-      }
-
-      if (data.success !== true || !data.token) {
-        return { error: "Puter sign-in was not completed." };
-      }
-
-      return { value: data.token };
-    }
+async function completeBridgeAuth(requestAuth) {
+  const result = await waitForBridge({
+    requestAuth
   });
 
-  await setPuterToken(token);
-  await setAiAuthorized(false);
+  await setPuterToken(result.token);
+  await setAiAuthorized(
+    result.aiAuthorized === true
+  );
+
+  if (!result.aiAuthorized) {
+    throw new Error(
+      "Puter connected, but AI permission was not granted."
+    );
+  }
+
   return true;
+}
+
+export async function connectPuter() {
+  return completeBridgeAuth(true);
 }
 
 export async function disconnectPuter() {
@@ -105,43 +167,16 @@ export async function disconnectPuter() {
 }
 
 export async function authorizePuterAi() {
-  const token = await getPuterToken();
+  const existingToken = await getPuterToken();
 
-  if (!token) {
-    throw new Error("Connect Puter first.");
+  if (!existingToken) {
+    return completeBridgeAuth(true);
   }
 
-  const msgId = crypto.randomUUID();
-  const url =
-    GUI_ORIGIN +
-    "/action/request-permission?embedded_in_popup=true&msg_id=" +
-    encodeURIComponent(msgId) +
-    "&permission=" +
-    encodeURIComponent(AI_PERMISSION);
-
-  const granted = await waitForPopup({
-    url,
-    name: "jobpilot-puter-permission",
-    isValidMessage(data) {
-      if (String(data.original_msg_id) !== String(msgId)) {
-        return null;
-      }
-
-      if (data.msg !== "permissionGranted") {
-        return null;
-      }
-
-      return { value: data.granted === true };
-    }
-  });
-
-  await setAiAuthorized(granted === true);
-
-  if (!granted) {
-    throw new Error("Puter AI permission was not granted.");
-  }
-
-  return true;
+  // The HTTPS bridge uses official Puter.js for both
+  // sign-in and permission prompting. Reusing the Puter
+  // web session normally makes this second pass quick.
+  return completeBridgeAuth(false);
 }
 
 function responseText(result) {
