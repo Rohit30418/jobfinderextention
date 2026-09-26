@@ -483,3 +483,127 @@ export async function analyzeJobWithAi(job) {
   const parsed = extractJson(responseText(result));
   return normalizeJobAiAnalysis(parsed);
 }
+
+
+export async function analyzeJobBatchForCandidate(profile, preferences, jobs) {
+  const candidate = profile && typeof profile === "object" ? profile : {};
+  const prefs = preferences && typeof preferences === "object" ? preferences : {};
+  const inputJobs = Array.isArray(jobs) ? jobs.slice(0, 30) : [];
+
+  if (!inputJobs.length) {
+    return [];
+  }
+
+  const candidatePayload = {
+    currentRole: cleanAiString(candidate.currentRole || candidate.headline, 220),
+    totalExperienceMonths: Number(candidate.totalExperienceMonths || 0),
+    skills: cleanAiList(candidate.skills, 80, 120),
+    projects: (Array.isArray(candidate.projects) ? candidate.projects : [])
+      .slice(0, 12)
+      .map((item) => ({
+        name: cleanAiString(item?.name, 180),
+        description: cleanAiString(item?.description, 600),
+        skillsUsed: cleanAiList(item?.skillsUsed, 30, 100)
+      })),
+    workExperience: (Array.isArray(candidate.workExperience) ? candidate.workExperience : [])
+      .slice(0, 10)
+      .map((item) => ({
+        title: cleanAiString(item?.title, 180),
+        description: cleanAiString(item?.description, 700),
+        skillsUsed: cleanAiList(item?.skillsUsed, 30, 100)
+      }))
+  };
+
+  const preferencePayload = {
+    targetRoles: cleanAiList(prefs.targetRoles, 20, 120),
+    priorityKeywords: cleanAiList(prefs.priorityKeywords, 40, 100),
+    preferredLocations: cleanAiList(prefs.preferredLocations, 30, 120),
+    experienceMin: Number.isFinite(Number(prefs.experienceMin)) ? Number(prefs.experienceMin) : null,
+    experienceMax: Number.isFinite(Number(prefs.experienceMax)) ? Number(prefs.experienceMax) : null,
+    workModes: cleanAiList(prefs.workModes, 10, 80),
+    employmentTypes: cleanAiList(prefs.employmentTypes, 10, 80),
+    excludedKeywords: cleanAiList(prefs.excludedKeywords, 30, 100)
+  };
+
+  const jobPayload = inputJobs.map((job) => ({
+    key: cleanAiString(job?.key, 220),
+    portal: cleanAiString(job?.portal, 60),
+    title: cleanAiString(job?.title, 300),
+    company: cleanAiString(job?.company, 240),
+    location: cleanAiString(job?.location, 300),
+    experienceText: cleanAiString(job?.experienceText, 220),
+    salaryText: cleanAiString(job?.salaryText, 220),
+    skills: cleanAiList(job?.skills, 40, 100),
+    snippet: cleanAiString(job?.snippet, 1200),
+    postedAge: cleanAiString(job?.postedAge, 100)
+  }));
+
+  const prompt = [
+    "You are the ranking engine for a job-search browser extension.",
+    "Compare each JOB only against the supplied CANDIDATE and PREFERENCES.",
+    "Be conservative and evidence-based. Never invent candidate experience or skills.",
+    "Generic words such as Developer, Engineer, Software, Web, or Application are NOT sufficient role matches.",
+    "Distinguish Java from JavaScript. Distinguish backend from frontend. Distinguish mobile, QA, DevOps and data roles from frontend roles.",
+    "A job may still be a good match when its title is generic if the supplied skills/snippet clearly show the target role.",
+    "Use listing evidence only. If evidence is too thin, choose REVIEW rather than guessing.",
+    "Score meaning:",
+    "90-100 = exceptional fit from listing evidence",
+    "75-89 = strong fit",
+    "60-74 = plausible but needs review",
+    "0-59 = weak or mismatched",
+    "Decision rules:",
+    "APPLY = strong role alignment and no obvious hard mismatch",
+    "REVIEW = potentially useful but evidence/gaps need checking",
+    "SKIP = clear role-family mismatch, excluded-role conflict, or major experience/location conflict",
+    "Return ONLY valid JSON. No markdown.",
+    "Schema:",
+    "{\"results\":[{\"key\":\"\",\"fitScore\":0,\"decision\":\"APPLY|REVIEW|SKIP\",\"roleFamily\":\"\",\"summary\":\"\",\"reasons\":[],\"gaps\":[],\"confidence\":\"HIGH|MEDIUM|LOW\"}]}",
+    "Every input job key must appear exactly once in results.",
+    "CANDIDATE:",
+    JSON.stringify(candidatePayload),
+    "PREFERENCES:",
+    JSON.stringify(preferencePayload),
+    "JOBS:",
+    JSON.stringify(jobPayload)
+  ].join("\n");
+
+  const result = await callPuterAi(prompt);
+  const parsed = extractJson(responseText(result));
+  const rows = Array.isArray(parsed?.results) ? parsed.results : [];
+  const allowedKeys = new Set(jobPayload.map((job) => job.key));
+
+  return rows
+    .map((row) => {
+      const key = cleanAiString(row?.key, 220);
+      if (!key || !allowedKeys.has(key)) return null;
+
+      const rawScore = Number(row?.fitScore);
+      const fitScore = Number.isFinite(rawScore)
+        ? Math.max(0, Math.min(100, Math.round(rawScore)))
+        : null;
+
+      const decisionRaw = cleanAiString(row?.decision, 20).toUpperCase();
+      const decision = ["APPLY", "REVIEW", "SKIP"].includes(decisionRaw)
+        ? decisionRaw
+        : "REVIEW";
+
+      const confidenceRaw = cleanAiString(row?.confidence, 20).toUpperCase();
+      const confidence = ["HIGH", "MEDIUM", "LOW"].includes(confidenceRaw)
+        ? confidenceRaw
+        : "LOW";
+
+      return {
+        key,
+        fitScore,
+        decision,
+        roleFamily: cleanAiString(row?.roleFamily, 180),
+        summary: cleanAiString(row?.summary, 500),
+        reasons: cleanAiList(row?.reasons, 6, 220),
+        gaps: cleanAiList(row?.gaps, 6, 220),
+        confidence,
+        analyzedAt: new Date().toISOString(),
+        source: "puter-ai-list-ranking"
+      };
+    })
+    .filter(Boolean);
+}
