@@ -198,3 +198,23 @@ Important rules:
 The latest extraction is saved locally and can be reviewed in `stage4/extractor.html`.
 
 See `tests/STAGE4_CHECKLIST.md`.
+
+
+### Stage 1 local resume autofill
+
+After resume text passes the quality gate, JobPilot now runs a local resume-to-profile parser before any AI call.
+
+It can prefill supported facts such as:
+
+- name
+- headline
+- current role
+- explicit total experience
+- skills
+- education
+- projects
+- certifications
+- resume keywords
+- an initial target role based on the extracted current role
+
+The parser is evidence-first: missing or uncertain fields stay blank. Puter AI is optional and may be used only to refine the locally extracted profile after user review.
