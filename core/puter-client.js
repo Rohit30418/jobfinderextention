@@ -408,12 +408,33 @@ function normalizeJobAiAnalysis(raw) {
       disqualifiers: cleanAiList(source.evidence?.disqualifiers, 8, 220)
     },
 
+    candidateRequirementMatches: (Array.isArray(source.candidateRequirementMatches)
+      ? source.candidateRequirementMatches
+      : []
+    )
+      .slice(0, 80)
+      .map((item) => {
+        const statusRaw = cleanAiString(item?.status, 30).toUpperCase();
+        const status = ["EXACT", "INFERRED", "PARTIAL", "MISSING"].includes(statusRaw)
+          ? statusRaw
+          : "MISSING";
+
+        return {
+          requirement: cleanAiString(item?.requirement, 220),
+          status,
+          evidence: cleanAiList(item?.evidence, 8, 220),
+          explanation: cleanAiString(item?.explanation, 500)
+        };
+      })
+      .filter((item) => item.requirement),
+
+    analysisVersion: 2,
     analyzedAt: new Date().toISOString(),
     source: "puter-ai"
   };
 }
 
-export async function analyzeJobWithAi(job) {
+export async function analyzeJobWithAi(job, profile = null, preferences = null) {
   const safeJob = job && typeof job === "object" ? job : {};
 
   const payload = {
@@ -437,6 +458,42 @@ export async function analyzeJobWithAi(job) {
     throw new Error("The job detail is not ready for AI analysis yet.");
   }
 
+  const candidatePayload = profile && typeof profile === "object"
+    ? {
+        headline: cleanAiString(profile.headline, 220),
+        currentRole: cleanAiString(profile.currentRole, 220),
+        totalExperienceMonths: Number(profile.totalExperienceMonths || 0),
+        skills: cleanAiList(profile.skills, 100, 120),
+        resumeKeywords: cleanAiList(profile.resumeKeywords, 100, 120),
+        certifications: cleanAiList(profile.certifications, 40, 160),
+        workExperience: (Array.isArray(profile.workExperience) ? profile.workExperience : [])
+          .slice(0, 12)
+          .map((item) => ({
+            title: cleanAiString(item?.title, 180),
+            description: cleanAiString(item?.description, 1000),
+            skillsUsed: cleanAiList(item?.skillsUsed, 40, 120)
+          })),
+        projects: (Array.isArray(profile.projects) ? profile.projects : [])
+          .slice(0, 15)
+          .map((item) => ({
+            name: cleanAiString(item?.name, 180),
+            description: cleanAiString(item?.description, 1000),
+            skillsUsed: cleanAiList(item?.skillsUsed, 40, 120)
+          }))
+      }
+    : null;
+
+  const preferencePayload = preferences && typeof preferences === "object"
+    ? {
+        targetRoles: cleanAiList(preferences.targetRoles, 20, 120),
+        priorityKeywords: cleanAiList(preferences.priorityKeywords, 40, 120),
+        excludedKeywords: cleanAiList(preferences.excludedKeywords, 40, 120),
+        preferredLocations: cleanAiList(preferences.preferredLocations, 30, 120),
+        workModes: cleanAiList(preferences.workModes, 10, 80),
+        employmentTypes: cleanAiList(preferences.employmentTypes, 10, 80)
+      }
+    : null;
+
   const prompt = [
     "You are a job-description interpreter inside a universal job-search browser extension.",
     "Your job is to STRUCTURE the supplied job posting, not to score the candidate and not to invent facts.",
@@ -446,6 +503,14 @@ export async function analyzeJobWithAi(job) {
     "Distinguish required skills from preferred/nice-to-have skills.",
     "A technology merely mentioned in a responsibility is not automatically required.",
     "Disqualifiers must only contain explicit hard constraints such as mandatory years, mandatory degree, location/work-mode restriction, certification, notice period, citizenship, language, or other stated must-have condition.",
+    "When CANDIDATE_DATA is provided, also evaluate every extracted required/preferred skill or capability against the candidate's actual evidence.",
+    "For candidateRequirementMatches use these statuses only:",
+    "EXACT = the same skill/capability is explicitly present in the candidate evidence.",
+    "INFERRED = different wording, but the candidate evidence strongly demonstrates the same capability. Example: Bootstrap + CSS + mobile layouts can support responsive design; meta tags + sitemap + robots.txt can support SEO.",
+    "PARTIAL = related experience exists but it does not fully establish the requested capability. Example: React alone does not prove Next.js.",
+    "MISSING = no credible candidate evidence.",
+    "Do not infer a match merely because technologies are commonly related. Require concrete resume/project/work evidence.",
+    "Do not upgrade years of experience, certifications, degrees, frameworks, languages, or tools that are not actually evidenced.",
     "Return ONLY one valid JSON object. No markdown.",
     "Schema:",
     "{",
@@ -470,13 +535,18 @@ export async function analyzeJobWithAi(job) {
     '    "preferredSkills": [],',
     '    "mustHaveRequirements": [],',
     '    "disqualifiers": []',
-    "  }",
+    "  },",
+    '  "candidateRequirementMatches": [{"requirement":"","status":"EXACT|INFERRED|PARTIAL|MISSING","evidence":[],"explanation":""}]',
     "}",
     "Evidence entries should be short phrases copied or tightly paraphrased from the supplied JD.",
     "Do NOT compare this job to any candidate.",
     "Do NOT produce a match percentage.",
     "JOB_DATA:",
-    JSON.stringify(payload)
+    JSON.stringify(payload),
+    "CANDIDATE_DATA:",
+    JSON.stringify(candidatePayload),
+    "CANDIDATE_PREFERENCES:",
+    JSON.stringify(preferencePayload)
   ].join("\n");
 
   const result = await callPuterAi(prompt);
