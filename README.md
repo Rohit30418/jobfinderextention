@@ -373,3 +373,30 @@ The original JD can be highlighted directly:
 - amber: missing preferred
 
 The last listing page is stored separately so opening a detail page no longer loses the user's search-list context.
+
+
+## JobPilot 1.0 UX architecture
+
+Normal usage is now split cleanly:
+
+```text
+EXTENSION
+→ setup / preferences / search settings
+→ captured ranked Job List only
+
+PORTAL DETAIL PAGE
+→ full JobPilot intelligence inline
+→ Match %
+→ Evidence confidence
+→ APPLY / REVIEW FIRST / SKIP
+→ required/preferred skills
+→ score breakdown
+→ blockers / strengths / gaps / review items
+→ explicit requirements / constraints
+→ Puter AI interpretation
+→ JD highlighting
+```
+
+Stage 4 and Stage 5 files remain available as developer/debug surfaces, but they are no longer part of the normal user flow.
+
+The browser-action button opens the saved Job List once a listing has been captured. Detail analysis never requires leaving the original job portal page.
