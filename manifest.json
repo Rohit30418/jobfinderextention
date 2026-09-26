@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "JobPilot - Naukri Job Extractor",
-  "version": "0.4.6",
-  "description": "Stages 1-4 with local resume autofill and corrected Naukri search-results vs job-detail detection.",
+  "version": "0.4.7",
+  "description": "Stages 1-4 with local resume autofill and current Naukri 2026 result-card extraction.",
   "permissions": [
     "storage",
     "unlimitedStorage",
