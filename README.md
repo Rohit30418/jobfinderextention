@@ -428,3 +428,25 @@ portal listing/detail
 LinkedIn permissions are limited to `/jobs/*`; JobPilot does not intentionally inject into the normal feed/profile experience.
 
 Portal HTML changes over time, so each adapter has its own acceptance checks in `tests/MULTI_PORTAL_CHECKLIST.md`.
+
+
+## Weekly gap intelligence
+
+JobPilot v1.2.0 keeps a deduplicated record of recurring gaps from deep-analyzed jobs.
+
+The rolling 7-day insight view can surface patterns such as:
+
+```text
+TypeScript    missing required in 12 jobs
+Jest          missing required in 7 jobs
+Next.js       missing preferred in 6 jobs
+```
+
+This is a profile-optimization signal, not permission to invent experience.
+
+- If a recurring skill is genuinely part of the candidate's experience but missing from the saved profile/resume, surface it with truthful project/work evidence.
+- If the candidate does not have the skill, use it as a learning target.
+
+The same release also changes Stage 6 from one latest listing into a combined multi-portal feed. The latest captured listing for each supported portal is retained independently.
+
+Current limitation: JobPilot does not fetch jobs from a portal that the user has never opened. Visit a supported listing/search page to contribute that portal's jobs to the combined feed.
