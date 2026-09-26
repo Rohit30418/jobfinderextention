@@ -29,7 +29,9 @@
   let closedForUrl = "";
   let detailWaitUrl = "";
   let detailWaitStartedAt = 0;
+  let detailPollTimer = null;
   const DETAIL_WAIT_TIMEOUT_MS = 15000;
+  const DETAIL_POLL_MS = 700;
 
   function clean(value, max = 5000) {
     return String(value || "")
@@ -1075,7 +1077,7 @@
                 '<div><b>' + escapeHtml(job.title) + '</b>' +
                 '<span>' + escapeHtml(job.company || "Company unknown") + '</span>' +
                 '<em class="jp4-' + job.extraction.level.toLowerCase() + '">' +
-                  job.extraction.level + ' ' + job.extraction.score + '/100' +
+                  (job.extraction.level === "HIGH" ? "READY" : job.extraction.level === "MEDIUM" ? "PARTIAL" : "LOW DATA") +
                 '</em></div>'
               ).join("") +
             '</div>'
@@ -1100,8 +1102,8 @@
       body.innerHTML =
         '<div class="jp4-row"><span>Page</span><b>Job detail</b></div>' +
         '<div class="jp4-confidence jp4-' + job.extraction.level.toLowerCase() + '">' +
-          '<strong>' + job.extraction.level + ' ' + job.extraction.score + '/100</strong>' +
-          '<span>Extraction confidence</span>' +
+          '<strong>' + (job.extraction.level === "HIGH" ? "READY" : job.extraction.level === "MEDIUM" ? "PARTIAL" : "LOW DATA") + '</strong>' +
+          '<span>Extraction status · not a match score</span>' +
         '</div>' +
         '<div class="jp4-fields">' +
           fields.map(([label, value]) =>
@@ -1138,7 +1140,9 @@
         renderOverlay(data);
 
         if (Date.now() - detailWaitStartedAt < DETAIL_WAIT_TIMEOUT_MS) {
-          scheduleExtraction(700);
+          startDetailPoll();
+        } else {
+          stopDetailPoll();
         }
 
         return;
@@ -1146,6 +1150,7 @@
 
       detailWaitUrl = "";
       detailWaitStartedAt = 0;
+      stopDetailPoll();
 
       renderOverlay(data);
       await persist(data);
@@ -1159,6 +1164,22 @@
     scheduleExtraction.timer = setTimeout(runExtraction, delay);
   }
 
+  function stopDetailPoll() {
+    if (detailPollTimer) {
+      clearInterval(detailPollTimer);
+      detailPollTimer = null;
+    }
+  }
+
+  function startDetailPoll() {
+    if (detailPollTimer) return;
+
+    detailPollTimer = setInterval(() => {
+      // Independent poller: Naukri DOM mutations must not cancel this retry.
+      runExtraction();
+    }, DETAIL_POLL_MS);
+  }
+
   lastSignature = "";
   runExtraction();
 
@@ -1169,6 +1190,7 @@
       closedForUrl = "";
       detailWaitUrl = "";
       detailWaitStartedAt = 0;
+      stopDetailPoll();
       scheduleExtraction(350);
     }
   }, 900);
