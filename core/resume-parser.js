@@ -27,8 +27,6 @@ async function hasPdfHeader(file) {
   return text.startsWith("%PDF-");
 }
 
-let sharedPdfWorker = null;
-
 function configurePdfWorker() {
   const pdfjs = globalThis.pdfjsLib;
 
@@ -36,19 +34,15 @@ function configurePdfWorker() {
     throw new Error("PDF.js library is missing.");
   }
 
-  const workerUrl = chrome.runtime.getURL("vendor/pdf.worker.min.js");
-
-  if (sharedPdfWorker) {
-    return;
+  if (!globalThis.pdfjsWorker || !globalThis.pdfjsWorker.WorkerMessageHandler) {
+    throw new Error("PDF.js worker engine is missing.");
   }
 
-  try {
-    sharedPdfWorker = new Worker(workerUrl);
-    pdfjs.GlobalWorkerOptions.workerPort = sharedPdfWorker;
-  } catch (error) {
-    sharedPdfWorker = null;
-    pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
-  }
+  // The worker engine is loaded locally on the extension page.
+  // PDF.js detects it and uses its built-in same-page worker bridge,
+  // avoiding Chrome-extension Web Worker handshake issues.
+  pdfjs.GlobalWorkerOptions.workerPort = null;
+  pdfjs.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL("vendor/pdf.worker.min.js");
 }
 
 function pageTextFromItems(items) {
@@ -104,8 +98,8 @@ async function parsePdf(file) {
   try {
     pdf = await withTimeout(
       task.promise,
-      25000,
-      "PDF extraction timed out. Try Paste Resume Text if this PDF is image-based or protected."
+      12000,
+      "PDF extraction timed out unexpectedly. Open Developer diagnostics and retry once."
     );
   } catch (error) {
     try {
@@ -162,7 +156,7 @@ async function parsePdf(file) {
     parser: "pdf.js-worker",
     details: {
       pages: pages.length,
-      worker: sharedPdfWorker ? "direct-extension-worker" : "workerSrc-fallback"
+      worker: "same-page-pdfjs-worker-engine"
     }
   };
 }
