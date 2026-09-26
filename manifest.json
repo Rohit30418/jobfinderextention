@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "JobPilot - Naukri Job Extractor",
-  "version": "0.4.7",
-  "description": "Stages 1-4 with local resume autofill and current Naukri 2026 result-card extraction.",
+  "name": "JobPilot - Universal Job Portal Assistant",
+  "version": "0.5.0",
+  "description": "Universal portal architecture with separate listing/detail capture adapters; Naukri is the first implementation.",
   "permissions": [
     "storage",
     "unlimitedStorage",
@@ -37,11 +37,15 @@
       ],
       "js": [
         "content/naukri-detector.js",
-        "content/naukri-extractor.js"
+        "core/portal-engine.js",
+        "portals/naukri/listing.js",
+        "portals/naukri/detail.js",
+        "portals/naukri/adapter.js",
+        "content/portal-runtime.js"
       ],
       "css": [
         "content/naukri-detector.css",
-        "content/naukri-extractor.css"
+        "content/portal-runtime.css"
       ],
       "run_at": "document_idle"
     }
