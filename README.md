@@ -450,3 +450,37 @@ This is a profile-optimization signal, not permission to invent experience.
 The same release also changes Stage 6 from one latest listing into a combined multi-portal feed. The latest captured listing for each supported portal is retained independently.
 
 Current limitation: JobPilot does not fetch jobs from a portal that the user has never opened. Visit a supported listing/search page to contribute that portal's jobs to the combined feed.
+
+
+## Universal Stage 3 Search Hub
+
+JobPilot v1.3.0 replaces the old Naukri-only Stage 3 screen with one search hub for:
+
+- Naukri
+- Foundit
+- LinkedIn Jobs
+- Indeed
+- Hirist
+
+Shared inputs:
+
+```text
+Primary role
+Search terms
+Locations
+Experience min/max
+Freshness
+Selected portals
+```
+
+Each portal gets its own URL builder. JobPilot only applies filters that are represented reliably in that portal's URL.
+
+Notably:
+
+- LinkedIn uses `f_TPR` for freshness; years of experience are not mapped to LinkedIn career-level codes.
+- Indeed uses `fromage` for freshness; no job-specific `vjk` is generated.
+- Hirist uses one role/location search at a time.
+- Foundit uses `experienceRanges=min~max` only when both values are known.
+- Naukri continues to reuse learned native experience/city values instead of inventing them.
+
+After the search tabs load, the existing portal adapters capture listings into the combined Stage 6 Job List.
