@@ -746,7 +746,7 @@ async function load() {
 els.aiRankBtn?.addEventListener("click", async () => {
   const jobs = allCapturedJobs()
     .filter((job) => job.relevance?.status !== "filtered")
-    .slice(0, 30)
+    .slice(0, 120)
     .map((job) => ({
       key: job.key,
       portal: job.portal,
