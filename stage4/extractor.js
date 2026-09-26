@@ -643,10 +643,10 @@ els.relevanceMode?.addEventListener("change", () => {
 
 els.connectPuterStage4Btn?.addEventListener("click", async () => {
   try {
-    setAiMessage("Opening Puter sign-in…");
+    setAiMessage("Opening secure Puter bridge…");
     await connectPuter();
     setAiMessage(
-      "Puter connected. Authorize AI once, then analyze the current job.",
+      "Puter connected and AI permission granted. You can analyze this job now.",
       "success"
     );
   } catch (error) {
