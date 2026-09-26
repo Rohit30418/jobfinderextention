@@ -1345,6 +1345,9 @@
       <div class="buttons">
         <button class="btn primary" data-action="back" type="button">← Back to Job List</button>
         <button class="btn" data-action="refresh" type="button">Refresh analysis</button>
+        <button class="btn full ${result.applied ? "" : "primary"}" data-action="applied" type="button">
+          ${result.applied ? "Undo Applied" : "Mark Applied"}
+        </button>
       </div>
 
       <div class="note">
@@ -1367,6 +1370,43 @@
     shadow
       .querySelector('[data-action="retry"]')
       ?.addEventListener("click", () => analyzeCurrent(false));
+
+    shadow
+      .querySelector('[data-action="applied"]')
+      ?.addEventListener("click", async (event) => {
+        const button = event.currentTarget;
+        const job = latestResult?.job;
+
+        if (!job || !button) return;
+
+        button.disabled = true;
+        button.textContent = "Saving…";
+
+        try {
+          const response = await chrome.runtime.sendMessage({
+            type: "jobpilot:toggle-applied",
+            job,
+            source: "job-detail"
+          });
+
+          if (!response?.ok) {
+            throw new Error(
+              response?.error || "Could not update applied status."
+            );
+          }
+
+          latestResult = {
+            ...latestResult,
+            applied: response.applied === true
+          };
+
+          renderPanel();
+        } catch (error) {
+          button.disabled = false;
+          button.textContent =
+            error?.message || "Could not update";
+        }
+      });
 
   }
 
