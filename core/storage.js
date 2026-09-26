@@ -8,6 +8,8 @@ export const NAUKRI_EXTRACTION_KEY = "jobpilot.stage4.naukriExtraction";
 export const PORTAL_CAPTURE_KEY = "jobpilot.stage4.portalCapture";
 export const JOB_CACHE_KEY = "jobpilot.jobs.cache";
 export const LISTING_CONTEXT_KEY = "jobpilot.stage6.listingContext";
+export const LISTING_CONTEXTS_KEY = "jobpilot.stage6.listingContexts";
+export const GAP_HISTORY_KEY = "jobpilot.insights.gapHistory";
 
 export function emptyState() {
   return {
@@ -466,6 +468,22 @@ export async function saveJobDeepMatch(jobKey, deepMatch) {
     [PORTAL_CAPTURE_KEY]: capture
   });
 
+  const gapJob =
+    cache[cacheKey] ||
+    (
+      detail && sameStoredJob(detail, cachedTarget)
+        ? detail
+        : null
+    );
+
+  if (gapJob && deepMatch) {
+    await saveGapSnapshot(
+      cacheKey || requestedKey,
+      gapJob,
+      deepMatch
+    );
+  }
+
   return capture.detail || cache[cacheKey] || null;
 }
 
@@ -486,9 +504,33 @@ export function emptyListingContext() {
   };
 }
 
+export function emptyListingContexts() {
+  return {
+    version: 1,
+    portals: {},
+    updatedAt: null
+  };
+}
+
 export async function getListingContext() {
   const result = await chrome.storage.local.get(LISTING_CONTEXT_KEY);
   return result[LISTING_CONTEXT_KEY] || emptyListingContext();
+}
+
+export async function getListingContexts() {
+  const result = await chrome.storage.local.get(LISTING_CONTEXTS_KEY);
+  const value = result[LISTING_CONTEXTS_KEY];
+
+  return value && typeof value === "object"
+    ? {
+        ...emptyListingContexts(),
+        ...value,
+        portals:
+          value.portals && typeof value.portals === "object"
+            ? value.portals
+            : {}
+      }
+    : emptyListingContexts();
 }
 
 export async function setListingContext(context) {
@@ -499,13 +541,211 @@ export async function setListingContext(context) {
     capturedAt: new Date().toISOString()
   };
 
+  const contexts = await getListingContexts();
+  const portalKey = String(next.portal || "unknown").trim() || "unknown";
+
+  const nextContexts = {
+    ...contexts,
+    version: 1,
+    portals: {
+      ...contexts.portals,
+      [portalKey]: next
+    },
+    updatedAt: next.capturedAt
+  };
+
   await chrome.storage.local.set({
-    [LISTING_CONTEXT_KEY]: next
+    [LISTING_CONTEXT_KEY]: next,
+    [LISTING_CONTEXTS_KEY]: nextContexts
   });
 
   return next;
 }
 
 export async function clearListingContext() {
-  await chrome.storage.local.remove(LISTING_CONTEXT_KEY);
+  await chrome.storage.local.remove([
+    LISTING_CONTEXT_KEY,
+    LISTING_CONTEXTS_KEY
+  ]);
+}
+
+function normalizeGapValue(value) {
+  return String(value || "")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+function uniqueGapValues(values) {
+  const output = [];
+  const seen = new Set();
+
+  for (const item of values || []) {
+    const value = normalizeGapValue(item);
+    const key = value.toLowerCase();
+
+    if (!value || seen.has(key)) continue;
+
+    seen.add(key);
+    output.push(value);
+  }
+
+  return output;
+}
+
+function gapRecordKey(jobKey, job) {
+  if (jobKey) return String(jobKey);
+
+  if (job?.portalJobId) {
+    return String(job.portal || "portal") + ":" + String(job.portalJobId);
+  }
+
+  return String(job?.canonicalUrl || job?.title || Date.now());
+}
+
+export async function saveGapSnapshot(jobKey, job, deepMatch) {
+  if (!deepMatch || !job) return null;
+
+  const result = await chrome.storage.local.get(GAP_HISTORY_KEY);
+  const history =
+    result[GAP_HISTORY_KEY] &&
+    typeof result[GAP_HISTORY_KEY] === "object"
+      ? result[GAP_HISTORY_KEY]
+      : {};
+
+  const key = gapRecordKey(jobKey, job);
+  const now = new Date().toISOString();
+  const previous = history[key] || null;
+
+  history[key] = {
+    key,
+    portal: job.portal || deepMatch.portal || "",
+    title: job.title || "",
+    company: job.company || "",
+    canonicalUrl: job.canonicalUrl || "",
+    roleFamily: deepMatch.source?.roleFamily || "",
+    matchScore: Number.isFinite(deepMatch.matchScore?.score)
+      ? deepMatch.matchScore.score
+      : null,
+    decision: deepMatch.applyDecision?.action || "",
+    verdict: deepMatch.verdict || "",
+
+    missingRequired: uniqueGapValues(
+      deepMatch.skills?.required?.missing || []
+    ),
+
+    missingPreferred: uniqueGapValues(
+      deepMatch.skills?.preferred?.missing || []
+    ),
+
+    blockers: uniqueGapValues(
+      (deepMatch.blockers || []).map((item) =>
+        item?.detail
+          ? item.label + ": " + item.detail
+          : item?.label
+      )
+    ),
+
+    gaps: uniqueGapValues(
+      (deepMatch.gaps || []).map((item) =>
+        item?.detail
+          ? item.label + ": " + item.detail
+          : item?.label
+      )
+    ),
+
+    firstSeenAt: previous?.firstSeenAt || now,
+    lastSeenAt: now
+  };
+
+  const compact = Object.fromEntries(
+    Object.entries(history)
+      .sort((a, b) =>
+        String(b[1]?.lastSeenAt || "").localeCompare(
+          String(a[1]?.lastSeenAt || "")
+        )
+      )
+      .slice(0, 500)
+  );
+
+  await chrome.storage.local.set({
+    [GAP_HISTORY_KEY]: compact
+  });
+
+  return compact[key] || history[key];
+}
+
+export async function getGapHistory() {
+  const result = await chrome.storage.local.get(GAP_HISTORY_KEY);
+  const value = result[GAP_HISTORY_KEY];
+  return value && typeof value === "object" ? value : {};
+}
+
+export async function getGapInsights(days = 7) {
+  const history = await getGapHistory();
+  const cutoff =
+    Date.now() - Math.max(1, Number(days) || 7) * 24 * 60 * 60 * 1000;
+
+  const records = Object.values(history).filter((item) => {
+    const time = Date.parse(item?.lastSeenAt || "");
+    return Number.isFinite(time) && time >= cutoff;
+  });
+
+  const countValues = (field) => {
+    const map = new Map();
+
+    for (const record of records) {
+      for (const raw of record?.[field] || []) {
+        const value = normalizeGapValue(raw);
+        const key = value.toLowerCase();
+
+        if (!value) continue;
+
+        const existing = map.get(key) || {
+          value,
+          count: 0,
+          portals: new Set()
+        };
+
+        existing.count += 1;
+
+        if (record.portal) {
+          existing.portals.add(record.portal);
+        }
+
+        map.set(key, existing);
+      }
+    }
+
+    return [...map.values()]
+      .map((item) => ({
+        value: item.value,
+        count: item.count,
+        portals: [...item.portals]
+      }))
+      .sort((a, b) =>
+        b.count - a.count ||
+        a.value.localeCompare(b.value)
+      );
+  };
+
+  const portalCounts = {};
+
+  for (const record of records) {
+    const portal = record.portal || "unknown";
+    portalCounts[portal] = (portalCounts[portal] || 0) + 1;
+  }
+
+  return {
+    days: Math.max(1, Number(days) || 7),
+    analyzedJobs: records.length,
+    missingRequired: countValues("missingRequired"),
+    missingPreferred: countValues("missingPreferred"),
+    blockers: countValues("blockers"),
+    portalCounts,
+    generatedAt: new Date().toISOString()
+  };
+}
+
+export async function clearGapHistory() {
+  await chrome.storage.local.remove(GAP_HISTORY_KEY);
 }
