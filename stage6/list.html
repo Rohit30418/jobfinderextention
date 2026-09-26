@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>JobPilot - Job List</title>
+  <link rel="stylesheet" href="list.css">
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <div>
+        <div class="eyebrow">JOBPILOT</div>
+        <h1>Your job list.</h1>
+        <p class="lede">
+          The extension is now for job discovery and prioritization only.
+          Deep analysis happens directly on the job portal page.
+        </p>
+      </div>
+      <div class="actions">
+        <button class="btn" id="openSourceBtn" type="button">Open last search</button>
+        <a class="btn ghost" href="../stage3/naukri.html">Search settings</a>
+      </div>
+    </header>
+
+    <section class="panel" id="summaryPanel">
+      <div class="summary-head">
+        <div>
+          <div class="kicker">LAST CAPTURED LISTING</div>
+          <h2 id="listingTitle">Waiting for a job listing…</h2>
+          <p id="listingMeta">Open a Naukri search-results page to capture jobs.</p>
+        </div>
+        <div class="status" id="listingStatus">Waiting</div>
+      </div>
+
+      <div class="stats">
+        <div><strong id="totalCount">0</strong><span>Total</span></div>
+        <div><strong id="relevantCount">0</strong><span>Relevant</span></div>
+        <div><strong id="reviewCount">0</strong><span>Review</span></div>
+        <div><strong id="filteredCount">0</strong><span>Filtered</span></div>
+        <div><strong id="analyzedCount">0</strong><span>Deep analyzed</span></div>
+      </div>
+    </section>
+
+    <section class="toolbar panel">
+      <div class="filters">
+        <button class="filter active" data-mode="recommended" type="button">Recommended</button>
+        <button class="filter" data-mode="relevant" type="button">Relevant</button>
+        <button class="filter" data-mode="review" type="button">Review</button>
+        <button class="filter" data-mode="analyzed" type="button">Analyzed</button>
+        <button class="filter" data-mode="all" type="button">All</button>
+      </div>
+      <input id="searchInput" type="search" placeholder="Search title, company, skill…">
+    </section>
+
+    <main class="job-list" id="jobList"></main>
+
+    <section class="empty panel hidden" id="emptyState">
+      <strong>No captured jobs yet.</strong>
+      <span>Open a Naukri search-results page. JobPilot will keep the latest listing here.</span>
+    </section>
+  </div>
+
+  <script type="module" src="list.js"></script>
+</body>
+</html>
