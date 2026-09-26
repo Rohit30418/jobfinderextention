@@ -617,6 +617,12 @@
           color: #9ff7bf;
         }
 
+        .pill.info,
+        .skill.info {
+          border-color: rgba(94, 145, 247, .42);
+          color: #9fbcff;
+        }
+
         .pill.bad,
         .skill.bad {
           border-color: rgba(255, 113, 128, .38);
@@ -907,7 +913,7 @@
       <div class="section">
         <h4>Preferred / nice to have</h4>
         <div class="skills">
-          ${renderSkills(preferredMatched, "good")}
+          ${renderSkills(preferredMatched, "info")}
           ${renderSkills(preferredMissing, "warn")}
         </div>
       </div>
