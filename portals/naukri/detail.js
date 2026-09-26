@@ -404,66 +404,103 @@
         300
       );
 
+    const job = {
+      portalJobId: identifier,
+      canonicalUrl,
+
+      title: engine.clean(json?.title, 350) || dom.title,
+      company: engine.clean(json?.hiringOrganization?.name, 300) || dom.company,
+      experienceText: jsonExperience || dom.experienceText,
+      location: finalLocation,
+      salaryText: finalSalary,
+
+      skills: allSkills,
+      description: fullDescription,
+      responsibilities,
+      requiredSkills,
+      preferredSkills,
+
+      requirementStatements,
+      preferredStatements,
+
+      postedAge: dom.postedAge,
+      datePosted: engine.clean(json?.datePosted, 180),
+      employmentType,
+      education,
+      workMode,
+
+      captureMethod: json ? "json-ld+detail-dom" : "detail-dom",
+
+      sources: {
+        title: json?.title ? "json-ld" : dom.title ? "detail-dom" : "",
+        company: json?.hiringOrganization?.name ? "json-ld" : dom.company ? "detail-dom" : "",
+        experienceText: jsonExperience ? "json-ld" : dom.experienceText ? "detail-dom" : "",
+        location:
+          meaningfulLocation(jsonLocationText) ? "json-ld" :
+          meaningfulLocation(dom.location) ? "detail-dom" : "",
+        salaryText:
+          meaningfulSalary(jsonSalaryText) ? "json-ld" :
+          meaningfulSalary(dom.salaryText) ? "detail-dom" : "",
+        skills:
+          jsonSkills.length && dom.skills.length ? "json-ld+detail-dom" :
+          jsonSkills.length ? "json-ld" :
+          dom.skills.length ? "detail-dom" : "",
+        description: jsonDescription ? "json-ld" : dom.description ? "detail-dom" : "",
+        responsibilities: responsibilities.length ? "jd-parser" : "",
+        requiredSkills: requiredSkills.length ? "jd-parser" : "",
+        preferredSkills: preferredSkills.length ? "jd-parser" : "",
+        education:
+          explicitEducation ? "json-ld" :
+          education ? "jd-parser" : "",
+        employmentType:
+          json?.employmentType ? "json-ld" :
+          dom.employmentType ? "detail-dom" : "",
+        workMode: workMode ? "jd-parser" : "",
+        datePosted: json?.datePosted ? "json-ld" : "",
+        postedAge: dom.postedAge ? "detail-dom" : "",
+        portalJobId:
+          json?.identifier?.value ? "json-ld" :
+          identifier ? "url" : ""
+      }
+    };
+
+    const readinessSignals = {
+      title: Boolean(job.title),
+      company: Boolean(job.company),
+      description: job.description.length >= 80,
+      experience: Boolean(job.experienceText),
+      location: Boolean(job.location),
+      skills: job.skills.length > 0,
+      posted: Boolean(job.datePosted || job.postedAge)
+    };
+
+    const secondaryReady = [
+      readinessSignals.company,
+      readinessSignals.experience,
+      readinessSignals.location,
+      readinessSignals.skills,
+      readinessSignals.posted
+    ].filter(Boolean).length;
+
+    const ready =
+      readinessSignals.title &&
+      readinessSignals.description &&
+      secondaryReady >= 2;
+
     return {
       method: json ? "json-ld+detail-dom" : "detail-dom",
-      job: {
-        portalJobId: identifier,
-        canonicalUrl,
-
-        title: engine.clean(json?.title, 350) || dom.title,
-        company: engine.clean(json?.hiringOrganization?.name, 300) || dom.company,
-        experienceText: jsonExperience || dom.experienceText,
-        location: finalLocation,
-        salaryText: finalSalary,
-
-        skills: allSkills,
-        description: fullDescription,
-        responsibilities,
-        requiredSkills,
-        preferredSkills,
-
-        requirementStatements,
-        preferredStatements,
-
-        postedAge: dom.postedAge,
-        datePosted: engine.clean(json?.datePosted, 180),
-        employmentType,
-        education,
-        workMode,
-
-        captureMethod: json ? "json-ld+detail-dom" : "detail-dom",
-
-        sources: {
-          title: json?.title ? "json-ld" : dom.title ? "detail-dom" : "",
-          company: json?.hiringOrganization?.name ? "json-ld" : dom.company ? "detail-dom" : "",
-          experienceText: jsonExperience ? "json-ld" : dom.experienceText ? "detail-dom" : "",
-          location:
-            meaningfulLocation(jsonLocationText) ? "json-ld" :
-            meaningfulLocation(dom.location) ? "detail-dom" : "",
-          salaryText:
-            meaningfulSalary(jsonSalaryText) ? "json-ld" :
-            meaningfulSalary(dom.salaryText) ? "detail-dom" : "",
-          skills:
-            jsonSkills.length && dom.skills.length ? "json-ld+detail-dom" :
-            jsonSkills.length ? "json-ld" :
-            dom.skills.length ? "detail-dom" : "",
-          description: jsonDescription ? "json-ld" : dom.description ? "detail-dom" : "",
-          responsibilities: responsibilities.length ? "jd-parser" : "",
-          requiredSkills: requiredSkills.length ? "jd-parser" : "",
-          preferredSkills: preferredSkills.length ? "jd-parser" : "",
-          education:
-            explicitEducation ? "json-ld" :
-            education ? "jd-parser" : "",
-          employmentType:
-            json?.employmentType ? "json-ld" :
-            dom.employmentType ? "detail-dom" : "",
-          workMode: workMode ? "jd-parser" : "",
-          datePosted: json?.datePosted ? "json-ld" : "",
-          postedAge: dom.postedAge ? "detail-dom" : "",
-          portalJobId:
-            json?.identifier?.value ? "json-ld" :
-            identifier ? "url" : ""
-        }
+      job,
+      readiness: {
+        ready,
+        secondaryReady,
+        signals: readinessSignals,
+        reason: ready
+          ? "detail-ready"
+          : !readinessSignals.title
+            ? "waiting-for-title"
+            : !readinessSignals.description
+              ? "waiting-for-description"
+              : "waiting-for-core-fields"
       }
     };
   }
