@@ -865,3 +865,27 @@ export async function getGapInsights(days = 7) {
 export async function clearGapHistory() {
   await chrome.storage.local.remove(GAP_HISTORY_KEY);
 }
+
+
+export async function saveJobAiRankings(rankings) {
+  const rows = Array.isArray(rankings) ? rankings : [];
+  const result = await chrome.storage.local.get(JOB_CACHE_KEY);
+  const cache =
+    result[JOB_CACHE_KEY] && typeof result[JOB_CACHE_KEY] === "object"
+      ? result[JOB_CACHE_KEY]
+      : {};
+
+  for (const row of rows) {
+    const key = String(row?.key || "").trim();
+    if (!key || !cache[key]) continue;
+
+    cache[key] = {
+      ...cache[key],
+      aiRanking: row,
+      aiRankedAt: row?.analyzedAt || new Date().toISOString()
+    };
+  }
+
+  await chrome.storage.local.set({ [JOB_CACHE_KEY]: cache });
+  return cache;
+}
