@@ -339,3 +339,86 @@ export async function saveJobAiAnalysis(jobKey, analysis) {
 
   return capture.detail || cache[cacheKey] || null;
 }
+
+
+export async function saveJobDeepMatch(jobKey, deepMatch) {
+  const result = await chrome.storage.local.get([
+    JOB_CACHE_KEY,
+    PORTAL_CAPTURE_KEY
+  ]);
+
+  const cache =
+    result[JOB_CACHE_KEY] && typeof result[JOB_CACHE_KEY] === "object"
+      ? result[JOB_CACHE_KEY]
+      : {};
+
+  const capture =
+    result[PORTAL_CAPTURE_KEY] && typeof result[PORTAL_CAPTURE_KEY] === "object"
+      ? result[PORTAL_CAPTURE_KEY]
+      : emptyPortalCapture();
+
+  const detail = capture.detail || null;
+  const requestedKey = String(jobKey || detail?.key || "").trim();
+
+  if (!requestedKey && !detail) {
+    throw new Error("No current detail job is available for Stage 5.");
+  }
+
+  let cacheKey = requestedKey;
+
+  if (!cache[cacheKey] && detail) {
+    const detailUrl = String(detail.canonicalUrl || "")
+      .split("?")[0]
+      .replace(/\/+$/, "");
+    const detailId = String(detail.portalJobId || "");
+
+    for (const [key, item] of Object.entries(cache)) {
+      if (!item || item.portal !== detail.portal) continue;
+
+      const sameId =
+        detailId &&
+        item.portalJobId &&
+        String(item.portalJobId) === detailId;
+
+      const itemUrl = String(item.canonicalUrl || "")
+        .split("?")[0]
+        .replace(/\/+$/, "");
+
+      const sameUrl =
+        detailUrl &&
+        itemUrl &&
+        itemUrl.toLowerCase() === detailUrl.toLowerCase();
+
+      if (sameId || sameUrl) {
+        cacheKey = key;
+        break;
+      }
+    }
+  }
+
+  const evaluatedAt =
+    deepMatch?.evaluatedAt || new Date().toISOString();
+
+  if (cache[cacheKey]) {
+    cache[cacheKey] = {
+      ...cache[cacheKey],
+      deepMatch: deepMatch || null,
+      deepMatchedAt: evaluatedAt
+    };
+  }
+
+  if (detail) {
+    capture.detail = {
+      ...detail,
+      deepMatch: deepMatch || null,
+      deepMatchedAt: evaluatedAt
+    };
+  }
+
+  await chrome.storage.local.set({
+    [JOB_CACHE_KEY]: cache,
+    [PORTAL_CAPTURE_KEY]: capture
+  });
+
+  return capture.detail || cache[cacheKey] || null;
+}
