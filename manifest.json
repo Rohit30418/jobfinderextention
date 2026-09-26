@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "JobPilot - Universal Job Portal Assistant",
-  "version": "1.5.2",
-  "description": "JobPilot 1.5.2: AI semantic evidence plus foundational frontend competency recognition.",
+  "version": "1.6.0",
+  "description": "JobPilot 1.6: persistent Skill Vault, automatic gap capture, add/remove/dismiss skill controls, AI matching, and safe backup/restore.",
   "permissions": [
     "storage",
     "unlimitedStorage",
