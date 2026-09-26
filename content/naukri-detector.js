@@ -133,29 +133,38 @@
       return { type: "not-found", label: "Expired / not-found page" };
     }
 
-    if (
-      path.includes("job-listings-") ||
-      Boolean(getJsonLdJobPosting()) ||
-      Boolean(
-        document.querySelector(
-          '[class*="job-desc"], [class*="jd-header"], [class*="jobDescription"]'
-        )
-      )
-    ) {
-      return { type: "job-detail", label: "Individual job page" };
-    }
-
     const params = new URLSearchParams(location.search);
     const jobLinks = uniqueJobLinks();
 
-    if (
+    const strongSearchEvidence =
+      /-jobs(?:-in-)?/.test(path) ||
+      jobLinks.length >= 2 ||
+      params.has("k") ||
+      params.has("l") ||
       params.has("jobAge") ||
       params.has("experience") ||
-      params.has("cityTypeGid") ||
-      /-jobs(?:-in-)?/.test(path) ||
-      jobLinks.length >= 2
-    ) {
+      params.has("cityTypeGid");
+
+    // Search pages contain job-card classes such as job-desc too, so
+    // search evidence must win before any generic DOM selector.
+    if (strongSearchEvidence && !path.includes("job-listings-")) {
       return { type: "search-results", label: "Naukri search results" };
+    }
+
+    const strongDetailEvidence =
+      path.includes("job-listings-") ||
+      (
+        Boolean(getJsonLdJobPosting()) &&
+        jobLinks.length <= 1 &&
+        Boolean(
+          document.querySelector(
+            '[class*="jd-header"], [class*="jobDescription"], .dang-inner-html'
+          )
+        )
+      );
+
+    if (strongDetailEvidence) {
+      return { type: "job-detail", label: "Individual job page" };
     }
 
     return { type: "unknown", label: "Unknown Naukri page" };
