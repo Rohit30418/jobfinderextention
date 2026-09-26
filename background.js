@@ -2,11 +2,14 @@ import {
   getAiAuthorized,
   getJobCache,
   getPuterToken,
+  isJobApplied,
   getPreferences,
   getState,
+  markJobApplied,
   saveJobAiAnalysis,
   saveJobAiRankings,
-  saveJobDeepMatch
+  saveJobDeepMatch,
+  unmarkJobApplied
 } from "./core/storage.js";
 import {
   analyzeJobBatchForCandidate,
@@ -261,9 +264,12 @@ async function buildInlineIntelligence(incomingJob, forceAi = false) {
 
   await saveJobDeepMatch(job.key, deepMatch);
 
+  const applied = await isJobApplied(job);
+
   return {
     job,
     match: deepMatch,
+    applied,
     aiStatus,
     puterReady: Boolean(token && aiAuthorized)
   };
@@ -329,6 +335,42 @@ async function injectJobPilotIntoPortal(tabId, url, reason = "background") {
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message?.type === "jobpilot:toggle-applied") {
+    (async () => {
+      try {
+        const job = message.job;
+
+        if (!job) {
+          throw new Error("Job data is required.");
+        }
+
+        const applied = await isJobApplied(job);
+
+        if (applied) {
+          await unmarkJobApplied(job);
+          sendResponse({ ok: true, applied: false });
+        } else {
+          const record = await markJobApplied(job, {
+            source: message.source || "job-detail"
+          });
+
+          sendResponse({
+            ok: true,
+            applied: true,
+            record
+          });
+        }
+      } catch (error) {
+        sendResponse({
+          ok: false,
+          error: error?.message || String(error)
+        });
+      }
+    })();
+
+    return true;
+  }
+
   if (message?.type === "jobpilot:rank-list-ai") {
     (async () => {
       try {
