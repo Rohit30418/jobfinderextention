@@ -197,10 +197,12 @@ async function renderDiagnostics() {
   const data = extraction || await getNaukriExtraction();
   const connectionResult = await chrome.storage.local.get([
     "jobpilot.stage3.connection",
-    "jobpilot.stage4.connection"
+    "jobpilot.stage4.connection",
+    "jobpilot.naukri.injectionStatus"
   ]);
   const stage3Connection = connectionResult["jobpilot.stage3.connection"];
   const stage4Connection = connectionResult["jobpilot.stage4.connection"];
+  const injectionStatus = connectionResult["jobpilot.naukri.injectionStatus"];
 
   const diagnostics = [
     ["Stage 1 profile", Boolean(state.profile), state.profile ? "Ready" : "Missing"],
@@ -223,6 +225,15 @@ async function renderDiagnostics() {
       "Stage 4 extractor connection",
       Boolean(stage4Connection && stage4Connection.status === "connected"),
       stage4Connection ? "Connected to Naukri" : "Not connected"
+    ],
+    [
+      "Injection attempt",
+      Boolean(injectionStatus && injectionStatus.ok === true),
+      injectionStatus
+        ? injectionStatus.ok
+          ? "PASS · " + injectionStatus.reason
+          : "FAILED · " + injectionStatus.reason + " · " + (injectionStatus.error || "Unknown error")
+        : "No injection attempt recorded"
     ],
     [
       "Stage 4 page type",
