@@ -1083,6 +1083,6 @@
     analyzeCurrent(false);
   }
 
-  tick();
+  setTimeout(tick, 700);
   setInterval(tick, 900);
 })();
