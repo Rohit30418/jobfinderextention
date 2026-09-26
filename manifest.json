@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "JobPilot - Universal Job Portal Assistant",
-  "version": "0.5.1",
-  "description": "Universal portal capture with a single clean overlay; legacy Naukri overlays disabled.",
+  "version": "0.5.2",
+  "description": "Universal portal capture with deterministic quick relevance filtering for listing pages.",
   "permissions": [
     "storage",
     "unlimitedStorage",
@@ -40,6 +40,7 @@
         "portals/naukri/listing.js",
         "portals/naukri/detail.js",
         "portals/naukri/adapter.js",
+        "core/relevance-gate.js",
         "content/portal-runtime.js"
       ],
       "css": [
