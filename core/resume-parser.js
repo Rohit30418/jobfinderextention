@@ -4,32 +4,166 @@ function extensionOf(file) {
   return index >= 0 ? name.slice(index + 1) : "";
 }
 
-async function parsePdf(file) {
-  if (!globalThis.pdfjsLib) {
-    throw new Error("PDF.js is not loaded.");
+function withTimeout(promise, ms, message) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message)), ms);
+
+    Promise.resolve(promise).then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      }
+    );
+  });
+}
+
+async function hasPdfHeader(file) {
+  const header = await file.slice(0, 8).arrayBuffer();
+  const text = new TextDecoder("latin1").decode(header);
+  return text.startsWith("%PDF-");
+}
+
+let sharedPdfWorker = null;
+
+function configurePdfWorker() {
+  const pdfjs = globalThis.pdfjsLib;
+
+  if (!pdfjs) {
+    throw new Error("PDF.js library is missing.");
   }
 
-  globalThis.pdfjsLib.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL("vendor/pdf.worker.min.js");
+  const workerUrl = chrome.runtime.getURL("vendor/pdf.worker.min.js");
 
+  if (sharedPdfWorker) {
+    return;
+  }
+
+  try {
+    sharedPdfWorker = new Worker(workerUrl);
+    pdfjs.GlobalWorkerOptions.workerPort = sharedPdfWorker;
+  } catch (error) {
+    sharedPdfWorker = null;
+    pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
+  }
+}
+
+function pageTextFromItems(items) {
+  const lines = [];
+  let current = [];
+
+  for (const item of items || []) {
+    if (!item || typeof item.str !== "string") {
+      continue;
+    }
+
+    const value = item.str.trim();
+
+    if (value) {
+      current.push(value);
+    }
+
+    if (item.hasEOL) {
+      if (current.length) {
+        lines.push(current.join(" "));
+        current = [];
+      }
+    }
+  }
+
+  if (current.length) {
+    lines.push(current.join(" "));
+  }
+
+  return lines.join("\n").trim();
+}
+
+async function parsePdf(file) {
+  if (!await hasPdfHeader(file)) {
+    throw new Error("This file does not appear to be a valid PDF.");
+  }
+
+  configurePdfWorker();
+
+  const pdfjs = globalThis.pdfjsLib;
   const data = new Uint8Array(await file.arrayBuffer());
-  const task = globalThis.pdfjsLib.getDocument({ data, isEvalSupported: false });
-  const pdf = await task.promise;
+
+  const task = pdfjs.getDocument({
+    data,
+    isEvalSupported: false,
+    disableFontFace: true,
+    useWorkerFetch: false,
+    stopAtErrors: false
+  });
+
+  let pdf;
+
+  try {
+    pdf = await withTimeout(
+      task.promise,
+      25000,
+      "PDF extraction timed out. Try Paste Resume Text if this PDF is image-based or protected."
+    );
+  } catch (error) {
+    try {
+      await task.destroy();
+    } catch (_) {}
+
+    const message = error && error.message ? error.message : String(error || "");
+
+    if (/password/i.test(message)) {
+      throw new Error("This PDF is password protected. Please upload an unlocked copy.");
+    }
+
+    throw new Error("PDF.js could not read this PDF: " + message);
+  }
+
   const pages = [];
 
-  for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
-    const page = await pdf.getPage(pageNumber);
-    const content = await page.getTextContent();
-    const text = content.items
-      .map((item) => (item && typeof item.str === "string" ? item.str : ""))
-      .filter(Boolean)
-      .join(" ");
-    pages.push(text);
+  try {
+    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+      const page = await withTimeout(
+        pdf.getPage(pageNumber),
+        10000,
+        "Timed out while opening PDF page " + pageNumber + "."
+      );
+
+      const content = await withTimeout(
+        page.getTextContent({
+          normalizeWhitespace: true,
+          disableCombineTextItems: false
+        }),
+        10000,
+        "Timed out while extracting text from PDF page " + pageNumber + "."
+      );
+
+      pages.push(pageTextFromItems(content.items));
+      page.cleanup();
+    }
+  } finally {
+    try {
+      await pdf.destroy();
+    } catch (_) {}
+  }
+
+  const text = pages.filter(Boolean).join("\n\n").trim();
+
+  if (!text) {
+    throw new Error(
+      "No selectable text was found in this PDF. It may be scanned/image-only. Use Paste Resume Text for now."
+    );
   }
 
   return {
-    text: pages.join("\n\n"),
-    parser: "pdf.js",
-    details: { pages: pdf.numPages }
+    text,
+    parser: "pdf.js-worker",
+    details: {
+      pages: pages.length,
+      worker: sharedPdfWorker ? "direct-extension-worker" : "workerSrc-fallback"
+    }
   };
 }
 
@@ -120,6 +254,10 @@ async function parseDocx(file) {
     .map((paragraph) => paragraph.textContent.replace(/\s+/g, " ").trim())
     .filter(Boolean);
 
+  if (!paragraphs.length) {
+    throw new Error("No readable text was found in this DOCX.");
+  }
+
   return {
     text: paragraphs.join("\n"),
     parser: "docx-local",
@@ -128,8 +266,14 @@ async function parseDocx(file) {
 }
 
 async function parsePlainText(file) {
+  const text = await file.text();
+
+  if (!text.trim()) {
+    throw new Error("This text file is empty.");
+  }
+
   return {
-    text: await file.text(),
+    text,
     parser: "plain-text",
     details: {}
   };
@@ -138,6 +282,14 @@ async function parsePlainText(file) {
 export async function parseResumeFile(file) {
   if (!file) {
     throw new Error("Choose a resume file first.");
+  }
+
+  if (file.size <= 0) {
+    throw new Error("The selected resume file is empty.");
+  }
+
+  if (file.size > 15 * 1024 * 1024) {
+    throw new Error("Resume file is too large. Please use a file under 15 MB.");
   }
 
   const extension = extensionOf(file);
