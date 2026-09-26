@@ -70,6 +70,25 @@
       };
     }
 
+    const monthsRange = value.match(/(\d+)\s*(?:-|–|to)\s*(\d+)\s*months?/i);
+    if (monthsRange) {
+      return {
+        text: value,
+        min: Math.round((Number(monthsRange[1]) / 12) * 10) / 10,
+        max: Math.round((Number(monthsRange[2]) / 12) * 10) / 10
+      };
+    }
+
+    const months = value.match(/(\d+)\s*months?/i);
+    if (months) {
+      const years = Math.round((Number(months[1]) / 12) * 10) / 10;
+      return {
+        text: value + " (" + years + " years)",
+        min: years,
+        max: years
+      };
+    }
+
     return { text: value, min: null, max: null };
   }
 
@@ -171,6 +190,8 @@
       responsibilities: unique(source.responsibilities || [], 40),
       requiredSkills: unique(source.requiredSkills || [], 40),
       preferredSkills: unique(source.preferredSkills || [], 40),
+      requirementStatements: unique(source.requirementStatements || [], 40),
+      preferredStatements: unique(source.preferredStatements || [], 30),
       education: clean(source.education, 1000),
       employmentType: clean(source.employmentType, 250),
       workMode: clean(source.workMode, 180),
@@ -194,6 +215,8 @@
             responsibilities: unique(source.responsibilities || [], 40),
             requiredSkills: unique(source.requiredSkills || [], 40),
             preferredSkills: unique(source.preferredSkills || [], 40),
+            requirementStatements: unique(source.requirementStatements || [], 40),
+            preferredStatements: unique(source.preferredStatements || [], 30),
             education: clean(source.education, 1000),
             employmentType: clean(source.employmentType, 250),
             workMode: clean(source.workMode, 180),
@@ -273,7 +296,9 @@
       "skills",
       "responsibilities",
       "requiredSkills",
-      "preferredSkills"
+      "preferredSkills",
+      "requirementStatements",
+      "preferredStatements"
     ]) {
       next[field] = unique([
         ...(existing[field] || []),
