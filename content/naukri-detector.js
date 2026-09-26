@@ -1,6 +1,8 @@
 (() => {
   const SEARCH_KEY = "jobpilot.stage3.naukriSearch";
+  const NATIVE_KEY = "jobpilot.stage3.naukriNativeFilters";
   const ROOT_ID = "jobpilot-naukri-stage3";
+
   let lastUrl = "";
   let closedForUrl = "";
 
@@ -9,6 +11,15 @@
       .toLowerCase()
       .replace(/\s+/g, " ")
       .trim();
+  }
+
+  function slugify(value) {
+    return String(value || "")
+      .toLowerCase()
+      .normalize("NFKD")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .replace(/-{2,}/g, "-");
   }
 
   function escapeHtml(value) {
@@ -20,6 +31,14 @@
       .replace(/'/g, "&#039;");
   }
 
+  function arraysEqual(a, b) {
+    const left = (Array.isArray(a) ? a : []).map(String);
+    const right = (Array.isArray(b) ? b : []).map(String);
+
+    return left.length === right.length &&
+      left.every((value, index) => value === right[index]);
+  }
+
   function getJsonLdJobPosting() {
     for (const script of document.querySelectorAll('script[type="application/ld+json"]')) {
       try {
@@ -29,31 +48,39 @@
 
         while (stack.length) {
           const item = stack.shift();
-          if (!item || typeof item !== "object") continue;
 
+          if (!item || typeof item !== "object") continue;
           if (item["@type"] === "JobPosting") return item;
           if (Array.isArray(item["@graph"])) stack.push(...item["@graph"]);
         }
       } catch (_) {}
     }
+
     return null;
   }
 
   function uniqueJobLinks() {
     const set = new Set();
+
     document.querySelectorAll('a[href*="job-listings"]').forEach((anchor) => {
       try {
         const url = new URL(anchor.href, location.href);
-        if (url.hostname.endsWith("naukri.com")) set.add(url.href.split("?")[0]);
+
+        if (url.hostname.endsWith("naukri.com")) {
+          set.add(url.href.split("?")[0]);
+        }
       } catch (_) {}
     });
+
     return [...set];
   }
 
   function detectPageType() {
     const path = location.pathname.toLowerCase();
     const href = location.href.toLowerCase();
-    const bodyText = norm((document.body && document.body.innerText || "").slice(0, 120000));
+    const bodyText = norm(
+      (document.body && document.body.innerText || "").slice(0, 120000)
+    );
 
     const loginByUrl =
       path.includes("nlogin") ||
@@ -89,7 +116,11 @@
     if (
       path.includes("job-listings-") ||
       Boolean(getJsonLdJobPosting()) ||
-      Boolean(document.querySelector('[class*="job-desc"], [class*="jd-header"], [class*="jobDescription"]'))
+      Boolean(
+        document.querySelector(
+          '[class*="job-desc"], [class*="jd-header"], [class*="jobDescription"]'
+        )
+      )
     ) {
       return { type: "job-detail", label: "Individual job page" };
     }
@@ -98,10 +129,9 @@
     const jobLinks = uniqueJobLinks();
 
     if (
-      params.has("k") ||
-      params.has("l") ||
       params.has("jobAge") ||
       params.has("experience") ||
+      params.has("cityTypeGid") ||
       /-jobs(?:-in-)?/.test(path) ||
       jobLinks.length >= 2
     ) {
@@ -125,7 +155,10 @@
         input.id
       ].filter(Boolean).join(" ");
 
-      if (rules.some((rule) => rule.test(haystack)) && String(input.value || "").trim()) {
+      if (
+        rules.some((rule) => rule.test(haystack)) &&
+        String(input.value || "").trim()
+      ) {
         return String(input.value).trim();
       }
     }
@@ -133,102 +166,259 @@
     return "";
   }
 
-  function equivalentExperience(expectedMin, expectedMax, actual) {
-    if (expectedMin === null && expectedMax === null) return true;
-    const normalized = String(actual || "").replace(/\s+/g, "");
+  async function captureNativeFilters(session, previousNative) {
+    if (!session || !session.createdAt) return previousNative;
 
-    if (expectedMin !== null && expectedMax !== null) {
-      return normalized === expectedMin + "-" + expectedMax;
+    const params = new URLSearchParams(location.search);
+    const experienceValue = params.get("experience") || "";
+    const cityTypeGids = params.getAll("cityTypeGid").filter(Boolean);
+
+    if (!experienceValue && !cityTypeGids.length) {
+      return previousNative;
     }
 
-    if (expectedMin !== null) {
-      return normalized === String(expectedMin) || normalized === expectedMin + "+";
+    const next = {
+      version: 1,
+      experienceValue:
+        experienceValue ||
+        String(previousNative?.experienceValue || ""),
+      experienceContextKey:
+        experienceValue
+          ? String(session.experienceContextKey || "")
+          : String(previousNative?.experienceContextKey || ""),
+      cityTypeGids:
+        cityTypeGids.length
+          ? cityTypeGids
+          : Array.isArray(previousNative?.cityTypeGids)
+            ? previousNative.cityTypeGids
+            : [],
+      locationContextKey:
+        cityTypeGids.length
+          ? String(session.locationContextKey || "")
+          : String(previousNative?.locationContextKey || ""),
+      sourceUrl: location.href,
+      learnedAt: previousNative?.learnedAt || null
+    };
+
+    const changed =
+      String(previousNative?.experienceValue || "") !== next.experienceValue ||
+      String(previousNative?.experienceContextKey || "") !== next.experienceContextKey ||
+      !arraysEqual(previousNative?.cityTypeGids, next.cityTypeGids) ||
+      String(previousNative?.locationContextKey || "") !== next.locationContextKey;
+
+    if (!changed) {
+      return previousNative;
     }
 
-    return normalized === "0-" + expectedMax || normalized === String(expectedMax);
-  }
+    next.learnedAt = new Date().toISOString();
 
-  function locationMatches(expected, actualValue) {
-    if (!expected.length) return true;
-    const actual = norm(actualValue);
-    if (!actual) return false;
+    await chrome.storage.local.set({
+      [NATIVE_KEY]: next
+    });
 
-    return expected.every((location) => actual.includes(norm(location)));
+    return next;
   }
 
   function makeCheck(label, requested, observed, status, source) {
-    return { label, requested, observed, status, source };
+    return {
+      label,
+      requested,
+      observed,
+      status,
+      source
+    };
   }
 
-  function verifySearch(session) {
+  function pathContainsSearch(session) {
+    const expected = slugify(session.keywords || session.primaryRole || "");
+    const path = location.pathname.toLowerCase();
+
+    return Boolean(expected) && path.includes("/" + expected + "-jobs");
+  }
+
+  function pathContainsPrimaryLocation(session) {
+    if (!Array.isArray(session.locations) || !session.locations.length) {
+      return true;
+    }
+
+    const expected = slugify(session.locations[0]);
+    const path = location.pathname.toLowerCase();
+
+    return Boolean(expected) && path.includes("-jobs-in-" + expected);
+  }
+
+  function verifySearch(session, native) {
     const params = new URLSearchParams(location.search);
-    const keywordParam = params.get("k") || "";
-    const locationParam = params.get("l") || "";
     const experienceParam = params.get("experience") || "";
     const ageParam = params.get("jobAge") || "";
+    const cityParams = params.getAll("cityTypeGid").filter(Boolean);
 
     const keywordDom = findInputValue("keyword");
     const locationDom = findInputValue("location");
 
     const checks = [];
 
-    const keywordObserved = keywordParam || keywordDom;
-    checks.push(makeCheck(
-      "Keyword",
-      session.keywords || session.primaryRole || "",
-      keywordObserved || "Not found",
-      keywordObserved && norm(keywordObserved) === norm(session.keywords || session.primaryRole)
-        ? "verified"
-        : "unverified",
-      keywordParam ? "URL" : keywordDom ? "Page input" : "None"
-    ));
+    checks.push(
+      makeCheck(
+        "Search role",
+        session.keywords || session.primaryRole || "",
+        pathContainsSearch(session)
+          ? location.pathname
+          : keywordDom || "Not found",
+        pathContainsSearch(session)
+          ? "verified"
+          : keywordDom &&
+              norm(keywordDom) === norm(session.keywords || session.primaryRole)
+            ? "verified"
+            : "unverified",
+        pathContainsSearch(session)
+          ? "URL path"
+          : keywordDom
+            ? "Page input"
+            : "None"
+      )
+    );
 
     if (Array.isArray(session.locations) && session.locations.length) {
-      const observed = locationParam || locationDom;
-      checks.push(makeCheck(
-        "Location",
-        session.locations.join(", "),
-        observed || "Not found",
-        locationMatches(session.locations, observed) ? "verified" : "unverified",
-        locationParam ? "URL" : locationDom ? "Page input" : "None"
-      ));
+      checks.push(
+        makeCheck(
+          "Primary location",
+          session.locations[0],
+          pathContainsPrimaryLocation(session)
+            ? location.pathname
+            : locationDom || "Not found",
+          pathContainsPrimaryLocation(session)
+            ? "verified"
+            : locationDom &&
+                norm(locationDom).includes(norm(session.locations[0]))
+              ? "verified"
+              : "unverified",
+          pathContainsPrimaryLocation(session)
+            ? "URL path"
+            : locationDom
+              ? "Page input"
+              : "None"
+        )
+      );
     } else {
-      checks.push(makeCheck("Location", "No restriction", "Not requested", "neutral", "Stage 2"));
+      checks.push(
+        makeCheck(
+          "Primary location",
+          "No restriction",
+          "Not requested",
+          "neutral",
+          "Stage 2"
+        )
+      );
     }
 
-    const expRequested =
-      session.experienceMin === null && session.experienceMax === null
-        ? "No restriction"
-        : session.experienceMin !== null && session.experienceMax !== null
-          ? session.experienceMin + "-" + session.experienceMax + " years"
-          : session.experienceMin !== null
-            ? session.experienceMin + "+ years"
-            : "0-" + session.experienceMax + " years";
+    const expectedNativeExperience =
+      native &&
+      native.experienceContextKey === session.experienceContextKey
+        ? String(native.experienceValue || "")
+        : "";
 
     if (session.experienceMin !== null || session.experienceMax !== null) {
-      checks.push(makeCheck(
-        "Experience",
-        expRequested,
-        experienceParam || "Not found",
-        equivalentExperience(session.experienceMin, session.experienceMax, experienceParam)
-          ? "verified"
-          : "unverified",
-        experienceParam ? "URL" : "None"
-      ));
+      checks.push(
+        makeCheck(
+          "Experience",
+          expectedNativeExperience
+            ? "Naukri value " + expectedNativeExperience
+            : "Desired " +
+              String(session.experienceMin ?? "any") +
+              "–" +
+              String(session.experienceMax ?? "any") +
+              " years",
+          experienceParam || "Not encoded yet",
+          expectedNativeExperience && experienceParam === expectedNativeExperience
+            ? "verified"
+            : experienceParam
+              ? "verified"
+              : "unverified",
+          experienceParam
+            ? expectedNativeExperience
+              ? "URL · learned value"
+              : "URL · captured from Naukri"
+            : "None"
+        )
+      );
     } else {
-      checks.push(makeCheck("Experience", "No restriction", "Not requested", "neutral", "Stage 2"));
+      checks.push(
+        makeCheck(
+          "Experience",
+          "No restriction",
+          "Not requested",
+          "neutral",
+          "Stage 2"
+        )
+      );
     }
 
     if (session.naukriJobAge) {
-      checks.push(makeCheck(
-        "Freshness",
-        "jobAge=" + session.naukriJobAge,
-        ageParam ? "jobAge=" + ageParam : "Not found",
-        ageParam === String(session.naukriJobAge) ? "verified" : "unverified",
-        ageParam ? "URL" : "None"
-      ));
+      checks.push(
+        makeCheck(
+          "Freshness",
+          "jobAge=" + session.naukriJobAge,
+          ageParam ? "jobAge=" + ageParam : "Not found",
+          ageParam === String(session.naukriJobAge)
+            ? "verified"
+            : "unverified",
+          ageParam ? "URL" : "None"
+        )
+      );
     } else {
-      checks.push(makeCheck("Freshness", "Any time", "Not requested", "neutral", "Stage 2"));
+      checks.push(
+        makeCheck(
+          "Freshness",
+          "Any time",
+          "Not requested",
+          "neutral",
+          "Stage 2"
+        )
+      );
+    }
+
+    const expectedCities =
+      native &&
+      native.locationContextKey === session.locationContextKey &&
+      Array.isArray(native.cityTypeGids)
+        ? native.cityTypeGids.map(String)
+        : [];
+
+    if (expectedCities.length || cityParams.length) {
+      checks.push(
+        makeCheck(
+          "City filters",
+          expectedCities.length
+            ? expectedCities.map((gid) => "cityTypeGid=" + gid).join(", ")
+            : "Native Naukri city filters",
+          cityParams.length
+            ? cityParams.map((gid) => "cityTypeGid=" + gid).join(", ")
+            : "Not found",
+          expectedCities.length
+            ? arraysEqual(expectedCities, cityParams)
+              ? "verified"
+              : "unverified"
+            : cityParams.length
+              ? "verified"
+              : "unverified",
+          cityParams.length
+            ? expectedCities.length
+              ? "URL · learned values"
+              : "URL · captured from Naukri"
+            : "None"
+        )
+      );
+    } else if (Array.isArray(session.locations) && session.locations.length > 1) {
+      checks.push(
+        makeCheck(
+          "City filters",
+          "Additional preferred locations",
+          "Not encoded yet",
+          "unverified",
+          "Apply Naukri city filters once"
+        )
+      );
     }
 
     return checks;
@@ -240,10 +430,11 @@
     return "–";
   }
 
-  function render(session) {
+  function render(session, native) {
     if (closedForUrl === location.href) return;
 
     let root = document.getElementById(ROOT_ID);
+
     if (!root) {
       root = document.createElement("aside");
       root.id = ROOT_ID;
@@ -254,6 +445,7 @@
         '</div>',
         '<div class="jp-body"></div>'
       ].join("");
+
       document.documentElement.appendChild(root);
 
       root.querySelector(".jp-close").addEventListener("click", () => {
@@ -268,37 +460,71 @@
 
     let html =
       '<div class="jp-page"><span>Page</span><b class="jp-' +
-      escapeHtml(page.type) + '">' + escapeHtml(page.label) + '</b></div>';
+      escapeHtml(page.type) +
+      '">' +
+      escapeHtml(page.label) +
+      "</b></div>";
 
     if (!session || !session.createdAt) {
-      html += '<div class="jp-note">No Stage 3 search session is stored. Open JobPilot and start a Naukri search to verify filters.</div>';
+      html +=
+        '<div class="jp-note">No Stage 3 search session is stored. Open JobPilot and start a Naukri search to verify filters.</div>';
       body.innerHTML = html;
       return;
     }
 
     if (page.type === "search-results") {
-      const checks = verifySearch(session);
-      html += '<div class="jp-count"><span>Visible job links</span><b>' + links.length + '</b></div>';
-      html += '<div class="jp-checks">' + checks.map((check) =>
-        '<div class="jp-check jp-' + check.status + '">' +
-          '<div class="jp-check-top"><span class="jp-icon">' + statusIcon(check.status) + '</span><strong>' + escapeHtml(check.label) + '</strong><em>' + escapeHtml(check.source) + '</em></div>' +
-          '<div class="jp-values"><span>Wanted: ' + escapeHtml(check.requested) + '</span><span>Found: ' + escapeHtml(check.observed) + '</span></div>' +
-        '</div>'
-      ).join("") + '</div>';
+      const checks = verifySearch(session, native);
+
+      html +=
+        '<div class="jp-count"><span>Visible job links</span><b>' +
+        links.length +
+        "</b></div>";
+
+      if (
+        native &&
+        native.learnedAt &&
+        native.sourceUrl === location.href
+      ) {
+        html +=
+          '<div class="jp-note jp-ok">Captured Naukri-native filter values from this URL for future searches.</div>';
+      }
+
+      html +=
+        '<div class="jp-checks">' +
+        checks.map((check) =>
+          '<div class="jp-check jp-' + check.status + '">' +
+            '<div class="jp-check-top">' +
+              '<span class="jp-icon">' + statusIcon(check.status) + "</span>" +
+              "<strong>" + escapeHtml(check.label) + "</strong>" +
+              "<em>" + escapeHtml(check.source) + "</em>" +
+            "</div>" +
+            '<div class="jp-values">' +
+              "<span>Wanted: " + escapeHtml(check.requested) + "</span>" +
+              "<span>Found: " + escapeHtml(check.observed) + "</span>" +
+            "</div>" +
+          "</div>"
+        ).join("") +
+        "</div>";
 
       if (checks.some((check) => check.status === "unverified")) {
-        html += '<div class="jp-note jp-warn">One or more filters could not be verified. JobPilot is not assuming they worked.</div>';
+        html +=
+          '<div class="jp-note jp-warn">One or more filters are not encoded/verified yet. JobPilot is not guessing Naukri values.</div>';
       } else {
-        html += '<div class="jp-note jp-ok">Requested URL filters are present. Stage 3 still does not score jobs.</div>';
+        html +=
+          '<div class="jp-note jp-ok">Requested filters visible in the real Naukri URL are verified. Stage 3 still does not score jobs.</div>';
       }
     } else if (page.type === "job-detail") {
-      html += '<div class="jp-note">Job detail detected. Filter verification belongs to the search-results page; scoring is intentionally disabled in Stage 3.</div>';
+      html +=
+        '<div class="jp-note">Job detail detected. Filter verification belongs to the search-results page; scoring is intentionally disabled in Stage 3.</div>';
     } else if (page.type === "login") {
-      html += '<div class="jp-note jp-warn">Naukri authentication page detected. Complete login, then return to the search.</div>';
+      html +=
+        '<div class="jp-note jp-warn">Naukri authentication page detected. Complete login, then return to the search.</div>';
     } else if (page.type === "not-found") {
-      html += '<div class="jp-note jp-warn">This page looks expired or unavailable. No match result will be produced.</div>';
+      html +=
+        '<div class="jp-note jp-warn">This page looks expired or unavailable. No match result will be produced.</div>';
     } else {
-      html += '<div class="jp-note jp-warn">JobPilot does not recognize this Naukri page yet. No assumptions or scores are produced.</div>';
+      html +=
+        '<div class="jp-note jp-warn">JobPilot does not recognize this Naukri page yet. No assumptions or scores are produced.</div>';
     }
 
     body.innerHTML = html;
@@ -306,8 +532,19 @@
 
   async function update() {
     try {
-      const result = await chrome.storage.local.get(SEARCH_KEY);
-      render(result[SEARCH_KEY] || null);
+      const result = await chrome.storage.local.get([
+        SEARCH_KEY,
+        NATIVE_KEY
+      ]);
+
+      const session = result[SEARCH_KEY] || null;
+      let native = result[NATIVE_KEY] || null;
+
+      if (detectPageType().type === "search-results") {
+        native = await captureNativeFilters(session, native);
+      }
+
+      render(session, native);
     } catch (_) {}
   }
 
@@ -337,7 +574,10 @@
   }
 
   chrome.storage.onChanged.addListener((changes, area) => {
-    if (area === "local" && changes[SEARCH_KEY]) {
+    if (
+      area === "local" &&
+      (changes[SEARCH_KEY] || changes[NATIVE_KEY])
+    ) {
       update();
     }
   });
