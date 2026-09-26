@@ -337,3 +337,39 @@ no hard blocker + role compatible + experience acceptable
 Preferred-skill gaps and unscored salary alone do not automatically stop an `APPLY` decision.
 
 JobPilot never auto-applies and never prevents the user from opening a job after `SKIP`. The decision is an explainable workflow aid, not an automatic application action.
+
+
+## Inline detail intelligence
+
+From v0.9.0, the normal job-detail workflow stays on the portal page.
+
+```text
+portal detail page
+→ detail adapter
+→ normalized job
+→ optional Puter AI enrichment
+→ deterministic deep match
+→ APPLY / REVIEW FIRST / SKIP
+→ inline JobPilot panel
+```
+
+The panel is rendered in Shadow DOM and shows:
+
+- application decision
+- deep-match verdict
+- evidence confidence
+- matched/missing required skills
+- matched/missing preferred skills
+- reasons and cautions
+- Back to Job List
+- Refresh
+- Open Full Analysis
+
+The original JD can be highlighted directly:
+
+- green: matched required
+- red: missing required
+- blue: matched preferred
+- amber: missing preferred
+
+The last listing page is stored separately so opening a detail page no longer loses the user's search-list context.
