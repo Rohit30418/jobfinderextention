@@ -54,17 +54,19 @@
           <label class="span-2">
             <span>Locations</span>
             <textarea id="locations" rows="3" placeholder="Noida&#10;Delhi NCR&#10;Gurugram"></textarea>
-            <small>One per line or comma-separated. Multiple locations are passed through Naukri's location query.</small>
+            <small>The first location is used in Naukri's SEO path. Extra city filters are reused only after JobPilot learns Naukri's real cityTypeGid values.</small>
           </label>
 
           <div class="range-grid span-2">
             <label>
-              <span>Minimum experience</span>
+              <span>Desired minimum experience</span>
               <input id="experienceMin" type="number" min="0" max="30" step="1">
+              <small>Reference from Stage 2. JobPilot will not invent Naukri's encoded experience value.</small>
             </label>
             <label>
-              <span>Maximum experience</span>
+              <span>Desired maximum experience</span>
               <input id="experienceMax" type="number" min="0" max="30" step="1">
+              <small>Apply Naukri's native experience filter once and JobPilot will learn its URL value.</small>
             </label>
             <label>
               <span>Freshness</span>
@@ -85,6 +87,14 @@
         <div class="preview">
           <div class="preview-label">Generated Naukri URL</div>
           <code id="urlPreview"></code>
+        </div>
+
+        <div class="notice" id="nativeFilterStatus">
+          Native Naukri filter values have not been learned yet.
+        </div>
+
+        <div class="footer-actions">
+          <button class="btn ghost" id="clearNativeFiltersBtn" type="button">Clear learned Naukri filters</button>
         </div>
 
         <div class="message hidden" id="message"></div>
