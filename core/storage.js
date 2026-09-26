@@ -3,6 +3,7 @@ export const PUTER_TOKEN_KEY = "jobpilot.puter.token";
 export const PUTER_AI_AUTH_KEY = "jobpilot.puter.ai.authorized";
 export const PREFERENCES_KEY = "jobpilot.stage2.preferences";
 export const NAUKRI_SEARCH_KEY = "jobpilot.stage3.naukriSearch";
+export const UNIVERSAL_SEARCH_KEY = "jobpilot.stage3.universalSearch";
 export const NAUKRI_NATIVE_FILTERS_KEY = "jobpilot.stage3.naukriNativeFilters";
 export const NAUKRI_EXTRACTION_KEY = "jobpilot.stage4.naukriExtraction";
 export const PORTAL_CAPTURE_KEY = "jobpilot.stage4.portalCapture";
@@ -102,6 +103,52 @@ export async function setPreferences(preferences) {
 
 export async function clearPreferences() {
   await chrome.storage.local.remove(PREFERENCES_KEY);
+}
+
+
+export function emptyUniversalSearch() {
+  return {
+    version: 1,
+    primaryRole: "",
+    searchTerms: [],
+    locations: [],
+    experienceMin: null,
+    experienceMax: null,
+    freshness: "3d",
+    selectedPortals: [
+      "naukri",
+      "foundit",
+      "linkedin",
+      "indeed",
+      "hirist"
+    ],
+    urls: {},
+    updatedAt: null
+  };
+}
+
+export async function getUniversalSearch() {
+  const result = await chrome.storage.local.get(UNIVERSAL_SEARCH_KEY);
+  return result[UNIVERSAL_SEARCH_KEY] || emptyUniversalSearch();
+}
+
+export async function setUniversalSearch(search) {
+  const next = {
+    ...emptyUniversalSearch(),
+    ...search,
+    version: 1,
+    updatedAt: new Date().toISOString()
+  };
+
+  await chrome.storage.local.set({
+    [UNIVERSAL_SEARCH_KEY]: next
+  });
+
+  return next;
+}
+
+export async function clearUniversalSearch() {
+  await chrome.storage.local.remove(UNIVERSAL_SEARCH_KEY);
 }
 
 
