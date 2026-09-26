@@ -742,24 +742,38 @@
 
   function pageType() {
     const path = location.pathname.toLowerCase();
+    const anchors = jobAnchors();
+    const params = new URLSearchParams(location.search);
 
-    if (
-      path.includes("job-listings-") ||
-      Boolean(getJsonLdJobPosting()) ||
-      Boolean(
-        document.querySelector(
-          ".jd-header-title, [class*='jd-header-title'], .dang-inner-html, [class*='job-desc']"
-        )
-      )
-    ) {
-      return "job-detail";
+    const strongSearchEvidence =
+      /-jobs(?:-in-)?/.test(path) ||
+      anchors.length >= 2 ||
+      params.has("k") ||
+      params.has("l") ||
+      params.has("jobAge") ||
+      params.has("experience") ||
+      params.has("cityTypeGid");
+
+    // Naukri result cards also use job-desc style classes. Never let those
+    // generic selectors turn a results page into one giant fake job.
+    if (strongSearchEvidence && !path.includes("job-listings-")) {
+      return "search-results";
     }
 
-    if (
-      /-jobs(?:-in-)?/.test(path) ||
-      jobAnchors().length > 1
-    ) {
-      return "search-results";
+    const strongDetailEvidence =
+      path.includes("job-listings-") ||
+      (
+        Boolean(getJsonLdJobPosting()) &&
+        anchors.length <= 1 &&
+        Boolean(
+          document.querySelector(
+            ".jd-header-title, [class*='jd-header-title'], .dang-inner-html, [class*='jobDescription']"
+          )
+        )
+      );
+
+    if (strongDetailEvidence) {
+      return "job-detail";
     }
 
     return "unknown";
