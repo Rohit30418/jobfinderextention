@@ -404,9 +404,13 @@ async function refreshDiagnostics() {
   const injectionStatus = connectionResult["jobpilot.naukri.injectionStatus"];
 
   const loadedVersion = chrome.runtime.getManifest().version;
+  const versionParts = loadedVersion.split(".").map((part) => Number(part) || 0);
+  const modernBuild =
+    versionParts[0] > 0 ||
+    (versionParts[0] === 0 && versionParts[1] >= 4);
 
   const diagnostics = [
-    ["Loaded extension version", loadedVersion === "0.4.4", "v" + loadedVersion],
+    ["Loaded extension version", modernBuild, "v" + loadedVersion],
     ["Stage 1 profile", Boolean(profile), profile ? "Ready" : "Missing"],
     [
       "Stage 2 preferences",
