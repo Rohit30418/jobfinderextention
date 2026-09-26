@@ -31,7 +31,8 @@ const els = {
   detailDescription: $("#detailDescription"),
   detailSources: $("#detailSources"),
   emptyPanel: $("#emptyPanel"),
-  diagnosticsGrid: $("#diagnosticsGrid")
+  diagnosticsGrid: $("#diagnosticsGrid"),
+  relevanceMode: $("#relevanceMode")
 };
 
 let capture = null;
@@ -69,21 +70,32 @@ function formatTime(value) {
 
 function renderMetrics(data) {
   const stats = data.stats || {};
+  const relevance = data.relevanceStats || {};
   const detected = Number(stats.detected || 0);
-  const normalized = Number(stats.normalized || 0);
 
   els.detectedCount.textContent = detected;
-  els.parsedCount.textContent = normalized;
-  els.failedCount.textContent = Math.max(0, detected - normalized);
-  els.highCount.textContent = Number(stats.high || 0);
-  els.mediumCount.textContent = Number(stats.medium || 0);
+  els.parsedCount.textContent = Number(relevance.relevant || 0);
+  els.failedCount.textContent = Number(relevance.review || 0);
+  els.highCount.textContent = Number(relevance.filtered || 0);
+  els.mediumCount.textContent = Number(stats.high || 0);
   els.lowCount.textContent = Number(stats.low || 0);
 }
 
 function renderJobs(jobs) {
-  const list = Array.isArray(jobs) ? jobs : [];
-  els.cardsPanel.classList.toggle("hidden", !list.length);
-  els.cardCountChip.textContent = list.length + " job" + (list.length === 1 ? "" : "s");
+  const all = Array.isArray(jobs) ? jobs : [];
+  const mode = els.relevanceMode?.value || "recommended";
+
+  const list = all.filter((job) => {
+    const status = job.relevance?.status || "review";
+    if (mode === "all") return true;
+    if (mode === "relevant") return status === "relevant";
+    if (mode === "review") return status === "review";
+    return status !== "filtered";
+  });
+
+  els.cardsPanel.classList.toggle("hidden", !all.length);
+  els.cardCountChip.textContent =
+    list.length + " shown / " + all.length + " extracted";
 
   els.jobList.innerHTML = list.map((job) => {
     const confidence = job.extraction?.confidence || {
@@ -106,8 +118,10 @@ function renderJobs(jobs) {
             '<h3>' + escapeHtml(display(job.title)) + '</h3>' +
             '<div class="job-company">' + escapeHtml(display(job.company)) + '</div>' +
           '</div>' +
-          '<div class="confidence ' + confidenceClass(confidence.level) + '">' +
-            'Extraction ' + escapeHtml(confidence.level) +
+          '<div class="confidence ' +
+            (job.relevance?.status === "relevant" ? "high" :
+             job.relevance?.status === "filtered" ? "low" : "medium") + '">' +
+            escapeHtml((job.relevance?.status || "review").toUpperCase()) +
           '</div>' +
         '</div>' +
         '<div class="job-meta">' +
@@ -128,7 +142,14 @@ function renderJobs(jobs) {
         (job.snippet
           ? '<div class="snippet">' + escapeHtml(job.snippet) + '</div>'
           : '') +
-        '<div class="missing-line">Missing: ' +
+        '<div class="missing-line">Why: ' +
+          escapeHtml(
+            job.relevance?.reasons?.length
+              ? job.relevance.reasons.slice(0, 2).join(" · ")
+              : "No quick relevance reason available"
+          ) +
+        '</div>' +
+        '<div class="missing-line">Extraction missing: ' +
           escapeHtml(
             confidence.missing?.length
               ? confidence.missing.join(", ")
@@ -237,6 +258,20 @@ async function renderDiagnostics() {
 
 async function render() {
   capture = await getPortalCapture();
+
+  if (
+    capture.pageType === "listing" &&
+    globalThis.JobPilotRelevanceGate
+  ) {
+    const preferences = await getPreferences();
+    const annotated = globalThis.JobPilotRelevanceGate.annotateJobs(
+      capture.jobs || [],
+      preferences
+    );
+    capture.jobs = annotated.jobs;
+    capture.relevanceStats = annotated.stats;
+  }
+
   renderMetrics(capture);
 
   const validPage =
@@ -283,6 +318,9 @@ els.openSourceBtn.addEventListener("click", async () => {
 });
 
 els.refreshBtn.addEventListener("click", render);
+els.relevanceMode?.addEventListener("change", () => {
+  renderJobs(capture?.jobs || []);
+});
 
 els.clearBtn.addEventListener("click", async () => {
   const confirmed = confirm(
