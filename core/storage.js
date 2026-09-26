@@ -264,6 +264,33 @@ export async function clearJobCache() {
 }
 
 
+function sameStoredJob(a, b) {
+  if (!a || !b) return false;
+
+  if (a.key && b.key && a.key === b.key) {
+    return true;
+  }
+
+  if (
+    a.portalJobId &&
+    b.portalJobId &&
+    String(a.portalJobId) === String(b.portalJobId)
+  ) {
+    return true;
+  }
+
+  const normalizeUrl = (value) =>
+    String(value || "")
+      .split("?")[0]
+      .replace(/\/+$/, "")
+      .toLowerCase();
+
+  const aUrl = normalizeUrl(a.canonicalUrl);
+  const bUrl = normalizeUrl(b.canonicalUrl);
+
+  return Boolean(aUrl && bUrl && aUrl === bUrl);
+}
+
 export async function saveJobAiAnalysis(jobKey, analysis) {
   const result = await chrome.storage.local.get([
     JOB_CACHE_KEY,
@@ -325,7 +352,16 @@ export async function saveJobAiAnalysis(jobKey, analysis) {
     };
   }
 
-  if (detail) {
+  const cachedTarget = cache[cacheKey] || null;
+
+  if (
+    detail &&
+    (
+      detail.key === requestedKey ||
+      detail.key === cacheKey ||
+      sameStoredJob(detail, cachedTarget)
+    )
+  ) {
     capture.detail = {
       ...detail,
       aiAnalysis: analysis || null,
@@ -408,7 +444,16 @@ export async function saveJobDeepMatch(jobKey, deepMatch) {
     };
   }
 
-  if (detail) {
+  const cachedTarget = cache[cacheKey] || null;
+
+  if (
+    detail &&
+    (
+      detail.key === requestedKey ||
+      detail.key === cacheKey ||
+      sameStoredJob(detail, cachedTarget)
+    )
+  ) {
     capture.detail = {
       ...detail,
       deepMatch: deepMatch || null,
