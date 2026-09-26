@@ -164,3 +164,37 @@ Stage 3 does **not**:
 - click application controls
 
 See `tests/STAGE3_CHECKLIST.md`.
+
+
+## Stage 4 — Naukri Job Extraction
+
+Stage 4 reads Naukri search-result cards and individual job pages into structured job objects.
+
+Search-result job objects may contain:
+
+- title
+- company
+- experience
+- location
+- salary
+- skills
+- description snippet
+- posting age
+- job URL
+- job ID
+- extraction sources
+- extraction confidence
+
+Individual job pages prefer Schema.org JSON-LD `JobPosting` data and use Naukri-specific DOM selectors only to fill missing fields.
+
+Important rules:
+
+- Whole-page `document.body.innerText` is not used as the job object.
+- Missing fields remain unknown.
+- Extraction confidence is separate from future job-match scoring.
+- No AI analysis runs in Stage 4.
+- No jobs are hidden or auto-applied.
+
+The latest extraction is saved locally and can be reviewed in `stage4/extractor.html`.
+
+See `tests/STAGE4_CHECKLIST.md`.
