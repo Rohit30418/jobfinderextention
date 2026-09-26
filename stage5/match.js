@@ -21,6 +21,16 @@ const els = {
   recalculateBtn: $("#recalculateBtn"),
   matchApp: $("#matchApp"),
 
+  applyDecisionPanel: $("#applyDecisionPanel"),
+  applyDecisionAction: $("#applyDecisionAction"),
+  applyDecisionHeadline: $("#applyDecisionHeadline"),
+  applyDecisionSummary: $("#applyDecisionSummary"),
+  applyDecisionConfidence: $("#applyDecisionConfidence"),
+  applyDecisionReasons: $("#applyDecisionReasons"),
+  applyDecisionCautions: $("#applyDecisionCautions"),
+  applyDecisionNextStep: $("#applyDecisionNextStep"),
+  decisionOpenJobBtn: $("#decisionOpenJobBtn"),
+
   hero: $(".hero-result"),
   verdict: $("#verdict"),
   verdictSummary: $("#verdictSummary"),
@@ -142,6 +152,53 @@ function verdictSummary(match) {
   return "JobPilot does not yet have enough positive evidence for a confident fit decision.";
 }
 
+function renderApplyDecision(match) {
+  const decision = match?.applyDecision || {
+    action: "REVIEW FIRST",
+    headline: "Check this job before applying",
+    summary: "The application decision is unavailable for this saved match.",
+    reasons: [],
+    cautions: [],
+    nextStep: "Recalculate the deep match.",
+    confidence: match?.confidence?.level || "LOW"
+  };
+
+  els.applyDecisionPanel.dataset.action = decision.action;
+  els.applyDecisionAction.textContent = decision.action;
+  els.applyDecisionHeadline.textContent = decision.headline;
+  els.applyDecisionSummary.textContent = decision.summary;
+  els.applyDecisionConfidence.textContent =
+    decision.confidence || match?.confidence?.level || "LOW";
+  els.applyDecisionNextStep.textContent = decision.nextStep || "";
+
+  const reasonKind =
+    decision.action === "SKIP"
+      ? "blocker"
+      : "strength";
+
+  showList(
+    els.applyDecisionReasons,
+    decision.reasons || [],
+    reasonKind
+  );
+
+  showList(
+    els.applyDecisionCautions,
+    decision.cautions || [],
+    decision.action === "SKIP" ? "blocker" : "gap"
+  );
+
+  if (els.decisionOpenJobBtn) {
+    els.decisionOpenJobBtn.textContent =
+      decision.action === "APPLY"
+        ? "Open job to apply →"
+        : decision.action === "SKIP"
+          ? "Open job anyway →"
+          : "Open job to review →";
+    els.decisionOpenJobBtn.disabled = !currentJob?.canonicalUrl;
+  }
+}
+
 function renderCore(match, job) {
   const roleDetail =
     match.role.exact?.length
@@ -192,6 +249,7 @@ function renderMatch(match, job) {
   currentMatch = match;
 
   els.matchApp.classList.remove("hidden");
+  renderApplyDecision(match);
   els.hero.dataset.verdict = match.verdict;
   els.verdict.textContent = match.verdict;
   els.verdictSummary.textContent = verdictSummary(match);
@@ -286,6 +344,11 @@ async function renderDiagnostics() {
       "Deep match",
       Boolean(currentMatch),
       currentMatch ? currentMatch.verdict : "Not calculated"
+    ],
+    [
+      "Application decision",
+      Boolean(currentMatch?.applyDecision?.action),
+      currentMatch?.applyDecision?.action || "Not calculated"
     ],
     [
       "Hard blockers",
@@ -422,7 +485,7 @@ async function initialize() {
 
   const existingFresh = Boolean(
     existing &&
-    existing.version === 1 &&
+    existing.version === 2 &&
     existing.inputs?.profileUpdatedAt === (state.updatedAt || null) &&
     existing.inputs?.preferencesUpdatedAt === (preferences.updatedAt || null) &&
     existing.inputs?.jobCapturedAt === (currentJob.capturedAt || null) &&
@@ -439,6 +502,14 @@ async function initialize() {
 }
 
 els.openJobBtn.addEventListener("click", async () => {
+  if (currentJob?.canonicalUrl) {
+    await chrome.tabs.create({
+      url: currentJob.canonicalUrl
+    });
+  }
+});
+
+els.decisionOpenJobBtn?.addEventListener("click", async () => {
   if (currentJob?.canonicalUrl) {
     await chrome.tabs.create({
       url: currentJob.canonicalUrl
