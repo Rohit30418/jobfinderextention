@@ -6,7 +6,7 @@ const EXTRACTOR_PAGE = "stage4/extractor.html";
 const STATE_KEY = "jobpilot.stage1.state";
 const PREFERENCES_KEY = "jobpilot.stage2.preferences";
 const NAUKRI_SEARCH_KEY = "jobpilot.stage3.naukriSearch";
-const NAUKRI_EXTRACTION_KEY = "jobpilot.stage4.naukriExtraction";
+const PORTAL_CAPTURE_KEY = "jobpilot.stage4.portalCapture";
 const INJECTION_STATUS_KEY = "jobpilot.naukri.injectionStatus";
 
 const NAUKRI_HOST_RE = /^https:\/\/(?:[^/]+\.)?naukri\.com\//i;
@@ -36,7 +36,7 @@ async function injectJobPilotIntoNaukri(tabId, url, reason = "background") {
       target: { tabId },
       files: [
         "content/naukri-detector.css",
-        "content/naukri-extractor.css"
+        "content/portal-runtime.css"
       ]
     });
 
@@ -44,7 +44,11 @@ async function injectJobPilotIntoNaukri(tabId, url, reason = "background") {
       target: { tabId },
       files: [
         "content/naukri-detector.js",
-        "content/naukri-extractor.js"
+        "core/portal-engine.js",
+        "portals/naukri/listing.js",
+        "portals/naukri/detail.js",
+        "portals/naukri/adapter.js",
+        "content/portal-runtime.js"
       ]
     });
 
@@ -123,7 +127,7 @@ chrome.action.onClicked.addListener(async (tab) => {
     STATE_KEY,
     PREFERENCES_KEY,
     NAUKRI_SEARCH_KEY,
-    NAUKRI_EXTRACTION_KEY
+    PORTAL_CAPTURE_KEY
   ]);
 
   const hasProfile = Boolean(
@@ -142,13 +146,13 @@ chrome.action.onClicked.addListener(async (tab) => {
   const search = result[NAUKRI_SEARCH_KEY];
   const hasSearch = Boolean(search && search.createdAt);
 
-  const extraction = result[NAUKRI_EXTRACTION_KEY];
+  const capture = result[PORTAL_CAPTURE_KEY];
   const hasExtraction = Boolean(
-    extraction &&
-    extraction.extractedAt &&
+    capture &&
+    capture.capturedAt &&
     (
-      extraction.pageType === "search-results" ||
-      extraction.pageType === "job-detail"
+      capture.pageType === "listing" ||
+      capture.pageType === "detail"
     )
   );
 
