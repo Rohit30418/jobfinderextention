@@ -7,6 +7,7 @@ export const NAUKRI_NATIVE_FILTERS_KEY = "jobpilot.stage3.naukriNativeFilters";
 export const NAUKRI_EXTRACTION_KEY = "jobpilot.stage4.naukriExtraction";
 export const PORTAL_CAPTURE_KEY = "jobpilot.stage4.portalCapture";
 export const JOB_CACHE_KEY = "jobpilot.jobs.cache";
+export const LISTING_CONTEXT_KEY = "jobpilot.stage6.listingContext";
 
 export function emptyState() {
   return {
@@ -421,4 +422,45 @@ export async function saveJobDeepMatch(jobKey, deepMatch) {
   });
 
   return capture.detail || cache[cacheKey] || null;
+}
+
+
+export function emptyListingContext() {
+  return {
+    version: 1,
+    portal: "",
+    portalName: "",
+    sourceUrl: "",
+    jobs: [],
+    relevanceStats: {
+      relevant: 0,
+      review: 0,
+      filtered: 0
+    },
+    capturedAt: null
+  };
+}
+
+export async function getListingContext() {
+  const result = await chrome.storage.local.get(LISTING_CONTEXT_KEY);
+  return result[LISTING_CONTEXT_KEY] || emptyListingContext();
+}
+
+export async function setListingContext(context) {
+  const next = {
+    ...emptyListingContext(),
+    ...context,
+    version: 1,
+    capturedAt: new Date().toISOString()
+  };
+
+  await chrome.storage.local.set({
+    [LISTING_CONTEXT_KEY]: next
+  });
+
+  return next;
+}
+
+export async function clearListingContext() {
+  await chrome.storage.local.remove(LISTING_CONTEXT_KEY);
 }
