@@ -20,15 +20,45 @@ const PREFERENCES_KEY = "jobpilot.stage2.preferences";
 const NAUKRI_SEARCH_KEY = "jobpilot.stage3.naukriSearch";
 const PORTAL_CAPTURE_KEY = "jobpilot.stage4.portalCapture";
 const LISTING_CONTEXT_KEY = "jobpilot.stage6.listingContext";
-const INJECTION_STATUS_KEY = "jobpilot.naukri.injectionStatus";
+const INJECTION_STATUS_KEY = "jobpilot.portal.injectionStatus";
 
-const PORTAL_FILES = [
-  "core/portal-engine.js",
-  "portals/naukri/listing.js",
-  "portals/naukri/detail.js",
-  "portals/naukri/adapter.js",
-  "portals/shared/configured-factory.js",
-  "portals/shared/configured-portals.js",
+const COMMON_PORTAL_FILES = [
+  "core/portal-engine.js"
+];
+
+const PORTAL_FILE_MAP = {
+  naukri: [
+    "portals/naukri/listing.js",
+    "portals/naukri/detail.js",
+    "portals/naukri/adapter.js"
+  ],
+  foundit: [
+    "portals/shared/portal-utils.js",
+    "portals/foundit/listing.js",
+    "portals/foundit/detail.js",
+    "portals/foundit/adapter.js"
+  ],
+  linkedin: [
+    "portals/shared/portal-utils.js",
+    "portals/linkedin/listing.js",
+    "portals/linkedin/detail.js",
+    "portals/linkedin/adapter.js"
+  ],
+  indeed: [
+    "portals/shared/portal-utils.js",
+    "portals/indeed/listing.js",
+    "portals/indeed/detail.js",
+    "portals/indeed/adapter.js"
+  ],
+  hirist: [
+    "portals/shared/portal-utils.js",
+    "portals/hirist/listing.js",
+    "portals/hirist/detail.js",
+    "portals/hirist/adapter.js"
+  ]
+};
+
+const COMMON_RUNTIME_FILES = [
   "core/relevance-gate.js",
   "content/portal-runtime.js",
   "content/detail-intelligence.js"
@@ -40,45 +70,53 @@ const STARTUP_PORTAL_URLS = [
   "https://*.naukri.com/*",
   "https://foundit.in/*",
   "https://www.foundit.in/*",
+  "https://*.foundit.in/*",
+  "https://www.linkedin.com/jobs/*",
   "https://*.linkedin.com/jobs/*",
   "https://in.indeed.com/*",
+  "https://www.indeed.com/*",
   "https://*.indeed.com/*",
   "https://hirist.tech/*",
   "https://www.hirist.tech/*"
 ];
 
-function isSupportedPortalUrl(value) {
+function getPortalIdFromUrl(value) {
   try {
     const url = new URL(String(value || ""));
     const host = url.hostname.toLowerCase();
+    const path = url.pathname.toLowerCase();
 
     if (host === "naukri.com" || host.endsWith(".naukri.com")) {
-      return true;
+      return "naukri";
     }
 
     if (host === "foundit.in" || host.endsWith(".foundit.in")) {
-      return true;
+      return "foundit";
     }
 
     if (
       (host === "linkedin.com" || host.endsWith(".linkedin.com")) &&
-      url.pathname.toLowerCase().startsWith("/jobs")
+      path.startsWith("/jobs")
     ) {
-      return true;
+      return "linkedin";
     }
 
     if (host === "indeed.com" || host.endsWith(".indeed.com")) {
-      return true;
+      return "indeed";
     }
 
     if (host === "hirist.tech" || host.endsWith(".hirist.tech")) {
-      return true;
+      return "hirist";
     }
 
-    return false;
+    return "";
   } catch (_) {
-    return false;
+    return "";
   }
+}
+
+function isSupportedPortalUrl(value) {
+  return Boolean(getPortalIdFromUrl(value));
 }
 
 function openPage(path) {
@@ -228,21 +266,28 @@ async function setInjectionStatus(payload) {
 }
 
 async function injectJobPilotIntoPortal(tabId, url, reason = "background") {
-  if (!tabId || !isSupportedPortalUrl(url)) {
+  const portalId = getPortalIdFromUrl(url);
+
+  if (!tabId || !portalId) {
     return false;
   }
+
+  const portalFiles = PORTAL_FILE_MAP[portalId] || [];
+  const files = [
+    ...COMMON_PORTAL_FILES,
+    ...portalFiles,
+    ...COMMON_RUNTIME_FILES
+  ];
 
   try {
     await chrome.scripting.insertCSS({
       target: { tabId },
-      files: [
-        "content/portal-runtime.css"
-      ]
+      files: ["content/portal-runtime.css"]
     });
 
     await chrome.scripting.executeScript({
       target: { tabId },
-      files: PORTAL_FILES
+      files
     });
 
     await setInjectionStatus({
