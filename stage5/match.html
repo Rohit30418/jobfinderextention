@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>JobPilot - Stage 5 Deep Match</title>
+  <link rel="stylesheet" href="match.css">
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <div>
+        <div class="eyebrow">JOBPILOT / STAGE 5</div>
+        <h1>Deep match.</h1>
+        <p class="lede">
+          Compare the saved candidate profile against one fully captured job.
+          Hard blockers, requirements and unknowns stay separate.
+        </p>
+      </div>
+      <div class="top-actions">
+        <a class="btn ghost" href="../stage4/extractor.html">Back to Stage 4</a>
+        <span class="stage-chip">Evidence-based Match</span>
+      </div>
+    </header>
+
+    <section class="panel" id="gatePanel">
+      <div class="panel-heading">
+        <div>
+          <div class="kicker">CURRENT JOB</div>
+          <h2 id="jobTitle">Checking Stage 4 data…</h2>
+          <p id="jobMeta">JobPilot needs a saved profile and a captured detail job.</p>
+        </div>
+        <div class="status-chip" id="gateStatus">Checking</div>
+      </div>
+      <div class="actions">
+        <button class="btn" id="openJobBtn" type="button">Open source job</button>
+        <button class="btn primary" id="recalculateBtn" type="button">Recalculate deep match</button>
+      </div>
+      <div id="gateMessage" class="notice hidden"></div>
+    </section>
+
+    <main id="matchApp" class="hidden">
+      <section class="hero-result panel">
+        <div class="verdict-wrap">
+          <div>
+            <div class="kicker">STAGE 5 RESULT</div>
+            <div class="verdict" id="verdict">REVIEW</div>
+            <p id="verdictSummary" class="lede"></p>
+          </div>
+          <div class="confidence-card">
+            <span>Evidence confidence</span>
+            <strong id="confidence">LOW</strong>
+            <small id="confidenceMeta"></small>
+          </div>
+        </div>
+
+        <div class="metric-grid">
+          <div class="metric"><strong id="blockerCount">0</strong><span>Hard blockers</span></div>
+          <div class="metric"><strong id="strengthCount">0</strong><span>Strong signals</span></div>
+          <div class="metric"><strong id="gapCount">0</strong><span>Gaps</span></div>
+          <div class="metric"><strong id="reviewCount">0</strong><span>Needs review</span></div>
+        </div>
+
+        <div id="sourceBanner" class="notice"></div>
+      </section>
+
+      <section class="grid-2">
+        <section class="panel">
+          <div class="panel-heading">
+            <div>
+              <div class="kicker">HARD BLOCKERS</div>
+              <h2>Clear reasons not to proceed</h2>
+            </div>
+            <span class="count-chip" id="blockerChip">0</span>
+          </div>
+          <div id="blockers" class="evidence-list"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-heading">
+            <div>
+              <div class="kicker">STRONG SIGNALS</div>
+              <h2>What aligns</h2>
+            </div>
+            <span class="count-chip" id="strengthChip">0</span>
+          </div>
+          <div id="strengths" class="evidence-list"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-heading">
+            <div>
+              <div class="kicker">GAPS</div>
+              <h2>What does not align</h2>
+            </div>
+            <span class="count-chip" id="gapChip">0</span>
+          </div>
+          <div id="gaps" class="evidence-list"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-heading">
+            <div>
+              <div class="kicker">REVIEW</div>
+              <h2>Unknown or non-blocking concerns</h2>
+            </div>
+            <span class="count-chip" id="reviewChip">0</span>
+          </div>
+          <div id="reviewItems" class="evidence-list"></div>
+        </section>
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading">
+          <div>
+            <div class="kicker">ROLE + EXPERIENCE</div>
+            <h2>Core compatibility</h2>
+          </div>
+        </div>
+        <div class="detail-grid" id="coreGrid"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading">
+          <div>
+            <div class="kicker">SKILL COVERAGE</div>
+            <h2>Required vs preferred</h2>
+          </div>
+        </div>
+        <div class="skill-columns">
+          <div>
+            <h3>Required matched</h3>
+            <div class="skills" id="requiredMatched"></div>
+          </div>
+          <div>
+            <h3>Required missing</h3>
+            <div class="skills" id="requiredMissing"></div>
+          </div>
+          <div>
+            <h3>Preferred matched</h3>
+            <div class="skills" id="preferredMatched"></div>
+          </div>
+          <div>
+            <h3>Preferred missing</h3>
+            <div class="skills" id="preferredMissing"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="grid-2">
+        <section class="panel">
+          <div class="panel-heading">
+            <div>
+              <div class="kicker">MUST-HAVE EVIDENCE</div>
+              <h2>Explicit job requirements</h2>
+            </div>
+          </div>
+          <div id="explicitRequirements" class="text-list"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-heading">
+            <div>
+              <div class="kicker">AI / JD WARNINGS</div>
+              <h2>Explicit constraints to review</h2>
+            </div>
+          </div>
+          <div id="explicitDisqualifiers" class="text-list"></div>
+        </section>
+      </section>
+
+      <details class="diagnostics">
+        <summary>Developer diagnostics</summary>
+        <div id="diagnosticsGrid" class="diag-grid"></div>
+      </details>
+    </main>
+  </div>
+
+  <script type="module" src="match.js"></script>
+</body>
+</html>
