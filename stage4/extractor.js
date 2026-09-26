@@ -1,7 +1,7 @@
 import {
-  clearNaukriExtraction,
-  getNaukriExtraction,
-  getNaukriSearch,
+  clearPortalCapture,
+  getJobCache,
+  getPortalCapture,
   getPreferences,
   getState
 } from "../core/storage.js";
@@ -34,7 +34,7 @@ const els = {
   diagnosticsGrid: $("#diagnosticsGrid")
 };
 
-let extraction = null;
+let capture = null;
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -70,26 +70,32 @@ function formatTime(value) {
 function renderMetrics(data) {
   const stats = data.stats || {};
   const detected = Number(stats.detected || 0);
-  const parsed = Number(stats.parsed || 0);
+  const normalized = Number(stats.normalized || 0);
 
   els.detectedCount.textContent = detected;
-  els.parsedCount.textContent = parsed;
-  els.failedCount.textContent = Math.max(0, detected - parsed);
+  els.parsedCount.textContent = normalized;
+  els.failedCount.textContent = Math.max(0, detected - normalized);
   els.highCount.textContent = Number(stats.high || 0);
   els.mediumCount.textContent = Number(stats.medium || 0);
   els.lowCount.textContent = Number(stats.low || 0);
 }
 
-function renderCards(cards) {
-  els.cardsPanel.classList.toggle("hidden", !cards.length);
-  els.cardCountChip.textContent = cards.length + " job" + (cards.length === 1 ? "" : "s");
+function renderJobs(jobs) {
+  const list = Array.isArray(jobs) ? jobs : [];
+  els.cardsPanel.classList.toggle("hidden", !list.length);
+  els.cardCountChip.textContent = list.length + " job" + (list.length === 1 ? "" : "s");
 
-  els.jobList.innerHTML = cards.map((job) => {
-    const confidence = job.extraction || { level: "LOW", score: 0, missing: [] };
+  els.jobList.innerHTML = list.map((job) => {
+    const confidence = job.extraction?.confidence || {
+      level: "LOW",
+      score: 0,
+      missing: []
+    };
+
     const fields = [
-      ["Experience", job.experience],
+      ["Experience", job.experienceText],
       ["Location", job.location],
-      ["Salary", job.salary],
+      ["Salary", job.salaryText],
       ["Posted", job.postedAge]
     ];
 
@@ -119,18 +125,18 @@ function renderCards(cards) {
               ).join("") +
             '</div>'
           : '') +
-        (job.descriptionSnippet
-          ? '<div class="snippet">' + escapeHtml(job.descriptionSnippet) + '</div>'
+        (job.snippet
+          ? '<div class="snippet">' + escapeHtml(job.snippet) + '</div>'
           : '') +
         '<div class="missing-line">Missing: ' +
           escapeHtml(
-            confidence.missing && confidence.missing.length
+            confidence.missing?.length
               ? confidence.missing.join(", ")
               : "none"
           ) +
         '</div>' +
-        (job.jobUrl
-          ? '<a class="job-link" href="' + escapeHtml(job.jobUrl) + '" target="_blank" rel="noreferrer">Open Naukri job ↗</a>'
+        (job.canonicalUrl
+          ? '<a class="job-link" href="' + escapeHtml(job.canonicalUrl) + '" target="_blank" rel="noreferrer">Open job ↗</a>'
           : '') +
       '</article>'
     );
@@ -141,28 +147,35 @@ function renderDetail(job) {
   els.detailPanel.classList.toggle("hidden", !job);
   if (!job) return;
 
-  const confidence = job.extraction || { level: "LOW", score: 0, missing: [] };
-  els.detailTitle.textContent = job.title || "Structured job detail";
+  const confidence = job.extraction?.confidence || {
+    level: "LOW",
+    score: 0,
+    missing: []
+  };
+
+  els.detailTitle.textContent = job.title || "Normalized job detail";
   els.detailConfidence.textContent =
     confidence.level + " " + Number(confidence.score || 0) + "/100";
   els.detailConfidence.className =
     "confidence-chip " + confidenceClass(confidence.level);
 
   const fields = [
+    ["Portal", job.portal, ""],
     ["Company", job.company, ""],
-    ["Experience", job.experience, ""],
+    ["Experience", job.experienceText, ""],
     ["Location", job.location, ""],
-    ["Salary", job.salary, ""],
+    ["Salary", job.salaryText, ""],
     ["Posted age", job.postedAge, ""],
     ["Date posted", job.datePosted, ""],
     ["Employment type", job.employmentType, ""],
+    ["Work mode", job.workMode, ""],
     ["Education", job.education, ""],
-    ["Job ID", job.jobId, ""],
-    ["Skills", Array.isArray(job.skills) ? job.skills.join(", ") : job.skills, "wide"],
-    ["Job URL", job.jobUrl, "wide"],
+    ["Portal job ID", job.portalJobId, ""],
+    ["Skills", job.skills?.join(", "), "wide"],
+    ["Job URL", job.canonicalUrl, "wide"],
     [
       "Missing fields",
-      confidence.missing && confidence.missing.length
+      confidence.missing?.length
         ? confidence.missing.join(", ")
         : "None",
       "wide"
@@ -193,73 +206,24 @@ function renderDetail(job) {
 async function renderDiagnostics() {
   const state = await getState();
   const preferences = await getPreferences();
-  const search = await getNaukriSearch();
-  const data = extraction || await getNaukriExtraction();
+  const data = capture || await getPortalCapture();
+  const cache = await getJobCache();
   const connectionResult = await chrome.storage.local.get([
-    "jobpilot.stage3.connection",
-    "jobpilot.stage4.connection",
-    "jobpilot.naukri.injectionStatus"
+    "jobpilot.stage4.connection"
   ]);
-  const stage3Connection = connectionResult["jobpilot.stage3.connection"];
-  const stage4Connection = connectionResult["jobpilot.stage4.connection"];
-  const injectionStatus = connectionResult["jobpilot.naukri.injectionStatus"];
+  const connection = connectionResult["jobpilot.stage4.connection"];
 
   const diagnostics = [
     ["Stage 1 profile", Boolean(state.profile), state.profile ? "Ready" : "Missing"],
-    [
-      "Stage 2 preferences",
-      Boolean(preferences.updatedAt),
-      preferences.updatedAt ? "Saved" : "Missing"
-    ],
-    [
-      "Stage 3 search",
-      Boolean(search.createdAt),
-      search.createdAt ? "Stored" : "Not opened"
-    ],
-    [
-      "Stage 3 verifier connection",
-      Boolean(stage3Connection && stage3Connection.status === "connected"),
-      stage3Connection ? "Connected to Naukri" : "Not connected"
-    ],
-    [
-      "Stage 4 extractor connection",
-      Boolean(stage4Connection && stage4Connection.status === "connected"),
-      stage4Connection ? "Connected to Naukri" : "Not connected"
-    ],
-    [
-      "Injection attempt",
-      Boolean(injectionStatus && injectionStatus.ok === true),
-      injectionStatus
-        ? injectionStatus.ok
-          ? "PASS · " + injectionStatus.reason
-          : "FAILED · " + injectionStatus.reason + " · " + (injectionStatus.error || "Unknown error")
-        : "No injection attempt recorded"
-    ],
-    [
-      "Stage 4 page type",
-      data.pageType === "search-results" || data.pageType === "job-detail",
-      data.pageType || "unknown"
-    ],
-    [
-      "Structured jobs",
-      Number(data.stats?.parsed || 0) > 0,
-      Number(data.stats?.parsed || 0) + " parsed"
-    ],
-    [
-      "Whole-body parsing",
-      true,
-      "Disabled"
-    ],
-    [
-      "Match scoring",
-      true,
-      "Disabled"
-    ],
-    [
-      "AI job analysis",
-      true,
-      "Disabled"
-    ]
+    ["Stage 2 preferences", Boolean(preferences.updatedAt), preferences.updatedAt ? "Saved" : "Missing"],
+    ["Portal runtime", Boolean(connection?.status === "connected"), connection ? "Connected · " + (connection.portal || "unknown") : "Not connected"],
+    ["Portal adapter", Boolean(data.portal), data.portal ? data.portal + " v" + (data.adapterVersion || "?") : "None"],
+    ["Page type", data.pageType === "listing" || data.pageType === "detail", data.pageType || "unknown"],
+    ["Capture method", data.captureMethod && data.captureMethod !== "none", data.captureMethod || "none"],
+    ["Normalized jobs", Number(data.stats?.normalized || 0) > 0, Number(data.stats?.normalized || 0) + " current"],
+    ["Job cache", Object.keys(cache).length > 0, Object.keys(cache).length + " cached"],
+    ["Match scoring", true, "Disabled"],
+    ["AI job analysis", true, "Disabled"]
   ];
 
   els.diagnosticsGrid.innerHTML = diagnostics.map((item) =>
@@ -271,49 +235,49 @@ async function renderDiagnostics() {
 }
 
 async function render() {
-  extraction = await getNaukriExtraction();
-  const stats = extraction.stats || {};
-
-  renderMetrics(extraction);
+  capture = await getPortalCapture();
+  renderMetrics(capture);
 
   const validPage =
-    extraction.pageType === "search-results" ||
-    extraction.pageType === "job-detail";
+    capture.pageType === "listing" ||
+    capture.pageType === "detail";
 
-  els.pageStatus.textContent = validPage ? "Extracted" : "Waiting";
+  els.pageStatus.textContent = validPage ? "Captured" : "Waiting";
   els.pageStatus.style.color = validPage ? "#a9fac3" : "#8f9db2";
 
-  if (extraction.pageType === "search-results") {
-    els.pageTitle.textContent = "Naukri search results extracted";
-  } else if (extraction.pageType === "job-detail") {
-    els.pageTitle.textContent = "Naukri job detail extracted";
+  if (capture.pageType === "listing") {
+    els.pageTitle.textContent =
+      (capture.portalName || capture.portal || "Portal") + " listing captured";
+  } else if (capture.pageType === "detail") {
+    els.pageTitle.textContent =
+      (capture.portalName || capture.portal || "Portal") + " job detail captured";
   } else {
-    els.pageTitle.textContent = "Waiting for Naukri data...";
+    els.pageTitle.textContent = "Waiting for portal data...";
   }
 
-  els.pageMeta.textContent = extraction.extractedAt
-    ? "Last extraction: " + formatTime(extraction.extractedAt) +
-      (extraction.sourceUrl ? " · " + extraction.sourceUrl : "")
-    : "Open a Naukri search result or job-detail page.";
+  els.pageMeta.textContent = capture.capturedAt
+    ? "Last capture: " + formatTime(capture.capturedAt) +
+      " · " + (capture.portal || "unknown") +
+      " · " + (capture.captureMethod || "none") +
+      (capture.sourceUrl ? " · " + capture.sourceUrl : "")
+    : "Open a supported portal listing or detail page.";
 
-  els.openSourceBtn.disabled = !extraction.sourceUrl;
+  els.openSourceBtn.disabled = !capture.sourceUrl;
 
-  const cards = Array.isArray(extraction.cards) ? extraction.cards : [];
-  renderCards(cards);
-  renderDetail(extraction.detail || null);
+  renderJobs(capture.jobs || []);
+  renderDetail(capture.detail || null);
 
   const empty =
-    extraction.pageType === "unknown" ||
-    (Number(stats.parsed || 0) === 0 && !extraction.detail);
+    capture.pageType === "unknown" ||
+    (Number(capture.stats?.normalized || 0) === 0 && !capture.detail);
 
   els.emptyPanel.classList.toggle("hidden", !empty);
-
   await renderDiagnostics();
 }
 
 els.openSourceBtn.addEventListener("click", async () => {
-  if (extraction?.sourceUrl) {
-    await chrome.tabs.create({ url: extraction.sourceUrl });
+  if (capture?.sourceUrl) {
+    await chrome.tabs.create({ url: capture.sourceUrl });
   }
 });
 
@@ -321,16 +285,16 @@ els.refreshBtn.addEventListener("click", render);
 
 els.clearBtn.addEventListener("click", async () => {
   const confirmed = confirm(
-    "Clear only the latest Stage 4 extraction data? Stage 1–3 data will remain."
+    "Clear only the latest Stage 4 portal capture? Profile, preferences and cached jobs remain."
   );
   if (!confirmed) return;
 
-  await clearNaukriExtraction();
+  await clearPortalCapture();
   await render();
 });
 
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === "local" && changes["jobpilot.stage4.naukriExtraction"]) {
+  if (area === "local" && changes["jobpilot.stage4.portalCapture"]) {
     render().catch(() => {});
   }
 });
