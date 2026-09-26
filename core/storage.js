@@ -261,3 +261,53 @@ export async function getJobCache() {
 export async function clearJobCache() {
   await chrome.storage.local.remove(JOB_CACHE_KEY);
 }
+
+
+export async function saveJobAiAnalysis(jobKey, analysis) {
+  const result = await chrome.storage.local.get([
+    JOB_CACHE_KEY,
+    PORTAL_CAPTURE_KEY
+  ]);
+
+  const cache =
+    result[JOB_CACHE_KEY] && typeof result[JOB_CACHE_KEY] === "object"
+      ? result[JOB_CACHE_KEY]
+      : {};
+
+  const capture =
+    result[PORTAL_CAPTURE_KEY] && typeof result[PORTAL_CAPTURE_KEY] === "object"
+      ? result[PORTAL_CAPTURE_KEY]
+      : emptyPortalCapture();
+
+  const key = String(jobKey || capture.detail?.key || "").trim();
+
+  if (!key) {
+    throw new Error("No current detail job is available for AI enrichment.");
+  }
+
+  const analyzedAt =
+    analysis?.analyzedAt || new Date().toISOString();
+
+  if (cache[key]) {
+    cache[key] = {
+      ...cache[key],
+      aiAnalysis: analysis || null,
+      aiAnalyzedAt: analyzedAt
+    };
+  }
+
+  if (capture.detail && capture.detail.key === key) {
+    capture.detail = {
+      ...capture.detail,
+      aiAnalysis: analysis || null,
+      aiAnalyzedAt: analyzedAt
+    };
+  }
+
+  await chrome.storage.local.set({
+    [JOB_CACHE_KEY]: cache,
+    [PORTAL_CAPTURE_KEY]: capture
+  });
+
+  return capture.detail || cache[key] || null;
+}
