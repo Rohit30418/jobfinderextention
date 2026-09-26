@@ -340,7 +340,6 @@ async function forceConnectToNaukri() {
     await chrome.scripting.insertCSS({
       target: { tabId: target.id },
       files: [
-        "content/naukri-detector.css",
         "content/portal-runtime.css"
       ]
     });
@@ -348,7 +347,6 @@ async function forceConnectToNaukri() {
     await chrome.scripting.executeScript({
       target: { tabId: target.id },
       files: [
-        "content/naukri-detector.js",
         "core/portal-engine.js",
         "portals/naukri/listing.js",
         "portals/naukri/detail.js",
