@@ -55,6 +55,51 @@
       .replace(/'/g, "&#039;");
   }
 
+  function comparableUrl(value) {
+    try {
+      const url = new URL(value);
+      return (url.hostname + url.pathname)
+        .toLowerCase()
+        .replace(/\/+$/, "");
+    } catch (_) {
+      return String(value || "")
+        .toLowerCase()
+        .split("?")[0]
+        .replace(/\/+$/, "");
+    }
+  }
+
+  function findExistingJobKey(cache, incoming) {
+    if (!incoming) return "";
+
+    if (incoming.key && cache[incoming.key]) {
+      return incoming.key;
+    }
+
+    const incomingUrl = comparableUrl(incoming.canonicalUrl);
+
+    for (const [key, existing] of Object.entries(cache)) {
+      if (!existing || existing.portal !== incoming.portal) continue;
+
+      if (
+        incoming.portalJobId &&
+        existing.portalJobId &&
+        String(incoming.portalJobId) === String(existing.portalJobId)
+      ) {
+        return key;
+      }
+
+      if (
+        incomingUrl &&
+        comparableUrl(existing.canonicalUrl) === incomingUrl
+      ) {
+        return key;
+      }
+    }
+
+    return "";
+  }
+
   async function updateCache(jobs) {
     const result = await chrome.storage.local.get(CACHE_KEY);
     const current = result[CACHE_KEY] && typeof result[CACHE_KEY] === "object"
@@ -62,7 +107,15 @@
       : {};
 
     for (const job of jobs) {
-      current[job.key] = engine.mergeJob(current[job.key], job);
+      const existingKey = findExistingJobKey(current, job);
+
+      if (existingKey) {
+        const merged = engine.mergeJob(current[existingKey], job);
+        merged.key = existingKey;
+        current[existingKey] = merged;
+      } else {
+        current[job.key] = engine.mergeJob(current[job.key], job);
+      }
     }
 
     const entries = Object.entries(current)
