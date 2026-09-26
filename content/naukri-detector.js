@@ -515,6 +515,12 @@
     }
 
     const page = detectPageType();
+
+    if (page.type === "job-detail") {
+      root.remove();
+      return;
+    }
+
     const body = root.querySelector(".jp-body");
     const links = uniqueJobLinks();
 
