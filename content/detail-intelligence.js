@@ -592,6 +592,56 @@
           font-weight: 800;
         }
 
+        .scorebox {
+          margin-top: 12px;
+          padding: 11px 12px;
+          border: 1px solid #2b3a4e;
+          border-radius: 11px;
+          background: #09111a;
+        }
+
+        .scoreline {
+          display: flex;
+          align-items: baseline;
+          justify-content: space-between;
+          gap: 10px;
+        }
+
+        .scoreline span {
+          color: #8f9eb2;
+          font-size: 11px;
+          font-weight: 800;
+          text-transform: uppercase;
+          letter-spacing: .08em;
+        }
+
+        .scoreline strong {
+          font-size: 26px;
+          color: #7af1a6;
+          letter-spacing: -.03em;
+        }
+
+        .scorelabel {
+          margin-top: 2px;
+          color: #b8c5d5;
+          font-size: 11px;
+          font-weight: 800;
+        }
+
+        .scoretrack {
+          height: 6px;
+          margin-top: 8px;
+          border-radius: 999px;
+          background: #182334;
+          overflow: hidden;
+        }
+
+        .scorefill {
+          height: 100%;
+          border-radius: inherit;
+          background: linear-gradient(90deg,#f06b79,#dfaa44,#63d98f);
+        }
+
         .meta {
           display: flex;
           flex-wrap: wrap;
@@ -890,11 +940,34 @@
             ? "Puter AI ready"
             : "Local match only";
 
+    const scoreValue =
+      Number.isFinite(match.matchScore?.score)
+        ? match.matchScore.score
+        : null;
+    const scoreText =
+      scoreValue === null ? "--" : scoreValue + "%";
+    const scoreWidth =
+      scoreValue === null ? 0 : scoreValue;
+    const scoreLabel =
+      match.matchScore?.label || "INSUFFICIENT DATA";
+
     content.innerHTML = `
       <div class="decision" data-action="${escapeHtml(decision.action)}">
         <div class="kicker">Application decision</div>
         <div class="action">${escapeHtml(decision.action)}</div>
         <div class="headline">${escapeHtml(decision.headline || "")}</div>
+
+        <div class="scorebox">
+          <div class="scoreline">
+            <span>Profile match</span>
+            <strong>${escapeHtml(scoreText)}</strong>
+          </div>
+          <div class="scorelabel">${escapeHtml(scoreLabel)}</div>
+          <div class="scoretrack">
+            <div class="scorefill" style="width:${scoreWidth}%"></div>
+          </div>
+        </div>
+
         <div class="meta">
           <span class="pill">${escapeHtml(match.verdict || "REVIEW")}</span>
           <span class="pill">${escapeHtml(decision.confidence || match.confidence?.level || "LOW")} evidence</span>
@@ -942,7 +1015,7 @@
       </div>
 
       <div class="note">
-        JobPilot highlights exact JD evidence. Portal facts remain authoritative.
+        Match % ranks compatibility. APPLY / REVIEW FIRST / SKIP still takes precedence when JobPilot finds a blocker or unresolved mandatory requirement.
       </div>
     `;
 
