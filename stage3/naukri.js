@@ -341,7 +341,7 @@ async function forceConnectToNaukri() {
       target: { tabId: target.id },
       files: [
         "content/naukri-detector.css",
-        "content/naukri-extractor.css"
+        "content/portal-runtime.css"
       ]
     });
 
@@ -349,7 +349,11 @@ async function forceConnectToNaukri() {
       target: { tabId: target.id },
       files: [
         "content/naukri-detector.js",
-        "content/naukri-extractor.js"
+        "core/portal-engine.js",
+        "portals/naukri/listing.js",
+        "portals/naukri/detail.js",
+        "portals/naukri/adapter.js",
+        "content/portal-runtime.js"
       ]
     });
 
