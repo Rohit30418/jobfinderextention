@@ -459,14 +459,17 @@ async function refreshDiagnostics() {
       saved && saved.createdAt ? "Stored" : "Not opened yet"
     ],
     [
-      "Stage 3 page script",
-      Boolean(stage3Connection && stage3Connection.status === "connected"),
-      stage3Connection ? "Connected · " + stage3Connection.url : "Not connected to a Naukri tab"
+      "Legacy page verifier",
+      true,
+      "Disabled in v0.5.1 · replaced by portal runtime"
     ],
     [
-      "Stage 4 extractor script",
+      "Portal runtime",
       Boolean(stage4Connection && stage4Connection.status === "connected"),
-      stage4Connection ? "Connected · " + stage4Connection.url : "Not connected to a Naukri tab"
+      stage4Connection
+        ? "Connected · " + (stage4Connection.portal || "portal") +
+          " · " + (stage4Connection.pageType || "unknown")
+        : "Not connected to a supported portal tab"
     ],
     [
       "Injection attempt",
