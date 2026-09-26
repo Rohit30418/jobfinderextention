@@ -26,9 +26,9 @@
     <section class="panel" id="summaryPanel">
       <div class="summary-head">
         <div>
-          <div class="kicker">LAST CAPTURED LISTING</div>
-          <h2 id="listingTitle">Waiting for a job listing…</h2>
-          <p id="listingMeta">Open a Naukri search-results page to capture jobs.</p>
+          <div class="kicker">ALL CAPTURED PORTALS</div>
+          <h2 id="listingTitle">Waiting for job listings…</h2>
+          <p id="listingMeta">Visit supported portal listing pages and JobPilot will combine them here.</p>
         </div>
         <div class="status" id="listingStatus">Waiting</div>
       </div>
@@ -40,10 +40,46 @@
         <div><strong id="filteredCount">0</strong><span>Filtered</span></div>
         <div><strong id="analyzedCount">0</strong><span>Deep analyzed</span></div>
       </div>
+
+      <div class="portal-sources" id="portalSources"></div>
+    </section>
+
+    <section class="panel insights-panel">
+      <div class="summary-head">
+        <div>
+          <div class="kicker">7-DAY GAP INTELLIGENCE</div>
+          <h2>What keeps appearing in jobs but not in your profile?</h2>
+          <p id="insightSummary">
+            Deep-analyze jobs and JobPilot will build a deduplicated weekly profile-gap report.
+          </p>
+        </div>
+        <div class="status" id="insightStatus">Learning</div>
+      </div>
+
+      <div class="insight-grid">
+        <div class="insight-card">
+          <h3>Missing required</h3>
+          <div id="missingRequiredInsights" class="insight-list"></div>
+        </div>
+        <div class="insight-card">
+          <h3>Missing preferred</h3>
+          <div id="missingPreferredInsights" class="insight-list"></div>
+        </div>
+      </div>
+
+      <div class="profile-guidance">
+        <strong>How to use this:</strong>
+        If you genuinely have a recurring skill but it is missing from your saved profile/resume, surface it with real evidence.
+        If you do not have it, treat it as a learning target — do not add skills you cannot support.
+      </div>
     </section>
 
     <section class="toolbar panel">
-      <div class="filters">
+      <div class="portal-filter-wrap">
+        <span class="filter-label">Portal</span>
+        <div class="filters" id="portalFilters"></div>
+      </div>
+      <div class="filters result-filters">
         <button class="filter active" data-mode="recommended" type="button">Recommended</button>
         <button class="filter" data-mode="relevant" type="button">Relevant</button>
         <button class="filter" data-mode="review" type="button">Review</button>
@@ -57,7 +93,7 @@
 
     <section class="empty panel hidden" id="emptyState">
       <strong>No captured jobs yet.</strong>
-      <span>Open a Naukri search-results page. JobPilot will keep the latest listing here.</span>
+      <span>Visit Naukri, Foundit, LinkedIn Jobs, Indeed or Hirist listing pages. JobPilot will combine the captured jobs here.</span>
     </section>
   </div>
 
