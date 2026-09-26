@@ -447,6 +447,230 @@ function evidenceConfidence(job, requiredSkills, role) {
   };
 }
 
+function buildMatchScore({
+  preferences,
+  role,
+  requiredSkills,
+  required,
+  preferredSkills,
+  preferred,
+  experience,
+  location,
+  mode,
+  employment,
+  blockers,
+  confidence
+}) {
+  const components = [];
+
+  const add = ({
+    id,
+    label,
+    weight,
+    assessed,
+    ratio,
+    detail
+  }) => {
+    if (!assessed) return;
+
+    const safeRatio = Math.max(0, Math.min(1, Number(ratio) || 0));
+    components.push({
+      id,
+      label,
+      weight,
+      ratio: safeRatio,
+      points: Math.round(weight * safeRatio * 10) / 10,
+      detail: detail || ""
+    });
+  };
+
+  add({
+    id: "role",
+    label: "Role fit",
+    weight: 25,
+    assessed: Boolean(role?.jobRole || role?.targetRoles?.length),
+    ratio: role?.compatible ? 1 : 0,
+    detail: role?.compatible
+      ? "Target role/family aligns"
+      : "No reliable target-role alignment"
+  });
+
+  add({
+    id: "required-skills",
+    label: "Required skills",
+    weight: 35,
+    assessed: requiredSkills.length > 0,
+    ratio:
+      requiredSkills.length > 0
+        ? required.matched.length / requiredSkills.length
+        : 0,
+    detail:
+      requiredSkills.length > 0
+        ? required.matched.length + "/" + requiredSkills.length + " matched"
+        : "Required skills not identified"
+  });
+
+  add({
+    id: "experience",
+    label: "Experience",
+    weight: 15,
+    assessed: experience.candidateStatus !== "unknown",
+    ratio:
+      experience.candidateStatus === "within"
+        ? 1
+        : experience.candidateStatus === "above"
+          ? 0.8
+          : 0,
+    detail:
+      experience.candidateStatus === "unknown"
+        ? "Unknown"
+        : experience.candidateStatus
+  });
+
+  add({
+    id: "location",
+    label: "Location",
+    weight: 10,
+    assessed:
+      Array.isArray(preferences?.preferredLocations) &&
+      preferences.preferredLocations.length > 0 &&
+      (location.status === "match" || location.status === "mismatch"),
+    ratio: location.status === "match" ? 1 : 0,
+    detail: location.status
+  });
+
+  add({
+    id: "preferred-skills",
+    label: "Preferred skills",
+    weight: 5,
+    assessed: preferredSkills.length > 0,
+    ratio:
+      preferredSkills.length > 0
+        ? preferred.matched.length / preferredSkills.length
+        : 0,
+    detail:
+      preferredSkills.length > 0
+        ? preferred.matched.length + "/" + preferredSkills.length + " matched"
+        : "Not stated"
+  });
+
+  add({
+    id: "work-mode",
+    label: "Work mode",
+    weight: 5,
+    assessed:
+      Array.isArray(preferences?.workModes) &&
+      preferences.workModes.length > 0 &&
+      (mode.status === "match" || mode.status === "mismatch"),
+    ratio: mode.status === "match" ? 1 : 0,
+    detail: mode.status
+  });
+
+  add({
+    id: "employment-type",
+    label: "Employment type",
+    weight: 5,
+    assessed:
+      Array.isArray(preferences?.employmentTypes) &&
+      preferences.employmentTypes.length > 0 &&
+      (employment.status === "match" || employment.status === "mismatch"),
+    ratio: employment.status === "match" ? 1 : 0,
+    detail: employment.status
+  });
+
+  const assessedWeight = components.reduce(
+    (sum, item) => sum + item.weight,
+    0
+  );
+  const earnedPoints = components.reduce(
+    (sum, item) => sum + item.points,
+    0
+  );
+
+  let score =
+    assessedWeight > 0
+      ? Math.round((earnedPoints / assessedWeight) * 100)
+      : null;
+
+  const caps = [];
+
+  if (score !== null) {
+    if (blockers.length) {
+      caps.push({
+        value: 39,
+        reason: "Hard blocker present"
+      });
+    }
+
+    if (!requiredSkills.length) {
+      caps.push({
+        value: 79,
+        reason: "Required skills are not clear enough"
+      });
+    }
+
+    if (!role.compatible) {
+      caps.push({
+        value: 54,
+        reason: "Role alignment is weak"
+      });
+    }
+
+    if (experience.candidateStatus === "below") {
+      caps.push({
+        value: 69,
+        reason: "Candidate experience is below the stated minimum"
+      });
+    }
+
+    if (location.status === "mismatch") {
+      caps.push({
+        value: 74,
+        reason: "Job location is outside saved preferences"
+      });
+    }
+
+    if (confidence.level === "LOW") {
+      caps.push({
+        value: 69,
+        reason: "Evidence confidence is low"
+      });
+    } else if (confidence.level === "MEDIUM") {
+      caps.push({
+        value: 84,
+        reason: "Evidence confidence is medium"
+      });
+    }
+
+    for (const cap of caps) {
+      score = Math.min(score, cap.value);
+    }
+  }
+
+  const label =
+    score === null
+      ? "INSUFFICIENT DATA"
+      : score >= 85
+        ? "EXCELLENT MATCH"
+        : score >= 75
+          ? "STRONG MATCH"
+          : score >= 60
+            ? "MODERATE MATCH"
+            : score >= 40
+              ? "WEAK MATCH"
+              : "LOW MATCH";
+
+  return {
+    score,
+    label,
+    confidence: confidence.level,
+    assessedWeight,
+    earnedPoints: Math.round(earnedPoints * 10) / 10,
+    components,
+    caps
+  };
+}
+
 function buildApplyDecision({
   verdict,
   blockers,
@@ -914,6 +1138,21 @@ export function evaluateDeepMatch(profile, preferences, job) {
 
   const confidence = evidenceConfidence(job, requiredSkills, role);
 
+  const matchScore = buildMatchScore({
+    preferences,
+    role,
+    requiredSkills,
+    required,
+    preferredSkills,
+    preferred,
+    experience,
+    location,
+    mode,
+    employment,
+    blockers,
+    confidence
+  });
+
   const applyDecision = buildApplyDecision({
     verdict,
     blockers,
@@ -931,8 +1170,9 @@ export function evaluateDeepMatch(profile, preferences, job) {
   });
 
   return {
-    version: 2,
+    version: 3,
     jobKey: job.key || "",
+    matchScore,
     portal: job.portal || "",
     verdict,
     confidence,
