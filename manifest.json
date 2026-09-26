@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "JobPilot - Stage 1 Profile Setup",
-  "version": "0.1.3",
-  "description": "Stage 1: reliable resume extraction, validation and local candidate profile setup.",
+  "name": "JobPilot - Profile & Job Preferences",
+  "version": "0.2.0",
+  "description": "Stage 1 profile setup + Stage 2 local job-search preferences.",
   "permissions": [
     "storage",
     "unlimitedStorage"
