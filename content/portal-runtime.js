@@ -18,6 +18,16 @@
   let lastUrl = location.href;
   let closedForUrl = "";
 
+  function cleanupLegacyOverlays() {
+    for (const selector of [
+      "#jobpilot-naukri-stage3",
+      "#jobpilot-naukri-stage4"
+    ]) {
+      const node = document.querySelector(selector);
+      if (node) node.remove();
+    }
+  }
+
   async function publishConnection(adapter, pageType) {
     try {
       await chrome.storage.local.set({
@@ -147,7 +157,7 @@
     if (pageType === "listing") {
       const result = adapter.captureListing();
       const rawJobs = Array.isArray(result?.jobs) ? result.jobs : [];
-      const jobs = rawJobs.map((raw) =>
+      const normalizedJobs = rawJobs.map((raw) =>
         engine.normalizeJob(raw, {
           portal: adapter.id,
           pageType: "listing",
@@ -155,6 +165,13 @@
           adapterVersion: adapter.version
         })
       );
+
+      const jobMap = new Map();
+      for (const job of normalizedJobs) {
+        if (!job?.key) continue;
+        jobMap.set(job.key, engine.mergeJob(jobMap.get(job.key), job));
+      }
+      const jobs = [...jobMap.values()];
 
       return {
         version: 2,
@@ -268,7 +285,7 @@
                   '<b>' + escapeHtml(job.title || "Untitled") + '</b>' +
                   '<span>' + escapeHtml(job.company || "Company unknown") + '</span>' +
                   '<em class="jpp-' + confidenceClass(confidence.level) + '">' +
-                    escapeHtml((confidence.level || "LOW") + " " + Number(confidence.score || 0) + "/100") +
+                    escapeHtml("Extraction " + (confidence.level || "LOW")) +
                   '</em>' +
                 '</div>'
               );
@@ -285,8 +302,8 @@
 
       html +=
         '<div class="jpp-confidence jpp-' + confidenceClass(confidence.level) + '">' +
-          '<strong>' + escapeHtml((confidence.level || "LOW") + " " + Number(confidence.score || 0) + "/100") + '</strong>' +
-          '<span>Extraction confidence</span>' +
+          '<strong>' + escapeHtml("Extraction " + (confidence.level || "LOW")) + '</strong>' +
+          '<span>Completeness ' + Number(confidence.score || 0) + '% · not a match score</span>' +
         '</div>' +
         '<div class="jpp-fields">' +
           [
@@ -316,6 +333,7 @@
 
   async function run() {
     try {
+      cleanupLegacyOverlays();
       const adapter = engine.detectAdapter(location.href);
       const pageType = adapter?.detectPage?.() || "unknown";
 
@@ -334,9 +352,11 @@
     schedule.timer = setTimeout(run, delay);
   }
 
+  cleanupLegacyOverlays();
   run();
 
   setInterval(() => {
+    cleanupLegacyOverlays();
     if (location.href !== lastUrl) {
       lastUrl = location.href;
       lastSignature = "";
