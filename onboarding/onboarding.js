@@ -1,6 +1,7 @@
 import { parseResumeFile } from "../core/resume-parser.js";
 import { normalizeResumeText, validateResumeText } from "../core/resume-validator.js";
 import { profileFromForm } from "../core/profile-normalizer.js";
+import { extractLocalProfileFromResume } from "../core/local-resume-profile.js";
 import {
   clearState,
   getAiAuthorized,
@@ -29,6 +30,8 @@ let currentValidation = null;
 let currentParser = null;
 let existingState = null;
 let profileSource = "manual";
+let localProfileDraft = null;
+let localProfileTextSnapshot = "";
 let extractionRunId = 0;
 let extractionState = {
   selected: false,
@@ -195,6 +198,8 @@ function clearProfileForm() {
   els.experienceYears.value = "";
   els.experienceMonths.value = "";
   profileSource = "manual";
+  localProfileDraft = null;
+  localProfileTextSnapshot = "";
 }
 
 function fillProfile(profile) {
@@ -234,6 +239,44 @@ function fillProfile(profile) {
       .filter(Boolean)
       .join("\n");
   }
+}
+
+function applyLocalProfileFromText(text, announce = false) {
+  const sourceText = String(text || "").trim();
+
+  if (!sourceText) {
+    return null;
+  }
+
+  // Do not overwrite edits when the same validated resume text is revisited.
+  if (
+    localProfileDraft &&
+    localProfileTextSnapshot === sourceText
+  ) {
+    return localProfileDraft;
+  }
+
+  const draft = extractLocalProfileFromResume(sourceText);
+  localProfileDraft = draft;
+  localProfileTextSnapshot = sourceText;
+  profileSource = "local-resume-parser";
+
+  fillProfile(draft);
+
+  if (announce) {
+    const details = draft.localExtraction || {};
+    setMessage(
+      els.aiMessage,
+      "Profile auto-filled locally from the validated resume. " +
+      (details.skillsFound || 0) + " skill(s), " +
+      (details.educationFound || 0) + " education item(s) and " +
+      (details.projectsFound || 0) + " project item(s) found. " +
+      "Review/edit anything uncertain. Puter AI is optional.",
+      "success"
+    );
+  }
+
+  return draft;
 }
 
 function formData() {
@@ -355,6 +398,16 @@ async function refreshDiagnostics() {
       Boolean(currentValidation && currentValidation.passed),
       liveQuality
     ],
+    [
+      "Local profile parser",
+      Boolean(localProfileDraft),
+      localProfileDraft
+        ? (localProfileDraft.localExtraction?.extractedFields || 0) +
+          " profile field group(s) · " +
+          (localProfileDraft.skills?.length || 0) +
+          " skill(s)"
+        : "Waiting for validated resume"
+    ],
     ["Chrome storage", true, state.profile ? "Saved profile found" : "Ready · no saved profile"],
     [
       "Saved original file",
@@ -405,6 +458,10 @@ async function loadExisting() {
     currentValidation = validateResumeText(currentText);
     currentParser = existingState.resume.parser || null;
     els.resumePreview.value = currentText;
+
+    if (currentValidation.passed && !existingState.profile) {
+      applyLocalProfileFromText(currentValidation.text, false);
+    }
   }
 
   if (existingState.profile) {
@@ -471,6 +528,10 @@ async function extractSelectedFile() {
     const result = validateResumeText(normalized);
 
     renderValidation(result);
+
+    if (result.passed) {
+      applyLocalProfileFromText(result.text, false);
+    }
 
     extractionState = {
       selected: true,
@@ -568,7 +629,14 @@ els.usePasteBtn.addEventListener("click", () => {
     return;
   }
 
-  validateAndShow(text);
+  const result = validateResumeText(text);
+  renderValidation(result);
+
+  if (result.passed) {
+    applyLocalProfileFromText(result.text, false);
+  }
+
+  setStep(2);
   els.resumeSourceStatus.textContent = "Pasted text";
 });
 
@@ -585,8 +653,10 @@ els.continueProfileBtn.addEventListener("click", () => {
   }
 
   currentText = result.text;
+  applyLocalProfileFromText(result.text, true);
   setStep(3);
   updatePuterUi();
+  refreshDiagnostics();
 });
 
 els.backToResumeBtn.addEventListener("click", () => setStep(1));
