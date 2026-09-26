@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "JobPilot - Universal Job Portal Assistant",
-  "version": "0.9.1",
-  "description": "Inline job intelligence with explainable match %, evidence confidence, APPLY / REVIEW FIRST / SKIP, Puter AI and JD highlighting.",
+  "version": "0.9.2",
+  "description": "Stable Stage 5 rendering: semantic freshness fingerprint prevents timestamp recapture loops and UI flicker.",
   "permissions": [
     "storage",
     "unlimitedStorage",
