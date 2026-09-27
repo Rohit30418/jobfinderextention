@@ -14,6 +14,10 @@ export function validateBackup(payload) {
     } else if (object(value)) {
       for (const [key, item] of Object.entries(value)) {
         if (["__proto__", "constructor", "prototype"].includes(key)) fail(path + "." + key);
+        if (path.endsWith(".sources")) {
+          if (item != null && typeof item !== "string") fail(path + "." + key);
+          continue;
+        }
         // Contexts.portals is a dictionary; skill records.portals is an array.
         if (key === "education" && path.endsWith(".profile") && item != null && !Array.isArray(item)) fail(path + ".education");
         if (arrays.has(key) && item != null && !((key === "portals" || (key === "skills" && path.endsWith(".deepMatch"))) && object(item)) && !Array.isArray(item)) fail(path + "." + key);
