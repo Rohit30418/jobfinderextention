@@ -191,8 +191,16 @@ async function calculateInlineIntelligence(incomingJob, forceAi = false) {
 
   const inputRevision = analysisRevision(state.profile, preferences, job);
   if (job.aiAnalysis?.inputRevision !== inputRevision) job.aiAnalysis = null;
-  let aiStatus = job.aiAnalysis ? "cached" : "local";
-  if (token && aiAuthorized && (forceAi || preferences.automaticAi === true) && (!job.aiAnalysis || forceAi)) {
+  const fullJdReady = String(job.description || "").trim().length >= 250;
+  let aiStatus = job.aiAnalysis
+    ? "cached"
+    : token && aiAuthorized && !fullJdReady
+      ? "waiting-for-jd"
+      : "local";
+
+  // Full job-detail pages automatically run AI once when Puter is connected.
+  // Cached analysis is reused until the profile/preferences/JD revision changes.
+  if (token && aiAuthorized && fullJdReady && (!job.aiAnalysis || forceAi)) {
     try {
       const analysis = await analyzeJobWithAi(job, state.profile, preferences);
       const current = await getState();
