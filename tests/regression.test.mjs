@@ -186,3 +186,12 @@ test('extension page reads and saves without a background storage response',asyn
   if(descriptor)Object.defineProperty(navigator,'locks',descriptor);else delete navigator.locks;
  }
 });
+
+test('agent mode toggles retain recommendations while actual preference edits invalidate them',async()=>{
+ await store.setState({profile});await store.setPreferences({targetRoles:['Frontend Developer']});
+ await store.persistPortalCapture({portal:'indeed',pageType:'detail',detail:job,jobs:[]});
+ const preferences=await store.getPreferences();const cached=(await store.getJobCache())[job.key];
+ await store.saveJobAiRankings([{key:job.key,inputRevision:analysisRevision(profile,preferences,cached),version:1,decision:'APPLY',fitScore:85}]);
+ await store.setPreferences({...preferences,agentEnabled:true,automaticAi:true});assert.equal((await store.getJobCache())[job.key].aiRanking.fitScore,85);
+ await store.setPreferences({...preferences,targetRoles:['Backend Developer']});assert.equal((await store.getJobCache())[job.key].aiRanking,undefined);
+});

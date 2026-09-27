@@ -1069,7 +1069,7 @@ async function load() {
   render();
   if (currentPreferences.agentEnabled && !agentRunning && !agentStopped && !agentError) {
     clearTimeout(agentTimer);
-    agentTimer = setTimeout(()=>runAgent(), 800);
+    agentTimer = setTimeout(()=>{if(currentPreferences.agentEnabled && !agentStopped) runAgent();}, 800);
   }
 }
 
@@ -1217,6 +1217,7 @@ els.aiRankBtn?.addEventListener('click', ()=>{agentStopped=false;agentError='';r
 document.querySelector('#agentStopBtn')?.addEventListener('click',()=>{agentStopped=true;els.aiRankStatus.textContent='Stopping after the current request…';});
 document.querySelector('#agentAuto')?.addEventListener('change',async event=>{
   const enabled=event.target.checked;
+  clearTimeout(agentTimer); agentStopped=!enabled;
   try {
     await setPreferences({...currentPreferences,agentEnabled:enabled,automaticAi:enabled});
     agentStopped=!enabled; agentError=''; await load();

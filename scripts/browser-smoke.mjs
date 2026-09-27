@@ -117,6 +117,25 @@ try {
  const detail = await page.evaluate(async()=>{const s=await import('../core/storage.js');const job=(await s.getJobCache())['indeed:agent-0'];return chrome.runtime.sendMessage({type:'jobpilot:inline-analyze',job,forceAi:true});});
  assert.equal(detail.ok,true);assert.equal(detail.aiStatus,'completed');assert.equal(detail.match.matchScore.score,94);assert.equal(detail.match.applyDecision.action,'APPLY');
  await page.locator('[data-mode="recommended"]').click();
+ // Stop finishes the in-flight batch; Run resumes only pending jobs.
+ await page.evaluate(async job=>{
+  const s=await import('../core/storage.js');
+  await s.persistPortalCapture({portal:'indeed',pageType:'listing',jobs:Array.from({length:4},(_,i)=>({...job,key:'indeed:resume-'+i,portalJobId:'resume-'+i,canonicalUrl:'https://in.indeed.com/viewjob?jk=resume-'+i,title:'Good Frontend '+i}))});
+ },captured);
+ await worker.evaluate(()=>{const original=globalThis.fetch;globalThis.fetch=async(...args)=>{if(!globalThis.agentGateUsed){globalThis.agentGateUsed=true;await new Promise(resolve=>{globalThis.releaseAgentGate=resolve;});}return original(...args);};});
+ await page.locator('#aiRankBtn').click();
+ await poll(()=>worker.evaluate(()=>Boolean(globalThis.releaseAgentGate)),'agent request started');
+ await page.locator('#agentStopBtn').click();await worker.evaluate(()=>globalThis.releaseAgentGate());
+ await poll(()=>page.locator('#aiRankStatus').innerText().then(text=>text.includes('Agent paused')),'agent stopped');
+ const countResumed=()=>page.evaluate(async()=>{const s=await import('../core/storage.js');return Object.values(await s.getJobCache()).filter(job=>job.key.startsWith('indeed:resume-') && job.aiRanking).length;});
+ assert.equal(await countResumed(),2);
+ await page.locator('#aiRankBtn').click();await poll(async()=>await countResumed()===4,'agent resumed');
+ // Agent mode also enables AI on detail pages; disabling it stops automatic work.
+ await page.locator('#agentAuto').check();
+ await poll(()=>page.evaluate(async()=>{const s=await import('../core/storage.js');const p=await s.getPreferences();return p.agentEnabled && p.automaticAi;}),'agent preference enabled');
+ await poll(async()=>await countResumed()===4,'automatic agent reanalysis');
+ await page.locator('#agentAuto').uncheck();
+ await poll(()=>page.evaluate(async()=>{const s=await import('../core/storage.js');const p=await s.getPreferences();return !p.agentEnabled && !p.automaticAi;}),'agent preference disabled');
  fs.mkdirSync('test-results',{recursive:true});await page.screenshot({path:'test-results/job-list.png',fullPage:true});
  assert.deepEqual(errors,[],'Browser JavaScript errors');
  console.log('PASS: AI agent shortlist ordering, evidence, review/skip filters and shared detail score with controlled provider responses; real extension startup without storage RPC, cross-context Web Lock saves, preference control, Indeed vjk capture, local match, concurrent storage, backup/undo, and pinned bridge transport. Provider authentication remains a live release gate.');

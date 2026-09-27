@@ -346,6 +346,10 @@ export async function analyzeJobWithAi(job, profile = null, preferences = null) 
     title: cleanAiString(safeJob.title, 300),
     company: cleanAiString(safeJob.company, 300),
     experienceText: cleanAiString(safeJob.experienceText, 300),
+    experienceMin: safeJob.experienceMin ?? null,
+    experienceMax: safeJob.experienceMax ?? null,
+    postedAge: safeJob.postedAge || "",
+    datePosted: safeJob.datePosted || "",
     location: cleanAiString(safeJob.location, 500),
     salaryText: cleanAiString(safeJob.salaryText, 300),
     skills: cleanAiList(safeJob.skills, 60, 140),
@@ -478,7 +482,7 @@ export async function analyzeJobBatchForCandidate(profile, preferences, jobs) {
   if (!inputJobs.length) return [];
   // Send relevant career information; omit contact details and raw resume text.
   const candidate = Object.fromEntries(['currentRole','headline','totalExperienceMonths','skills','workExperience','projects','education','certifications','resumeKeywords'].map(key => [key, profile?.[key]]));
-  const payload = inputJobs.map(job => Object.fromEntries(['key','title','company','description','snippet','skills','requiredSkills','preferredSkills','requirementStatements','preferredStatements','responsibilities','experienceText','location','salaryText','education','workMode','employmentType'].map(key => [key, key === 'description' ? String(job[key] || '').slice(0,16000) : job[key]])));
+  const payload = inputJobs.map(job => Object.fromEntries(['key','title','company','description','snippet','skills','requiredSkills','preferredSkills','requirementStatements','preferredStatements','responsibilities','experienceText','experienceMin','experienceMax','location','salaryText','education','workMode','employmentType','postedAge','datePosted'].map(key => [key, key === 'description' ? String(job[key] || '').slice(0,16000) : job[key]])));
   const prompt = [recommendationInstructions, 'Return ONLY JSON: {"results":[{"key":"exact input key","recommendation":{...}}]}. Every input key exactly once.', 'CANDIDATE:',JSON.stringify(candidate),'PREFERENCES:',JSON.stringify(preferences),'JOBS:',JSON.stringify(payload)].join('\n');
   const parsed = extractJson(responseText(await callPuterAi(prompt)));
   if (!Array.isArray(parsed.results)) throw new Error('AI returned no job recommendations. Retry.');
