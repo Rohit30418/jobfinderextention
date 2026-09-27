@@ -235,6 +235,7 @@ async function calculateInlineIntelligence(incomingJob, forceAi = false) {
     match: deepMatch,
     applied,
     aiStatus,
+    aiError: job.aiError || "",
     puterReady: Boolean(token && aiAuthorized)
   };
 }
