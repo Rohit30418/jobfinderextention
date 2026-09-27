@@ -197,19 +197,23 @@ function clearProfileForm() {
 
   els.experienceYears.value = "";
   els.experienceMonths.value = "";
+  originalProfile = null;
   profileSource = "manual";
   localProfileDraft = null;
   localProfileTextSnapshot = "";
 }
 
+let originalProfile = null;
+
 function fillProfile(profile) {
+  originalProfile = structuredClone(profile);
   const months = Math.max(0, Number(profile.totalExperienceMonths || 0));
 
   els.profileName.value = profile.name || "";
   els.profileHeadline.value = profile.headline || "";
   els.profileCurrentRole.value = profile.currentRole || "";
-  els.experienceYears.value = Math.floor(months / 12);
-  els.experienceMonths.value = months % 12;
+  els.experienceYears.value = profile.totalExperienceMonths == null ? "" : Math.floor(months / 12);
+  els.experienceMonths.value = profile.totalExperienceMonths == null ? "" : months % 12;
   els.profileSkills.value = listText(profile.skills);
   els.profileTargetRoles.value = listText(profile.targetRoles || profile.suggestedTargetRoles);
   els.profileKeywords.value = listText(profile.resumeKeywords);
@@ -281,6 +285,7 @@ function applyLocalProfileFromText(text, announce = false) {
 
 function formData() {
   return {
+    originalProfile,
     name: els.profileName.value,
     headline: els.profileHeadline.value,
     currentRole: els.profileCurrentRole.value,
@@ -308,7 +313,7 @@ function renderReview() {
   const items = [
     ["Name", profile.name || "Not provided", ""],
     ["Current role", profile.currentRole || "Not provided", ""],
-    ["Experience", experienceYears + "y " + experienceMonths + "m", ""],
+    ["Experience", profile.totalExperienceMonths == null ? "Unknown — please review" : experienceYears + "y " + experienceMonths + "m", ""],
     ["Headline", profile.headline || "Not provided", "wide"],
     ["Skills", profile.skills.join(", ") || "None added", "wide"],
     ["Target roles", profile.targetRoles.join(", ") || "None added", ""],

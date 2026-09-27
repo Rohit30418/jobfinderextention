@@ -1134,7 +1134,9 @@
       match.skills?.required?.evidence || {};
 
     const aiLabel =
-      result.aiStatus === "completed"
+      result.aiStatus === "unavailable"
+        ? "AI unavailable · local match shown"
+        : result.aiStatus === "completed"
         ? "Puter AI analyzed"
         : result.aiStatus === "cached"
           ? "Puter AI cached"
@@ -1389,7 +1391,8 @@
             source: "job-detail"
           });
 
-          if (!response?.ok) {
+          if (requestGeneration !== generation || requestUrl !== location.href) return;
+      if (!response?.ok) {
             throw new Error(
               response?.error || "Could not update applied status."
             );
@@ -1436,7 +1439,21 @@
     history.back();
   }
 
+  let retryAfter = 0;
+  let failures = 0;
+  let generation = 0;
+  let contentSignature = "";
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === "local" && (changes["jobpilot.stage1.state"] || changes["jobpilot.stage2.preferences"])) {
+      generation += 1;
+      latestStatus = "waiting";
+      latestResult = null;
+      retryAfter = 0;
+      failures = 0;
+    }
+  });
   async function analyzeCurrent(forceAi = false) {
+    if (!forceAi && Date.now() < retryAfter) return;
     if (running) return;
 
     const capture = captureCurrentDetail();
@@ -1466,6 +1483,10 @@
       job.canonicalUrl ||
       location.href;
 
+    const signature = JSON.stringify([job.title, job.description, job.requiredSkills, job.preferredSkills, job.experienceText]);
+    if (signature !== contentSignature) { latestStatus = "waiting"; contentSignature = signature; generation += 1; }
+    const requestGeneration = generation;
+    const requestUrl = location.href;
     if (
       !forceAi &&
       latestStatus === "ready" &&
@@ -1493,6 +1514,7 @@
         forceAi
       });
 
+      if (requestGeneration !== generation || requestUrl !== location.href) return;
       if (!response?.ok) {
         throw new Error(
           response?.error ||
@@ -1500,6 +1522,8 @@
         );
       }
 
+      failures = 0;
+      retryAfter = 0;
       latestResult = response;
       latestStatus = "ready";
       latestMessage = "";
@@ -1509,6 +1533,9 @@
         applyHighlights(response.match);
       }
     } catch (error) {
+      if (requestGeneration !== generation || requestUrl !== location.href) return;
+      failures += 1;
+      retryAfter = Date.now() + Math.min(300000, 15000 * 2 ** (failures - 1));
       latestStatus = "error";
       latestMessage =
         error?.message || String(error);
@@ -1520,6 +1547,9 @@
 
   function tick() {
     if (location.href !== currentUrl) {
+      generation += 1;
+      retryAfter = 0;
+      failures = 0;
       currentUrl = location.href;
       currentJobKey = "";
       latestResult = null;

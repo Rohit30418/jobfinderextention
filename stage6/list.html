@@ -106,6 +106,7 @@
           <div class="status" id="skillVaultStatus">0 saved</div>
           <button class="btn ghost" id="exportBackupBtn" type="button">Export Backup</button>
           <button class="btn ghost" id="importBackupBtn" type="button">Restore Backup</button>
+          <button class="btn ghost" id="undoImportBtn" type="button">Undo Last Restore</button>
           <input id="importBackupInput" type="file" accept="application/json,.json" hidden>
         </div>
       </div>
@@ -119,7 +120,8 @@
       <div id="skillVaultList" class="skill-vault-list"></div>
 
       <div class="profile-guidance">
-        <strong>Persistent behavior:</strong>
+        <strong>Backups:</strong> include your profile, resume text, jobs and skill history; the original uploaded resume file and Puter sign-in are excluded. Keep your original file separately.
+        <br><strong>Persistent behavior:</strong>
         removing a skill from My Skills does not erase its history. If jobs still require it, JobPilot moves it back to Missing.
       </div>
     </section>

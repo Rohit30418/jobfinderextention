@@ -1,3 +1,6 @@
+import { analysisRevision } from "./analysis-inputs.js";
+import "./portal-engine.js";
+import { validateBackup } from "./backup-validator.js";
 export const STATE_KEY = "jobpilot.stage1.state";
 export const PUTER_TOKEN_KEY = "jobpilot.puter.token";
 export const PUTER_AI_AUTH_KEY = "jobpilot.puter.ai.authorized";
@@ -23,12 +26,12 @@ export function emptyState() {
   };
 }
 
-export async function getState() {
+async function _getState() {
   const result = await chrome.storage.local.get(STATE_KEY);
   return result[STATE_KEY] || emptyState();
 }
 
-export async function setState(state) {
+async function _setState(state) {
   const next = {
     ...emptyState(),
     ...state,
@@ -36,33 +39,35 @@ export async function setState(state) {
     updatedAt: new Date().toISOString()
   };
   await chrome.storage.local.set({ [STATE_KEY]: next });
+  await invalidateMatches();
   return next;
 }
 
-export async function clearState() {
-  await chrome.storage.local.remove(STATE_KEY);
+async function _clearState() {
+  await chrome.storage.local.remove([STATE_KEY, "jobpilot.backup.beforeImport"]);
+  await invalidateMatches();
 }
 
-export async function getPuterToken() {
-  const result = await chrome.storage.local.get(PUTER_TOKEN_KEY);
+async function _getPuterToken() {
+  const result = await chrome.storage.session.get(PUTER_TOKEN_KEY);
   return result[PUTER_TOKEN_KEY] || "";
 }
 
-export async function setPuterToken(token) {
-  await chrome.storage.local.set({ [PUTER_TOKEN_KEY]: token || "" });
+async function _setPuterToken(token) {
+  await chrome.storage.session.set({ [PUTER_TOKEN_KEY]: token || "" });
 }
 
-export async function clearPuterToken() {
-  await chrome.storage.local.remove([PUTER_TOKEN_KEY, PUTER_AI_AUTH_KEY]);
+async function _clearPuterToken() {
+  await chrome.storage.session.remove([PUTER_TOKEN_KEY, PUTER_AI_AUTH_KEY]);
 }
 
-export async function getAiAuthorized() {
-  const result = await chrome.storage.local.get(PUTER_AI_AUTH_KEY);
+async function _getAiAuthorized() {
+  const result = await chrome.storage.session.get(PUTER_AI_AUTH_KEY);
   return result[PUTER_AI_AUTH_KEY] === true;
 }
 
-export async function setAiAuthorized(value) {
-  await chrome.storage.local.set({ [PUTER_AI_AUTH_KEY]: value === true });
+async function _setAiAuthorized(value) {
+  await chrome.storage.session.set({ [PUTER_AI_AUTH_KEY]: value === true });
 }
 
 
@@ -87,12 +92,12 @@ export function emptyPreferences() {
   };
 }
 
-export async function getPreferences() {
+async function _getPreferences() {
   const result = await chrome.storage.local.get(PREFERENCES_KEY);
   return result[PREFERENCES_KEY] || emptyPreferences();
 }
 
-export async function setPreferences(preferences) {
+async function _setPreferences(preferences) {
   const next = {
     ...emptyPreferences(),
     ...preferences,
@@ -100,11 +105,13 @@ export async function setPreferences(preferences) {
     updatedAt: new Date().toISOString()
   };
   await chrome.storage.local.set({ [PREFERENCES_KEY]: next });
+  await invalidateMatches();
   return next;
 }
 
-export async function clearPreferences() {
+async function _clearPreferences() {
   await chrome.storage.local.remove(PREFERENCES_KEY);
+  await invalidateMatches();
 }
 
 
@@ -129,12 +136,12 @@ export function emptyUniversalSearch() {
   };
 }
 
-export async function getUniversalSearch() {
+async function _getUniversalSearch() {
   const result = await chrome.storage.local.get(UNIVERSAL_SEARCH_KEY);
   return result[UNIVERSAL_SEARCH_KEY] || emptyUniversalSearch();
 }
 
-export async function setUniversalSearch(search) {
+async function _setUniversalSearch(search) {
   const next = {
     ...emptyUniversalSearch(),
     ...search,
@@ -149,7 +156,7 @@ export async function setUniversalSearch(search) {
   return next;
 }
 
-export async function clearUniversalSearch() {
+async function _clearUniversalSearch() {
   await chrome.storage.local.remove(UNIVERSAL_SEARCH_KEY);
 }
 
@@ -169,12 +176,12 @@ export function emptyNaukriSearch() {
   };
 }
 
-export async function getNaukriSearch() {
+async function _getNaukriSearch() {
   const result = await chrome.storage.local.get(NAUKRI_SEARCH_KEY);
   return result[NAUKRI_SEARCH_KEY] || emptyNaukriSearch();
 }
 
-export async function setNaukriSearch(search) {
+async function _setNaukriSearch(search) {
   const next = {
     ...emptyNaukriSearch(),
     ...search,
@@ -185,7 +192,7 @@ export async function setNaukriSearch(search) {
   return next;
 }
 
-export async function clearNaukriSearch() {
+async function _clearNaukriSearch() {
   await chrome.storage.local.remove(NAUKRI_SEARCH_KEY);
 }
 
@@ -202,12 +209,12 @@ export function emptyNaukriNativeFilters() {
   };
 }
 
-export async function getNaukriNativeFilters() {
+async function _getNaukriNativeFilters() {
   const result = await chrome.storage.local.get(NAUKRI_NATIVE_FILTERS_KEY);
   return result[NAUKRI_NATIVE_FILTERS_KEY] || emptyNaukriNativeFilters();
 }
 
-export async function setNaukriNativeFilters(filters) {
+async function _setNaukriNativeFilters(filters) {
   const next = {
     ...emptyNaukriNativeFilters(),
     ...filters,
@@ -218,7 +225,7 @@ export async function setNaukriNativeFilters(filters) {
   return next;
 }
 
-export async function clearNaukriNativeFilters() {
+async function _clearNaukriNativeFilters() {
   await chrome.storage.local.remove(NAUKRI_NATIVE_FILTERS_KEY);
 }
 
@@ -241,12 +248,12 @@ export function emptyNaukriExtraction() {
   };
 }
 
-export async function getNaukriExtraction() {
+async function _getNaukriExtraction() {
   const result = await chrome.storage.local.get(NAUKRI_EXTRACTION_KEY);
   return result[NAUKRI_EXTRACTION_KEY] || emptyNaukriExtraction();
 }
 
-export async function setNaukriExtraction(extraction) {
+async function _setNaukriExtraction(extraction) {
   const next = {
     ...emptyNaukriExtraction(),
     ...extraction,
@@ -257,7 +264,7 @@ export async function setNaukriExtraction(extraction) {
   return next;
 }
 
-export async function clearNaukriExtraction() {
+async function _clearNaukriExtraction() {
   await chrome.storage.local.remove(NAUKRI_EXTRACTION_KEY);
 }
 
@@ -284,12 +291,12 @@ export function emptyPortalCapture() {
   };
 }
 
-export async function getPortalCapture() {
+async function _getPortalCapture() {
   const result = await chrome.storage.local.get(PORTAL_CAPTURE_KEY);
   return result[PORTAL_CAPTURE_KEY] || emptyPortalCapture();
 }
 
-export async function setPortalCapture(capture) {
+async function _setPortalCapture(capture) {
   const next = {
     ...emptyPortalCapture(),
     ...capture,
@@ -300,49 +307,33 @@ export async function setPortalCapture(capture) {
   return next;
 }
 
-export async function clearPortalCapture() {
+async function _clearPortalCapture() {
   await chrome.storage.local.remove(PORTAL_CAPTURE_KEY);
 }
 
-export async function getJobCache() {
+async function _getJobCache() {
   const result = await chrome.storage.local.get(JOB_CACHE_KEY);
   const value = result[JOB_CACHE_KEY];
-  return value && typeof value === "object" ? value : {};
+  const cache = value && typeof value === "object" ? value : {};
+  const state = await _getState();
+  const preferences = await _getPreferences();
+  for (const job of Object.values(cache)) {
+    const revision = analysisRevision(state.profile, preferences, job);
+    for (const field of ["aiAnalysis", "aiRanking", "deepMatch"]) {
+      if (job?.[field]?.inputRevision !== revision) delete job[field];
+    }
+  }
+  return cache;
 }
 
-export async function clearJobCache() {
+async function _clearJobCache() {
   await chrome.storage.local.remove(JOB_CACHE_KEY);
 }
 
 
-function sameStoredJob(a, b) {
-  if (!a || !b) return false;
+function sameStoredJob(a, b) { return globalThis.JobPilotPortalEngine.sameJob(a, b); }
 
-  if (a.key && b.key && a.key === b.key) {
-    return true;
-  }
-
-  if (
-    a.portalJobId &&
-    b.portalJobId &&
-    String(a.portalJobId) === String(b.portalJobId)
-  ) {
-    return true;
-  }
-
-  const normalizeUrl = (value) =>
-    String(value || "")
-      .split("?")[0]
-      .replace(/\/+$/, "")
-      .toLowerCase();
-
-  const aUrl = normalizeUrl(a.canonicalUrl);
-  const bUrl = normalizeUrl(b.canonicalUrl);
-
-  return Boolean(aUrl && bUrl && aUrl === bUrl);
-}
-
-export async function saveJobAiAnalysis(jobKey, analysis) {
+async function _saveJobAiAnalysis(jobKey, analysis) {
   const result = await chrome.storage.local.get([
     JOB_CACHE_KEY,
     PORTAL_CAPTURE_KEY
@@ -367,29 +358,15 @@ export async function saveJobAiAnalysis(jobKey, analysis) {
 
   let cacheKey = requestedKey;
 
-  if (!cache[cacheKey] && detail) {
-    const detailUrl = String(detail.canonicalUrl || "").split("?")[0].replace(/\/+$/, "");
-    const detailId = String(detail.portalJobId || "");
+  if (!cache[cacheKey] && detail?.key === requestedKey) {
+    cache[cacheKey] = detail;
+  }
 
-    for (const [key, item] of Object.entries(cache)) {
-      if (!item || item.portal !== detail.portal) continue;
-
-      const sameId =
-        detailId &&
-        item.portalJobId &&
-        String(item.portalJobId) === detailId;
-
-      const itemUrl = String(item.canonicalUrl || "").split("?")[0].replace(/\/+$/, "");
-      const sameUrl =
-        detailUrl &&
-        itemUrl &&
-        itemUrl.toLowerCase() === detailUrl.toLowerCase();
-
-      if (sameId || sameUrl) {
-        cacheKey = key;
-        break;
-      }
-    }
+  if (analysis?.inputRevision) {
+    const state = await _getState();
+    const preferences = await _getPreferences();
+    const target = cache[cacheKey];
+    if (!target || analysis.inputRevision !== analysisRevision(state.profile, preferences, target)) return null;
   }
 
   const analyzedAt =
@@ -425,11 +402,11 @@ export async function saveJobAiAnalysis(jobKey, analysis) {
     [PORTAL_CAPTURE_KEY]: capture
   });
 
-  return capture.detail || cache[cacheKey] || null;
+  return cache[cacheKey] || (detail?.key === requestedKey ? capture.detail : null);
 }
 
 
-export async function saveJobDeepMatch(jobKey, deepMatch) {
+async function _saveJobDeepMatch(jobKey, deepMatch) {
   const result = await chrome.storage.local.get([
     JOB_CACHE_KEY,
     PORTAL_CAPTURE_KEY
@@ -454,34 +431,15 @@ export async function saveJobDeepMatch(jobKey, deepMatch) {
 
   let cacheKey = requestedKey;
 
-  if (!cache[cacheKey] && detail) {
-    const detailUrl = String(detail.canonicalUrl || "")
-      .split("?")[0]
-      .replace(/\/+$/, "");
-    const detailId = String(detail.portalJobId || "");
+  if (!cache[cacheKey] && detail?.key === requestedKey) {
+    cache[cacheKey] = detail;
+  }
 
-    for (const [key, item] of Object.entries(cache)) {
-      if (!item || item.portal !== detail.portal) continue;
-
-      const sameId =
-        detailId &&
-        item.portalJobId &&
-        String(item.portalJobId) === detailId;
-
-      const itemUrl = String(item.canonicalUrl || "")
-        .split("?")[0]
-        .replace(/\/+$/, "");
-
-      const sameUrl =
-        detailUrl &&
-        itemUrl &&
-        itemUrl.toLowerCase() === detailUrl.toLowerCase();
-
-      if (sameId || sameUrl) {
-        cacheKey = key;
-        break;
-      }
-    }
+  if (deepMatch?.inputRevision) {
+    const state = await _getState();
+    const preferences = await _getPreferences();
+    const target = cache[cacheKey];
+    if (!target || deepMatch.inputRevision !== analysisRevision(state.profile, preferences, target)) return null;
   }
 
   const evaluatedAt =
@@ -526,20 +484,20 @@ export async function saveJobDeepMatch(jobKey, deepMatch) {
     );
 
   if (gapJob && deepMatch) {
-    await saveGapSnapshot(
+    await _saveGapSnapshot(
       cacheKey || requestedKey,
       gapJob,
       deepMatch
     );
 
-    await saveMissingSkillsToVault(
+    await _saveMissingSkillsToVault(
       cacheKey || requestedKey,
       gapJob,
       deepMatch
     );
   }
 
-  return capture.detail || cache[cacheKey] || null;
+  return cache[cacheKey] || (detail?.key === requestedKey ? capture.detail : null);
 }
 
 
@@ -567,12 +525,12 @@ export function emptyListingContexts() {
   };
 }
 
-export async function getListingContext() {
+async function _getListingContext() {
   const result = await chrome.storage.local.get(LISTING_CONTEXT_KEY);
   return result[LISTING_CONTEXT_KEY] || emptyListingContext();
 }
 
-export async function getListingContexts() {
+async function _getListingContexts() {
   const result = await chrome.storage.local.get(LISTING_CONTEXTS_KEY);
   const value = result[LISTING_CONTEXTS_KEY];
 
@@ -588,7 +546,7 @@ export async function getListingContexts() {
     : emptyListingContexts();
 }
 
-export async function setListingContext(context) {
+async function _setListingContext(context) {
   const next = {
     ...emptyListingContext(),
     ...context,
@@ -596,7 +554,7 @@ export async function setListingContext(context) {
     capturedAt: new Date().toISOString()
   };
 
-  const contexts = await getListingContexts();
+  const contexts = await _getListingContexts();
   const portalKey = String(next.portal || "unknown").trim() || "unknown";
 
   const nextContexts = {
@@ -617,7 +575,7 @@ export async function setListingContext(context) {
   return next;
 }
 
-export async function clearListingContext() {
+async function _clearListingContext() {
   await chrome.storage.local.remove([
     LISTING_CONTEXT_KEY,
     LISTING_CONTEXTS_KEY
@@ -657,7 +615,7 @@ function gapRecordKey(jobKey, job) {
   return String(job?.canonicalUrl || job?.title || Date.now());
 }
 
-export async function saveGapSnapshot(jobKey, job, deepMatch) {
+async function _saveGapSnapshot(jobKey, job, deepMatch) {
   if (!deepMatch || !job) return null;
 
   const result = await chrome.storage.local.get(GAP_HISTORY_KEY);
@@ -729,18 +687,18 @@ export async function saveGapSnapshot(jobKey, job, deepMatch) {
   return compact[key] || history[key];
 }
 
-export async function getGapHistory() {
+async function _getGapHistory() {
   const result = await chrome.storage.local.get(GAP_HISTORY_KEY);
   const value = result[GAP_HISTORY_KEY];
   return value && typeof value === "object" ? value : {};
 }
 
-export async function getGapInsights(days = 7) {
+async function _getGapInsights(days = 7) {
   const rangeDays = Math.max(1, Number(days) || 7);
 
   const [history, cache] = await Promise.all([
-    getGapHistory(),
-    getJobCache()
+    _getGapHistory(),
+    _getJobCache()
   ]);
 
   const cutoff =
@@ -870,12 +828,12 @@ export async function getGapInsights(days = 7) {
   };
 }
 
-export async function clearGapHistory() {
+async function _clearGapHistory() {
   await chrome.storage.local.remove(GAP_HISTORY_KEY);
 }
 
 
-export async function saveJobAiRankings(rankings) {
+async function _saveJobAiRankings(rankings) {
   const rows = Array.isArray(rankings) ? rankings : [];
   const result = await chrome.storage.local.get(JOB_CACHE_KEY);
   const cache =
@@ -886,6 +844,9 @@ export async function saveJobAiRankings(rankings) {
   for (const row of rows) {
     const key = String(row?.key || "").trim();
     if (!key || !cache[key]) continue;
+    const state = await _getState();
+    const preferences = await _getPreferences();
+    if (row.inputRevision !== analysisRevision(state.profile, preferences, cache[key])) continue;
 
     cache[key] = {
       ...cache[key],
@@ -966,26 +927,29 @@ async function persistSkillVault(vault) {
     [SKILL_VAULT_KEY]: compact
   });
 
+  // A compact portable mirror fits Chrome's per-item quota; full evidence stays local.
+  const mirror = { version: 2, items: Object.values(compact.items).map(item => [item.skill.slice(0, 100), item.status, item.kind]) };
+  compact.syncStatus = "local-only";
   try {
-    await chrome.storage.sync.set({
-      [SKILL_VAULT_KEY]: compact
-    });
-  } catch (_) {
-    // Chrome Sync may be unavailable or quota-limited.
-    // Local storage remains authoritative.
+    if (new TextEncoder().encode(JSON.stringify(mirror)).length > 7800) throw new Error("Sync copy is too large; export a backup to transfer all skills.");
+    await chrome.storage.sync.set({ [SKILL_VAULT_KEY]: mirror });
+    compact.syncStatus = "synced";
+  } catch (error) {
+    compact.syncError = error?.message || "Chrome Sync is unavailable.";
   }
+  await chrome.storage.local.set({ [SKILL_VAULT_KEY]: compact });
 
   return compact;
 }
 
-export async function getSkillVault() {
+async function _getSkillVault() {
   const localResult = await chrome.storage.local.get(SKILL_VAULT_KEY);
   const localValue = localResult[SKILL_VAULT_KEY];
 
   if (
     localValue &&
     typeof localValue === "object" &&
-    Object.keys(localValue.items || {}).length
+    localValue.items && typeof localValue.items === "object"
   ) {
     return {
       ...emptySkillVault(),
@@ -1002,7 +966,9 @@ export async function getSkillVault() {
       const restored = {
         ...emptySkillVault(),
         ...syncValue,
-        items: syncValue.items || {}
+        items: syncValue.version === 2 && Array.isArray(syncValue.items)
+          ? Object.fromEntries(syncValue.items.map(([skill, status, kind]) => [skillVaultKey(skill), { skill, status, kind, sourceKeys: [], portals: [] }]))
+          : syncValue.items || {}
       };
 
       await chrome.storage.local.set({
@@ -1016,10 +982,10 @@ export async function getSkillVault() {
   return emptySkillVault();
 }
 
-export async function saveMissingSkillsToVault(jobKey, job, deepMatch) {
+async function _saveMissingSkillsToVault(jobKey, job, deepMatch) {
   if (!deepMatch) return null;
 
-  const vault = await getSkillVault();
+  const vault = await _getSkillVault();
   const now = new Date().toISOString();
   const portal = String(job?.portal || deepMatch?.portal || "");
   const sourceKey = String(
@@ -1082,13 +1048,13 @@ export async function saveMissingSkillsToVault(jobKey, job, deepMatch) {
   return persistSkillVault(vault);
 }
 
-export async function addSkillToProfile(skill) {
+async function _addSkillToProfile(skill) {
   const value = String(skill || "").trim().replace(/\s+/g, " ");
   if (!value) throw new Error("Skill is required.");
 
   const [state, vault] = await Promise.all([
-    getState(),
-    getSkillVault()
+    _getState(),
+    _getSkillVault()
   ]);
 
   if (!state?.profile) {
@@ -1108,7 +1074,7 @@ export async function addSkillToProfile(skill) {
     }
   };
 
-  await setState(nextState);
+  await _setState(nextState);
 
   const key = skillVaultKey(value);
   const previous = vault.items[key] || {};
@@ -1132,13 +1098,13 @@ export async function addSkillToProfile(skill) {
   return nextState.profile;
 }
 
-export async function removeSkillFromProfile(skill) {
+async function _removeSkillFromProfile(skill) {
   const value = String(skill || "").trim().replace(/\s+/g, " ");
   if (!value) throw new Error("Skill is required.");
 
   const [state, vault] = await Promise.all([
-    getState(),
-    getSkillVault()
+    _getState(),
+    _getSkillVault()
   ]);
 
   if (!state?.profile) {
@@ -1159,7 +1125,7 @@ export async function removeSkillFromProfile(skill) {
     }
   };
 
-  await setState(nextState);
+  await _setState(nextState);
 
   const previous = vault.items[key] || {};
   const now = new Date().toISOString();
@@ -1188,12 +1154,12 @@ export async function removeSkillFromProfile(skill) {
   return nextState.profile;
 }
 
-export async function dismissSkillFromVault(skill) {
+async function _dismissSkillFromVault(skill) {
   const value = String(skill || "").trim().replace(/\s+/g, " ");
   const key = skillVaultKey(value);
   if (!key) throw new Error("Skill is required.");
 
-  const vault = await getSkillVault();
+  const vault = await _getSkillVault();
   const previous = vault.items[key] || {};
   const now = new Date().toISOString();
 
@@ -1214,12 +1180,12 @@ export async function dismissSkillFromVault(skill) {
   return persistSkillVault(vault);
 }
 
-export async function restoreSkillInVault(skill) {
+async function _restoreSkillInVault(skill) {
   const value = String(skill || "").trim().replace(/\s+/g, " ");
   const key = skillVaultKey(value);
   if (!key) throw new Error("Skill is required.");
 
-  const vault = await getSkillVault();
+  const vault = await _getSkillVault();
   const previous = vault.items[key] || {};
   const now = new Date().toISOString();
 
@@ -1256,7 +1222,7 @@ const JOBPILOT_BACKUP_KEYS = [
   APPLIED_JOBS_KEY
 ];
 
-export async function exportJobPilotBackup() {
+async function _exportJobPilotBackup() {
   const data = await chrome.storage.local.get(JOBPILOT_BACKUP_KEYS);
 
   return {
@@ -1267,7 +1233,7 @@ export async function exportJobPilotBackup() {
   };
 }
 
-export async function importJobPilotBackup(payload) {
+async function _importJobPilotBackup(payload) {
   if (
     !payload ||
     payload.type !== "jobpilot-backup" ||
@@ -1277,6 +1243,7 @@ export async function importJobPilotBackup(payload) {
     throw new Error("This is not a valid JobPilot backup.");
   }
 
+  validateBackup(payload);
   const allowed = {};
   for (const key of JOBPILOT_BACKUP_KEYS) {
     if (Object.prototype.hasOwnProperty.call(payload.data, key)) {
@@ -1288,15 +1255,12 @@ export async function importJobPilotBackup(payload) {
     throw new Error("The backup does not contain restorable JobPilot data.");
   }
 
+  const previous = await chrome.storage.local.get(JOBPILOT_BACKUP_KEYS);
+  await chrome.storage.local.set({ "jobpilot.backup.beforeImport": previous });
   await chrome.storage.local.set(allowed);
+  await invalidateMatches();
 
-  if (allowed[SKILL_VAULT_KEY]) {
-    try {
-      await chrome.storage.sync.set({
-        [SKILL_VAULT_KEY]: compactSkillVault(allowed[SKILL_VAULT_KEY])
-      });
-    } catch (_) {}
-  }
+  if (allowed[SKILL_VAULT_KEY]) await persistSkillVault(allowed[SKILL_VAULT_KEY]);
 
   return true;
 }
@@ -1331,7 +1295,7 @@ function appliedJobKey(job) {
   ].join("::").toLowerCase();
 }
 
-export async function getAppliedJobs() {
+async function _getAppliedJobs() {
   const result = await chrome.storage.local.get(APPLIED_JOBS_KEY);
   const value = result[APPLIED_JOBS_KEY];
 
@@ -1347,12 +1311,12 @@ export async function getAppliedJobs() {
     : emptyAppliedJobs();
 }
 
-export async function markJobApplied(job, options = {}) {
+async function _markJobApplied(job, options = {}) {
   if (!job) {
     throw new Error("Job data is required.");
   }
 
-  const store = await getAppliedJobs();
+  const store = await _getAppliedJobs();
   const key = appliedJobKey(job);
   const now = new Date().toISOString();
   const previous = store.items[key] || null;
@@ -1411,8 +1375,8 @@ export async function markJobApplied(job, options = {}) {
   return store.items[key];
 }
 
-export async function unmarkJobApplied(jobOrKey) {
-  const store = await getAppliedJobs();
+async function _unmarkJobApplied(jobOrKey) {
+  const store = await _getAppliedJobs();
 
   const key =
     typeof jobOrKey === "string"
@@ -1433,14 +1397,14 @@ export async function unmarkJobApplied(jobOrKey) {
   return true;
 }
 
-export async function isJobApplied(job) {
-  const store = await getAppliedJobs();
+async function _isJobApplied(job) {
+  const store = await _getAppliedJobs();
   const key = appliedJobKey(job);
   return Boolean(key && store.items[key]);
 }
 
-export async function updateAppliedJobNote(jobOrKey, note) {
-  const store = await getAppliedJobs();
+async function _updateAppliedJobNote(jobOrKey, note) {
+  const store = await _getAppliedJobs();
 
   const key =
     typeof jobOrKey === "string"
@@ -1466,8 +1430,8 @@ export async function updateAppliedJobNote(jobOrKey, note) {
   return store.items[key];
 }
 
-export async function exportAppliedJobsData() {
-  const store = await getAppliedJobs();
+async function _exportAppliedJobsData() {
+  const store = await _getAppliedJobs();
 
   return Object.values(store.items || {})
     .filter((item) => item?.status === "applied")
@@ -1477,3 +1441,184 @@ export async function exportAppliedJobsData() {
       )
     );
 }
+
+async function invalidateMatches() {
+  const result = await chrome.storage.local.get([JOB_CACHE_KEY, PORTAL_CAPTURE_KEY, LISTING_CONTEXTS_KEY, LISTING_CONTEXT_KEY]);
+  const clear = job => {
+    if (!job) return;
+    for (const key of ["aiAnalysis", "aiRanking", "deepMatch", "aiAnalyzedAt", "aiRankedAt", "deepMatchedAt"]) delete job[key];
+  };
+  Object.values(result[JOB_CACHE_KEY] || {}).forEach(clear);
+  clear(result[PORTAL_CAPTURE_KEY]?.detail);
+  (result[PORTAL_CAPTURE_KEY]?.jobs || []).forEach(clear);
+  (result[LISTING_CONTEXT_KEY]?.jobs || []).forEach(clear);
+  Object.values(result[LISTING_CONTEXTS_KEY]?.portals || {}).forEach(context => (context.jobs || []).forEach(clear));
+  await chrome.storage.local.set(result);
+}
+
+async function _toggleJobApplied(job, options = {}) {
+  if (await _isJobApplied(job)) {
+    await _unmarkJobApplied(job);
+    return { applied: false };
+  }
+  return { applied: true, record: await _markJobApplied(job, options) };
+}
+
+async function _persistPortalCapture(data) {
+  if (!data || typeof data !== "object" || !Array.isArray(data.jobs) || data.jobs.length > 500) throw new Error("Invalid portal capture.");
+  const cache = await _getJobCache();
+  const engine = globalThis.JobPilotPortalEngine;
+  for (const job of [...data.jobs, ...(data.detail ? [data.detail] : [])]) {
+    if (!job?.key || typeof job.key !== "string" || ["__proto__", "constructor", "prototype"].includes(job.key)) continue;
+    const key = Object.keys(cache).find(key => engine.sameJob(cache[key], job)) || job.key;
+    cache[key] = { ...engine.mergeJob(cache[key], job), key };
+    if (job === data.detail) data.detail = cache[key];
+  }
+  const compact = Object.fromEntries(Object.entries(cache).sort((a,b) => String(b[1]?.capturedAt || "").localeCompare(String(a[1]?.capturedAt || ""))).slice(0, 1000));
+  await chrome.storage.local.set({ [JOB_CACHE_KEY]: compact });
+  await _setPortalCapture(data);
+  if (data.pageType === "listing") await _setListingContext(data);
+  return true;
+}
+
+const operations = {
+  getState: _getState,
+  setState: _setState,
+  clearState: _clearState,
+  getPuterToken: _getPuterToken,
+  setPuterToken: _setPuterToken,
+  clearPuterToken: _clearPuterToken,
+  getAiAuthorized: _getAiAuthorized,
+  setAiAuthorized: _setAiAuthorized,
+  getPreferences: _getPreferences,
+  setPreferences: _setPreferences,
+  clearPreferences: _clearPreferences,
+  getUniversalSearch: _getUniversalSearch,
+  setUniversalSearch: _setUniversalSearch,
+  clearUniversalSearch: _clearUniversalSearch,
+  getNaukriSearch: _getNaukriSearch,
+  setNaukriSearch: _setNaukriSearch,
+  clearNaukriSearch: _clearNaukriSearch,
+  getNaukriNativeFilters: _getNaukriNativeFilters,
+  setNaukriNativeFilters: _setNaukriNativeFilters,
+  clearNaukriNativeFilters: _clearNaukriNativeFilters,
+  getNaukriExtraction: _getNaukriExtraction,
+  setNaukriExtraction: _setNaukriExtraction,
+  clearNaukriExtraction: _clearNaukriExtraction,
+  getPortalCapture: _getPortalCapture,
+  setPortalCapture: _setPortalCapture,
+  clearPortalCapture: _clearPortalCapture,
+  getJobCache: _getJobCache,
+  clearJobCache: _clearJobCache,
+  saveJobAiAnalysis: _saveJobAiAnalysis,
+  saveJobDeepMatch: _saveJobDeepMatch,
+  getListingContext: _getListingContext,
+  getListingContexts: _getListingContexts,
+  setListingContext: _setListingContext,
+  clearListingContext: _clearListingContext,
+  saveGapSnapshot: _saveGapSnapshot,
+  getGapHistory: _getGapHistory,
+  getGapInsights: _getGapInsights,
+  clearGapHistory: _clearGapHistory,
+  saveJobAiRankings: _saveJobAiRankings,
+  getSkillVault: _getSkillVault,
+  saveMissingSkillsToVault: _saveMissingSkillsToVault,
+  addSkillToProfile: _addSkillToProfile,
+  removeSkillFromProfile: _removeSkillFromProfile,
+  dismissSkillFromVault: _dismissSkillFromVault,
+  restoreSkillInVault: _restoreSkillInVault,
+  exportJobPilotBackup: _exportJobPilotBackup,
+  importJobPilotBackup: _importJobPilotBackup,
+  getAppliedJobs: _getAppliedJobs,
+  markJobApplied: _markJobApplied,
+  unmarkJobApplied: _unmarkJobApplied,
+  isJobApplied: _isJobApplied,
+  updateAppliedJobNote: _updateAppliedJobNote,
+  exportAppliedJobsData: _exportAppliedJobsData,
+  toggleJobApplied: _toggleJobApplied,
+  persistPortalCapture: _persistPortalCapture
+};
+let queue = Promise.resolve();
+export function runStorageOperation(name, args = []) {
+  if (!Object.hasOwn(operations, name) || !Array.isArray(args)) return Promise.reject(new Error("Unknown storage operation."));
+  const next = queue.then(() => operations[name](...args));
+  queue = next.catch(() => {});
+  return next;
+}
+async function dispatch(name, args) {
+  if (typeof document === "undefined") return runStorageOperation(name, args);
+  const response = await chrome.runtime.sendMessage({ type: "jobpilot:storage", name, args });
+  if (!response?.ok) throw new Error(response?.error || "JobPilot storage is unavailable. Reload the extension.");
+  return response.value;
+}
+export const getState = (...args) => dispatch("getState", args);
+export const setState = (...args) => dispatch("setState", args);
+export const clearState = (...args) => dispatch("clearState", args);
+export const getPuterToken = (...args) => dispatch("getPuterToken", args);
+export const setPuterToken = (...args) => dispatch("setPuterToken", args);
+export const clearPuterToken = (...args) => dispatch("clearPuterToken", args);
+export const getAiAuthorized = (...args) => dispatch("getAiAuthorized", args);
+export const setAiAuthorized = (...args) => dispatch("setAiAuthorized", args);
+export const getPreferences = (...args) => dispatch("getPreferences", args);
+export const setPreferences = (...args) => dispatch("setPreferences", args);
+export const clearPreferences = (...args) => dispatch("clearPreferences", args);
+export const getUniversalSearch = (...args) => dispatch("getUniversalSearch", args);
+export const setUniversalSearch = (...args) => dispatch("setUniversalSearch", args);
+export const clearUniversalSearch = (...args) => dispatch("clearUniversalSearch", args);
+export const getNaukriSearch = (...args) => dispatch("getNaukriSearch", args);
+export const setNaukriSearch = (...args) => dispatch("setNaukriSearch", args);
+export const clearNaukriSearch = (...args) => dispatch("clearNaukriSearch", args);
+export const getNaukriNativeFilters = (...args) => dispatch("getNaukriNativeFilters", args);
+export const setNaukriNativeFilters = (...args) => dispatch("setNaukriNativeFilters", args);
+export const clearNaukriNativeFilters = (...args) => dispatch("clearNaukriNativeFilters", args);
+export const getNaukriExtraction = (...args) => dispatch("getNaukriExtraction", args);
+export const setNaukriExtraction = (...args) => dispatch("setNaukriExtraction", args);
+export const clearNaukriExtraction = (...args) => dispatch("clearNaukriExtraction", args);
+export const getPortalCapture = (...args) => dispatch("getPortalCapture", args);
+export const setPortalCapture = (...args) => dispatch("setPortalCapture", args);
+export const clearPortalCapture = (...args) => dispatch("clearPortalCapture", args);
+export const getJobCache = (...args) => dispatch("getJobCache", args);
+export const clearJobCache = (...args) => dispatch("clearJobCache", args);
+export const saveJobAiAnalysis = (...args) => dispatch("saveJobAiAnalysis", args);
+export const saveJobDeepMatch = (...args) => dispatch("saveJobDeepMatch", args);
+export const getListingContext = (...args) => dispatch("getListingContext", args);
+export const getListingContexts = (...args) => dispatch("getListingContexts", args);
+export const setListingContext = (...args) => dispatch("setListingContext", args);
+export const clearListingContext = (...args) => dispatch("clearListingContext", args);
+export const saveGapSnapshot = (...args) => dispatch("saveGapSnapshot", args);
+export const getGapHistory = (...args) => dispatch("getGapHistory", args);
+export const getGapInsights = (...args) => dispatch("getGapInsights", args);
+export const clearGapHistory = (...args) => dispatch("clearGapHistory", args);
+export const saveJobAiRankings = (...args) => dispatch("saveJobAiRankings", args);
+export const getSkillVault = (...args) => dispatch("getSkillVault", args);
+export const saveMissingSkillsToVault = (...args) => dispatch("saveMissingSkillsToVault", args);
+export const addSkillToProfile = (...args) => dispatch("addSkillToProfile", args);
+export const removeSkillFromProfile = (...args) => dispatch("removeSkillFromProfile", args);
+export const dismissSkillFromVault = (...args) => dispatch("dismissSkillFromVault", args);
+export const restoreSkillInVault = (...args) => dispatch("restoreSkillInVault", args);
+export const exportJobPilotBackup = (...args) => dispatch("exportJobPilotBackup", args);
+export const importJobPilotBackup = (...args) => dispatch("importJobPilotBackup", args);
+export const getAppliedJobs = (...args) => dispatch("getAppliedJobs", args);
+export const markJobApplied = (...args) => dispatch("markJobApplied", args);
+export const unmarkJobApplied = (...args) => dispatch("unmarkJobApplied", args);
+export const isJobApplied = (...args) => dispatch("isJobApplied", args);
+export const updateAppliedJobNote = (...args) => dispatch("updateAppliedJobNote", args);
+export const exportAppliedJobsData = (...args) => dispatch("exportAppliedJobsData", args);
+export const toggleJobApplied = (...args) => dispatch("toggleJobApplied", args);
+export const persistPortalCapture = (...args) => dispatch("persistPortalCapture", args);
+
+async function _undoLastImport() {
+  const key = "jobpilot.backup.beforeImport";
+  const previous = (await chrome.storage.local.get(key))[key];
+  if (!previous) throw new Error("There is no previous import to undo.");
+  validateBackup({ type: "jobpilot-backup", version: 1, data: previous });
+  await chrome.storage.local.remove(JOBPILOT_BACKUP_KEYS.filter(name => !Object.hasOwn(previous, name)));
+  await chrome.storage.local.set(previous);
+  await chrome.storage.local.remove(key);
+  if (previous[SKILL_VAULT_KEY]) await persistSkillVault(previous[SKILL_VAULT_KEY]);
+  else await chrome.storage.sync.remove(SKILL_VAULT_KEY);
+  await invalidateMatches();
+  return true;
+}
+operations.undoLastImport = _undoLastImport;
+export const undoLastImport = (...args) => dispatch("undoLastImport", args);

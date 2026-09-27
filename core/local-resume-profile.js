@@ -157,7 +157,7 @@ function extractExperienceMonths(text) {
     }
   }
 
-  return 0;
+  return /\b(fresher|no (?:professional |work )?experience)\b/i.test(text) ? 0 : null;
 }
 
 function roleFromSummary(text) {

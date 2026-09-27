@@ -62,82 +62,6 @@
       .replace(/'/g, "&#039;");
   }
 
-  function comparableUrl(value) {
-    try {
-      const url = new URL(value);
-      return (url.hostname + url.pathname)
-        .toLowerCase()
-        .replace(/\/+$/, "");
-    } catch (_) {
-      return String(value || "")
-        .toLowerCase()
-        .split("?")[0]
-        .replace(/\/+$/, "");
-    }
-  }
-
-  function findExistingJobKey(cache, incoming) {
-    if (!incoming) return "";
-
-    if (incoming.key && cache[incoming.key]) {
-      return incoming.key;
-    }
-
-    const incomingUrl = comparableUrl(incoming.canonicalUrl);
-
-    for (const [key, existing] of Object.entries(cache)) {
-      if (!existing || existing.portal !== incoming.portal) continue;
-
-      if (
-        incoming.portalJobId &&
-        existing.portalJobId &&
-        String(incoming.portalJobId) === String(existing.portalJobId)
-      ) {
-        return key;
-      }
-
-      if (
-        incomingUrl &&
-        comparableUrl(existing.canonicalUrl) === incomingUrl
-      ) {
-        return key;
-      }
-    }
-
-    return "";
-  }
-
-  async function updateCache(jobs) {
-    const result = await chrome.storage.local.get(CACHE_KEY);
-    const current = result[CACHE_KEY] && typeof result[CACHE_KEY] === "object"
-      ? result[CACHE_KEY]
-      : {};
-
-    for (const job of jobs) {
-      const existingKey = findExistingJobKey(current, job);
-
-      if (existingKey) {
-        const merged = engine.mergeJob(current[existingKey], job);
-        merged.key = existingKey;
-        current[existingKey] = merged;
-      } else {
-        current[job.key] = engine.mergeJob(current[job.key], job);
-      }
-    }
-
-    const entries = Object.entries(current)
-      .sort((a, b) => {
-        const at = new Date(a[1]?.capturedAt || 0).getTime();
-        const bt = new Date(b[1]?.capturedAt || 0).getTime();
-        return bt - at;
-      })
-      .slice(0, MAX_CACHE);
-
-    const next = Object.fromEntries(entries);
-    await chrome.storage.local.set({ [CACHE_KEY]: next });
-    return next;
-  }
-
   function captureSignature(data) {
     return JSON.stringify({
       portal: data.portal,
@@ -157,7 +81,7 @@
             data.detail.key,
             data.detail.title,
             data.detail.company,
-            data.detail.description?.length || 0,
+            data.detail.description || "",
             data.detail.extraction?.confidence?.score
           ]
         : null
@@ -167,104 +91,9 @@
   async function persistCapture(data) {
     const signature = captureSignature(data);
     if (signature === lastSignature) return;
-
+    const response = await chrome.runtime.sendMessage({ type: "jobpilot:capture", data });
+    if (!response?.ok) throw new Error(response?.error || "Could not save job capture.");
     lastSignature = signature;
-
-    const allJobs = [
-      ...(Array.isArray(data.jobs) ? data.jobs : []),
-      ...(data.detail ? [data.detail] : [])
-    ];
-
-    let cacheAfterUpdate = null;
-
-    if (allJobs.length) {
-      cacheAfterUpdate = await updateCache(allJobs);
-    }
-
-    if (data.detail && cacheAfterUpdate) {
-      const existingKey = findExistingJobKey(
-        cacheAfterUpdate,
-        data.detail
-      );
-
-      const cachedDetail =
-        existingKey && cacheAfterUpdate[existingKey]
-          ? cacheAfterUpdate[existingKey]
-          : null;
-
-      if (cachedDetail?.aiAnalysis || cachedDetail?.deepMatch) {
-        data.detail = {
-          ...data.detail,
-          ...(cachedDetail.aiAnalysis
-            ? {
-                aiAnalysis: cachedDetail.aiAnalysis,
-                aiAnalyzedAt: cachedDetail.aiAnalyzedAt || null
-              }
-            : {}),
-          ...(cachedDetail.deepMatch
-            ? {
-                deepMatch: cachedDetail.deepMatch,
-                deepMatchedAt: cachedDetail.deepMatchedAt || null
-              }
-            : {})
-        };
-      }
-    }
-
-    const capturedAt = new Date().toISOString();
-    const nextStorage = {
-      [CAPTURE_KEY]: {
-        ...data,
-        capturedAt
-      }
-    };
-
-    if (data.pageType === "listing") {
-      const listingContext = {
-        version: 1,
-        portal: data.portal || "",
-        portalName: data.portalName || data.portal || "",
-        sourceUrl: data.sourceUrl || location.href,
-        jobs: Array.isArray(data.jobs) ? data.jobs : [],
-        relevanceStats: data.relevanceStats || {
-          relevant: 0,
-          review: 0,
-          filtered: 0
-        },
-        capturedAt
-      };
-
-      nextStorage[LISTING_CONTEXT_KEY] = listingContext;
-
-      const existing = await chrome.storage.local.get(
-        LISTING_CONTEXTS_KEY
-      );
-
-      const contexts =
-        existing[LISTING_CONTEXTS_KEY] &&
-        typeof existing[LISTING_CONTEXTS_KEY] === "object"
-          ? existing[LISTING_CONTEXTS_KEY]
-          : {
-              version: 1,
-              portals: {},
-              updatedAt: null
-            };
-
-      const portalKey =
-        String(data.portal || "unknown").trim() ||
-        "unknown";
-
-      nextStorage[LISTING_CONTEXTS_KEY] = {
-        version: 1,
-        portals: {
-          ...(contexts.portals || {}),
-          [portalKey]: listingContext
-        },
-        updatedAt: capturedAt
-      };
-    }
-
-    await chrome.storage.local.set(nextStorage);
   }
 
   function statsFor(jobs, detected) {

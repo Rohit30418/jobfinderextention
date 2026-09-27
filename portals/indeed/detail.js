@@ -5,7 +5,7 @@
 
   globalThis.JobPilotIndeedDetail = u.createDetail({
     isDetailPage(loc) {
-      return /\/viewjob/i.test(loc.pathname) || /\/rc\/clk/i.test(loc.pathname) || new URLSearchParams(loc.search).has("jk");
+      return /\/viewjob/i.test(loc.pathname) || /\/rc\/clk/i.test(loc.pathname) || (new URLSearchParams(loc.search).has("jk") || new URLSearchParams(loc.search).has("vjk"));
     },
     titleSelectors: [
       "h1[data-testid='jobsearch-JobInfoHeader-title']",
