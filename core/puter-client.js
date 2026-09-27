@@ -456,6 +456,8 @@ export async function analyzeJobWithAi(job, profile = null, preferences = null) 
     "}",
     "Evidence entries should be short phrases copied or tightly paraphrased from the supplied JD.",
     "Candidate comparisons and recommendations must use actual CANDIDATE_DATA evidence.",
+    "This is FULL-JD analysis. When the description is complete enough, this result is the final verdict and may return APPLY, REVIEW, or SKIP.",
+    "For frontend-targeted candidates, classify the role composition from the actual responsibilities and stack emphasis, not title alone.",
     "Include the recommendation object with a suitability score and application decision as specified above.",
     "JOB_DATA:",
     JSON.stringify(payload),
@@ -483,7 +485,17 @@ export async function analyzeJobBatchForCandidate(profile, preferences, jobs) {
   // Send relevant career information; omit contact details and raw resume text.
   const candidate = Object.fromEntries(['currentRole','headline','totalExperienceMonths','skills','workExperience','projects','education','certifications','resumeKeywords'].map(key => [key, profile?.[key]]));
   const payload = inputJobs.map(job => Object.fromEntries(['key','title','company','description','snippet','skills','requiredSkills','preferredSkills','requirementStatements','preferredStatements','responsibilities','experienceText','experienceMin','experienceMax','location','salaryText','education','workMode','employmentType','postedAge','datePosted'].map(key => [key, key === 'description' ? String(job[key] || '').slice(0,16000) : job[key]])));
-  const prompt = [recommendationInstructions, 'Return ONLY JSON: {"results":[{"key":"exact input key","recommendation":{...}}]}. Every input key exactly once.', 'CANDIDATE:',JSON.stringify(candidate),'PREFERENCES:',JSON.stringify(preferences),'JOBS:',JSON.stringify(payload)].join('\n');
+  const prompt = [
+    recommendationInstructions,
+    "This is LISTING-STAGE screening. You usually do NOT have the full JD.",
+    "Treat the result as provisional. Never return APPLY at listing stage; use REVIEW for promising jobs and SKIP only for clear role-family/backend-heavy mismatches or verified hard conflicts.",
+    "For frontend-targeted candidates, frontendRelevanceScore is critical. Infer it from title + visible snippet + visible skills + responsibilities if present. Do not assume a Full Stack title is relevant until the visible evidence shows frontend-heavy work.",
+    "Examples: Java/Spring + React where backend dominates => BACKEND_HEAVY and low frontend relevance. React/TypeScript/CSS/UI-heavy role with minor API work => FRONTEND_HEAVY and high frontend relevance.",
+    'Return ONLY JSON: {"results":[{"key":"exact input key","recommendation":{...}}]}. Every input key exactly once.',
+    "CANDIDATE:", JSON.stringify(candidate),
+    "PREFERENCES:", JSON.stringify(preferences),
+    "JOBS:", JSON.stringify(payload)
+  ].join('\n');
   const parsed = extractJson(responseText(await callPuterAi(prompt)));
   if (!Array.isArray(parsed.results)) throw new Error('AI returned no job recommendations. Retry.');
   const keys = new Set(inputJobs.map(job => job.key));
