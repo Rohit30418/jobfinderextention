@@ -1541,12 +1541,23 @@ const operations = {
 let queue = Promise.resolve();
 export function runStorageOperation(name, args = []) {
   if (!Object.hasOwn(operations, name) || !Array.isArray(args)) return Promise.reject(new Error("Unknown storage operation."));
-  const next = queue.then(() => operations[name](...args));
+  const next = queue.then(() => {
+    const execute = () => operations[name](...args);
+    // One origin-wide lock coordinates extension pages AND the service worker.
+    // Internal operations call raw helpers, so the lock is never nested.
+    return globalThis.navigator?.locks?.request
+      ? navigator.locks.request("jobpilot.storage.v1", execute)
+      : execute();
+  });
   queue = next.catch(() => {});
   return next;
 }
 async function dispatch(name, args) {
-  if (typeof document === "undefined") return runStorageOperation(name, args);
+  const ownPage = typeof document !== "undefined" &&
+    String(globalThis.location?.href || "").startsWith(chrome.runtime.getURL(""));
+  if (typeof document === "undefined" || (ownPage && globalThis.navigator?.locks?.request)) {
+    return runStorageOperation(name, args);
+  }
   const response = await chrome.runtime.sendMessage({ type: "jobpilot:storage", name, args });
   if (!response?.ok) throw new Error(response?.error || "JobPilot storage is unavailable. Reload the extension.");
   return response.value;

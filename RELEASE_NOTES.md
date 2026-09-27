@@ -1,3 +1,9 @@
+# JobPilot 1.7.1 hotfix
+
+Fixes setup initialization when background storage messaging returns no response. Extension pages now access storage under the same origin-wide Web Lock as the service worker, preserving concurrent-write protection without requiring a background RPC for every profile read/save.
+
+The extension ID and storage keys are unchanged from 1.7.0. Existing 1.7.0 users can replace the files in the SAME installed folder, click Reload in chrome://extensions, and close/reopen JobPilot tabs. Do not uninstall. Keep a backup when available.
+
 # JobPilot 1.7.0
 
 This release addresses the September 27 audit findings. It adds serialized storage mutations, strict job identity, input-bound analysis caching, conservative skill matching, decimal/unknown experience handling, validated backups with undo, bounded skill sync with visible status, safe CSV export, timeout/backoff/local AI recovery, Indeed split-pane detection, preserved profile evidence, automated regression checks, and updated privacy controls.
