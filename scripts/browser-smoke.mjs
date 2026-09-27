@@ -4,6 +4,15 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 const {chromium}=await import(process.env.JOBPILOT_PLAYWRIGHT_MODULE || 'playwright');
+async function poll(read, label, timeout = 15000) {
+ const deadline = Date.now() + timeout;
+ while (Date.now() < deadline) {
+  const value = await read();
+  if (value) return value;
+  await new Promise(resolve => setTimeout(resolve, 100));
+ }
+ throw new Error('Timed out waiting for ' + label);
+}
 const root=path.resolve('.');
 const temp=fs.mkdtempSync(path.join(os.tmpdir(),'jobpilot-browser-'));
 const context=await chromium.launchPersistentContext(temp,{
@@ -38,8 +47,7 @@ try {
  <div id="jobDescriptionText"><h2>Requirements</h2><p>We seek a Frontend Developer with React, JavaScript and CSS. Build accessible web applications and responsive interfaces. Collaborate with designers and maintain reliable automated tests. Experience with React and JavaScript is required.</p></div>
  <a href="/viewjob?jk=fixture-a">Frontend Developer</a></body></html>`}));
  const portal=await context.newPage();await portal.goto('https://in.indeed.com/jobs?q=react&vjk=fixture-a');
- await page.waitForFunction(async()=>{const x=await chrome.storage.local.get('jobpilot.jobs.cache');return Object.values(x['jobpilot.jobs.cache']||{}).some(job=>job.portalJobId==='fixture-a');},null,{timeout:15000});
- const captured=await page.evaluate(async()=>{const x=await chrome.storage.local.get('jobpilot.jobs.cache');return Object.values(x['jobpilot.jobs.cache']).find(job=>job.portalJobId==='fixture-a');});
+ const captured=await poll(()=>page.evaluate(async()=>{const x=await chrome.storage.local.get('jobpilot.jobs.cache');return Object.values(x['jobpilot.jobs.cache'] || {}).find(job=>job.portalJobId==='fixture-a');}), 'Indeed capture');
  assert.equal(captured.title,'Frontend Developer');assert.ok(captured.description.includes('accessible'));
  const result=await page.evaluate(async job=>chrome.runtime.sendMessage({type:'jobpilot:inline-analyze',job}),captured);
  assert.equal(result.ok,true);assert.equal(result.aiStatus,'local');assert.ok(result.match);
@@ -58,7 +66,7 @@ try {
   return route.fulfill({contentType:'text/html',body:'<!doctype html><div id="status"></div><button id="connectBtn">Connect</button><script>globalThis.puter={auth:{signIn:async()=>({token:"synthetic-browser-test"})},ui:{requestPermission:async()=>true}};</script><script src="puter-auth.js"></script>'});
  });
  const bridge=await context.newPage();await bridge.goto('https://rohit30418.github.io/jobfinderextention/puter-auth.html?state='+state);await bridge.locator('#connectBtn').click();
- await page.waitForFunction(async()=>{const x=await chrome.storage.session.get('jobpilot.puter.token');return x['jobpilot.puter.token']==='synthetic-browser-test';});
+ await poll(()=>page.evaluate(async()=>{const x=await chrome.storage.session.get('jobpilot.puter.token');return x['jobpilot.puter.token']==='synthetic-browser-test';}), 'bridge token acceptance');
  const auth=await page.evaluate(async state=>chrome.runtime.sendMessage({type:'jobpilot:auth-status',state}),state);assert.equal(auth.completed,true);
  fs.mkdirSync('test-results',{recursive:true});await page.screenshot({path:'test-results/job-list.png',fullPage:true});
  assert.deepEqual(errors,[],'Browser JavaScript errors');
