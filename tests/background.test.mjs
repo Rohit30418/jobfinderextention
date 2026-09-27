@@ -50,3 +50,7 @@ test('agent persists validated recommendation, but refuses a late response after
  globalThis.fetch=async()=>{await store.setState({profile:{...profile,skills:[]}});return {ok:true,status:200,json:async()=>({result:{message:{content:JSON.stringify(output)}}})};};
  const late=await send({type:'jobpilot:rank-list-ai',jobs:[{key:job.key}]});assert.equal(late.ok,false);assert.equal((await store.getJobCache())[job.key].aiRanking,undefined);
 });
+
+test('portal content cannot control automatic discovery browser navigation',async()=>{
+ const result=await send({type:'jobpilot:discovery-browser',action:'begin'});assert.equal(result.ok,false);assert.match(result.error,/denied/);
+});

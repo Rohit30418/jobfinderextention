@@ -1,6 +1,6 @@
 # JobPilot privacy
 
-Updated 27 September 2026 for version 1.8.0.
+Updated 27 September 2026 for version 1.9.0.
 
 ## Data on your device
 
@@ -27,3 +27,7 @@ JSON backups contain profile/resume text, preferences, captured jobs, applicatio
 Delete resume & profile removes the saved profile/resume text and original uploaded file; derived cached matches are invalidated. It does not remove application history, captured jobs, the skill vault, or previously downloaded exports. Disconnect Puter clears this extension's session credentials; it does not delete information already sent to Puter or sign you out of Puter's website.
 
 Uninstalling the extension removes its local data. Delete downloaded backups separately. A Chrome Sync skill mirror may remain associated with your Chrome account; manage synced extension data in Chrome settings. The current local pre-import snapshot remains until the next import, Undo Last Restore, or Delete resume & profile. Do not use an export as a secure deletion mechanism.
+
+## Automatic discovery
+
+Starting a discovery run authorizes JobPilot to navigate a dedicated browser tab through the displayed search plan and promising job links, capture visible portal data and send career profile/preferences/job text to Puter for screening and detail analysis. Search-query suggestions also send career evidence and preferences to Puter. The run uses your current browser login sessions but does not fill login forms, solve security challenges or submit applications. Stop ends orchestration after the current operation. Keep the discovery screen open to run; no background schedule is created. Run checkpoints are saved locally.

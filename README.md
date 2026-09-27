@@ -1,4 +1,4 @@
-# JobPilot 1.8.0
+# JobPilot 1.9.0
 
 See [release notes and upgrade steps](RELEASE_NOTES.md) before installing over an existing unpacked build. Export your old backup first; the secure sign-in bridge now uses a stable extension ID.
 
@@ -498,3 +498,11 @@ After the search tabs load, the existing portal adapters capture listings into t
 Connect and authorize Puter in Profile. Browse supported portals using your searches, then open Job List and choose Run AI Agent. Enable AI agent mode to analyze new captured jobs while the list is open and job descriptions when opened. Stop pauses after the current request; rerunning resumes jobs without current recommendations. Completed results are saved. Provider failures leave pending jobs available for retry.
 
 Recommended contains AI APPLY decisions only, sorted by estimated fit. Review retains uncertain/adjacent jobs; Pending AI and Not recommended keep all captured jobs accessible. Expand Why apply / why not for evidence, gaps and next steps. Listing advice is provisional; opening a full description improves the available evidence. AI cannot guarantee correct decisions or hiring odds. This is an assisted discovery and evaluation agent for pages you browse, not an unattended crawler or an automatic application submitter.
+
+## Automatic discovery (1.9.0)
+
+Open Discover jobs automatically from Job List. Connect Puter first. Suggest searches with AI or edit up to three queries, select portals and a job limit, then Build search plan and Start discovery. It visits the first result page of each planned search in one dedicated tab, screens the captured jobs and opens promising listings for full-description analysis. Location searches cover up to two saved locations; each run is bounded to 18 searches and 40 collected jobs. Already-applied jobs are excluded from new discovery.
+
+Keep the discovery screen open. Stop saves progress; Resume continues it. Closing Chrome or this screen stops orchestration; resume manually later. CAPTCHA/sign-in pauses the run: use Open agent tab, resolve the portal prompt yourself and resume, or Skip current page. No login automation, challenge bypass, background schedule or automatic applications are included. Pages that render no usable jobs within 35 seconds are logged and skipped. If the full description cannot be captured, listing-only advice is retained. Provider errors pause for retry.
+
+Discovery checkpoints are local to this browser and are not included in exported backups; captured jobs and recommendations use the normal backup storage. The first-page job limit is not a claim of complete coverage of a portal. Live portal layouts and provider output require user verification.
