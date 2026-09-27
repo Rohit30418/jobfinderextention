@@ -73,7 +73,7 @@ $('prepare').addEventListener('click',async()=>navigator.locks.request('jobpilot
 $('start').addEventListener('click',()=>execute().catch(error=>message(error.message)));
 $('stop').addEventListener('click',()=>{stopped=true;message('Stopping after the current operation. Progress will be saved.');});
 $('focus').addEventListener('click',()=>browser('focus').catch(error=>message(error.message)));
-$('skip').addEventListener('click',async()=>{if(!run || busy)return;if(run.phase==='search')run.searchIndex++;else if(run.phase==='screen')run.screenIndex=Math.min(run.jobs.length,run.screenIndex+2);else run.detailIndex++;event('Current step skipped by you.');await save();message('Step skipped. Resume when ready.');});
+$('skip').addEventListener('click',async()=>navigator.locks.request('jobpilot.discovery.runner',{ifAvailable:true},async lock=>{if(!lock){message('A discovery run is active in another tab.');return;}if(!run || busy)return;if(run.phase==='search')run.searchIndex++;else if(run.phase==='screen')run.screenIndex=Math.min(run.jobs.length,run.screenIndex+2);else run.detailIndex++;event('Current step skipped by you.');await save();message('Step skipped. Resume when ready.');}));
 await inputs().then(()=>{$('queries').value=preferences.targetRoles.slice(0,3).join('\n');}).catch(error=>message(error.message));
 run=(await chrome.storage.local.get(DISCOVERY_KEY))[DISCOVERY_KEY] || null;
 if(run?.status==='running'){run.status='paused';message('A saved run is available. Resume if it is no longer running in another tab.');}
