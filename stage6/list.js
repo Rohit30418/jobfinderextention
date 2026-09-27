@@ -236,13 +236,20 @@ function agentDetails(job) {
 
   return '<details class="agent-explanation">' +
     '<summary><span>Full AI review</span><span class="ai-review-summary-meta">' +
+      escapeHtml(rec.stage === 'FINAL' ? 'FINAL JD' : 'PROVISIONAL LISTING') + ' · ' +
       escapeHtml(priority) + ' priority · ' + escapeHtml(rec.confidence || 'LOW') +
       ' confidence · ' + escapeHtml(fit) +
     '</span></summary>' +
     '<div class="ai-verdict">' +
       '<div><span>AI decision</span><strong>' + escapeHtml(rec.decision || 'REVIEW') + '</strong></div>' +
       '<div><span>Role fit</span><strong>' + escapeHtml(rec.roleFit || 'UNKNOWN') + '</strong></div>' +
-      '<div><span>Analysis basis</span><strong>' + (rec.basis === 'LISTING' ? 'Listing only' : 'Full job description') + '</strong></div>' +
+      '<div><span>Analysis basis</span><strong>' + (rec.basis === 'LISTING' ? 'Listing only · provisional' : 'Full job description · final') + '</strong></div>' +
+      (Number.isFinite(rec.frontendRelevanceScore)
+        ? '<div><span>Frontend relevance</span><strong>' + rec.frontendRelevanceScore + '/100</strong></div>'
+        : '') +
+      (rec.roleComposition && rec.roleComposition !== 'UNKNOWN'
+        ? '<div><span>Role composition</span><strong>' + escapeHtml(String(rec.roleComposition).replaceAll('_',' ')) + '</strong></div>'
+        : '') +
     '</div>' +
     (rec.summary ? '<p class="ai-summary">' + escapeHtml(rec.summary) + '</p>' : '') +
     scoreBreakdown(rec) +
@@ -276,7 +283,13 @@ function matchesQuery(job) {
 
 function badgeFor(job) {
   const recommendation = recommendationFor(job);
-  return '<span class="badge '+(recommendation?.decision === 'APPLY' ? 'apply' : recommendation?.decision === 'SKIP' ? 'skip' : 'review')+'">'+escapeHtml(recommendation?.decision || 'PENDING AI')+'</span>';
+  if (!recommendation) return '<span class="badge review">PENDING AI</span>';
+
+  const label = recommendation.stage === 'PROVISIONAL'
+    ? (recommendation.decision === 'SKIP' ? 'SCREEN OUT' : 'PROVISIONAL')
+    : recommendation.decision;
+
+  return '<span class="badge '+(recommendation.decision === 'APPLY' ? 'apply' : recommendation.decision === 'SKIP' ? 'skip' : 'review')+'">'+escapeHtml(label)+'</span>';
 }
 function portalMeta(id) {
   return PORTALS.find((item) => item.id === id) || {
@@ -937,6 +950,20 @@ function renderJobs() {
               ? '<span class="badge rank">#' + (index + 1) + ' AI RANK</span>'
               : '') +
             badgeFor(job) +
+            (
+              Number.isFinite(recommendationFor(job)?.frontendRelevanceScore)
+                ? '<span class="badge frontend">' +
+                  recommendationFor(job).frontendRelevanceScore +
+                  '/100 FRONTEND</span>'
+                : ''
+            ) +
+            (
+              recommendationFor(job)?.roleComposition && recommendationFor(job).roleComposition !== 'UNKNOWN'
+                ? '<span class="badge composition">' +
+                  escapeHtml(String(recommendationFor(job).roleComposition).replaceAll('_',' ')) +
+                  '</span>'
+                : ''
+            ) +
             (
               recommendationFor(job)?.priority
                 ? '<span class="badge priority ' + String(recommendationFor(job).priority).toLowerCase() + '">' +
