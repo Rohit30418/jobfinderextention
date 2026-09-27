@@ -1,3 +1,13 @@
+# JobPilot 1.9.0 — AI Job Agent Upgrade
+
+- AI-ranked job feed based on the saved candidate profile and job preferences.
+- Evidence-grounded 0–100 fit score with role, skills, experience, preferences and evidence-quality breakdown.
+- Explicit AI priority (HIGH / MEDIUM / LOW / HOLD) and safer ordering: APPLY → REVIEW → SKIP.
+- Full “why apply / why not apply” review, missing skills, verified conflicts, unknowns, evidence and next step.
+- Listing-only results are automatically treated as lower-confidence than full job descriptions.
+- Project skills can support capability fit but are not promoted to commercial years of experience.
+- Existing Chrome storage keys and saved JobPilot data are preserved.
+
 # 1.8.0 — AI job finding agent
 
 - Shared AI recommendation for Job List and Job Intelligence, with estimated suitability, role alignment, confidence, reasons to apply/avoid, unknowns and quoted evidence.

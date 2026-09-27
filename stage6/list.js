@@ -193,21 +193,70 @@ function score(job) { return recommendationFor(job)?.fitScore ?? -1; }
 function visible(job) {
   if (portalMode !== 'all' && job.portal !== portalMode) return false;
   const rec = recommendationFor(job);
-  if (mode === 'recommended' || mode === 'relevant') return rec?.decision === 'APPLY';
+  if (mode === 'recommended') return Boolean(rec) && rec.decision !== 'SKIP';
+  if (mode === 'relevant') return rec?.decision === 'APPLY';
   if (mode === 'review') return rec?.decision === 'REVIEW';
   if (mode === 'pending') return !rec;
   if (mode === 'skip') return rec?.decision === 'SKIP';
   if (mode === 'analyzed') return Boolean(rec);
   return true;
 }
+
+function scoreBreakdown(rec) {
+  const items = Array.isArray(rec?.scoreBreakdown)
+    ? rec.scoreBreakdown.filter((item) => Number.isFinite(item?.score))
+    : [];
+
+  if (!items.length) return "";
+
+  return '<div class="ai-score-grid">' +
+    items.map((item) =>
+      '<div class="ai-score-item">' +
+        '<span>' + escapeHtml(item.label || item.id || "Fit") + '</span>' +
+        '<strong>' + item.score + '/100</strong>' +
+        (item.reason ? '<small>' + escapeHtml(item.reason) + '</small>' : '') +
+      '</div>'
+    ).join('') +
+  '</div>';
+}
+
 function agentDetails(job) {
   const rec = recommendationFor(job);
   if (!rec) return '<p class="reason">Waiting for AI analysis. Run the agent to evaluate this job.</p>';
-  const section = (title,items) => items.length ? '<strong>'+title+'</strong><ul>'+items.map(x=>'<li>'+escapeHtml(x)+'</li>').join('')+'</ul>' : '';
-  return '<details class="agent-explanation"><summary>Why apply / why not · '+escapeHtml(rec.confidence)+' confidence · '+(rec.basis === 'LISTING' ? 'Listing only' : 'Job description')+'</summary>'+
-    section('Why apply',rec.reasons)+section('Why not / gaps',rec.gaps)+section('Confirmed conflicts',rec.hardBlockers.map(x=>x.explanation))+
-    section('Check before applying',rec.unknowns)+section('Evidence',rec.evidence.map(x=>'Your profile: “'+x.candidateQuote+'” · Job: “'+x.jobQuote+'” — '+x.explanation))+
-    '<p>'+escapeHtml(rec.nextStep)+'</p><small>Estimated fit, not an interview or selection probability.</small></details>';
+
+  const section = (title, items) =>
+    Array.isArray(items) && items.length
+      ? '<section class="ai-review-section"><strong>' + title + '</strong><ul>' +
+        items.map((x) => '<li>' + escapeHtml(x) + '</li>').join('') +
+        '</ul></section>'
+      : '';
+
+  const priority = rec.priority || (rec.decision === 'APPLY' ? 'HIGH' : rec.decision === 'SKIP' ? 'LOW' : 'MEDIUM');
+  const fit = Number.isFinite(rec.fitScore) ? rec.fitScore + '/100' : 'Not enough evidence';
+
+  return '<details class="agent-explanation">' +
+    '<summary><span>Full AI review</span><span class="ai-review-summary-meta">' +
+      escapeHtml(priority) + ' priority · ' + escapeHtml(rec.confidence || 'LOW') +
+      ' confidence · ' + escapeHtml(fit) +
+    '</span></summary>' +
+    '<div class="ai-verdict">' +
+      '<div><span>AI decision</span><strong>' + escapeHtml(rec.decision || 'REVIEW') + '</strong></div>' +
+      '<div><span>Role fit</span><strong>' + escapeHtml(rec.roleFit || 'UNKNOWN') + '</strong></div>' +
+      '<div><span>Analysis basis</span><strong>' + (rec.basis === 'LISTING' ? 'Listing only' : 'Full job description') + '</strong></div>' +
+    '</div>' +
+    (rec.summary ? '<p class="ai-summary">' + escapeHtml(rec.summary) + '</p>' : '') +
+    scoreBreakdown(rec) +
+    '<div class="ai-review-columns">' +
+      '<div>' + section('Why you should apply', rec.reasons) + '</div>' +
+      '<div>' + section('Why you may not want to apply', rec.gaps) + '</div>' +
+    '</div>' +
+    section('Missing skills / capabilities', rec.missingSkills) +
+    section('Confirmed conflicts', (rec.hardBlockers || []).map((x) => x.explanation)) +
+    section('Check before applying', rec.unknowns) +
+    section('Evidence used', (rec.evidence || []).map((x) => 'Your profile: “' + x.candidateQuote + '” · Job: “' + x.jobQuote + '” — ' + x.explanation)) +
+    '<div class="ai-next-step"><strong>Next step</strong><span>' + escapeHtml(rec.nextStep || 'Verify the job requirements before applying.') + '</span></div>' +
+    '<small class="ai-disclaimer">Fit score estimates candidate-to-job suitability. It is not an interview or selection probability.</small>' +
+  '</details>';
 }
 
 function matchesQuery(job) {
@@ -853,7 +902,7 @@ function renderJobs() {
     Boolean(jobs.length)
   );
 
-  els.jobList.innerHTML = jobs.map((job) => {
+  els.jobList.innerHTML = jobs.map((job, index) => {
     const matchScore = recommendationFor(job)?.fitScore;
     const reasons =
       recommendationFor(job)?.reasons?.length
@@ -884,12 +933,21 @@ function renderJobs() {
             "</div>" +
           "</div>" +
           '<div class="badges">' +
+            (mode === 'recommended' && recommendationFor(job)
+              ? '<span class="badge rank">#' + (index + 1) + ' AI RANK</span>'
+              : '') +
             badgeFor(job) +
+            (
+              recommendationFor(job)?.priority
+                ? '<span class="badge priority ' + String(recommendationFor(job).priority).toLowerCase() + '">' +
+                  escapeHtml(recommendationFor(job).priority) + ' PRIORITY</span>'
+                : ''
+            ) +
             (
               Number.isFinite(matchScore)
                 ? '<span class="badge score">' +
                   matchScore +
-                  "/100 EST. FIT" +
+                  "/100 AI FIT" +
                   "</span>"
                 : ""
             ) +
@@ -922,15 +980,14 @@ function renderJobs() {
             .join("") +
         "</div>" +
 
-        '<div class="reason">' +
+        '<div class="reason ai-card-summary">' +
           escapeHtml(
+            recommendationFor(job)?.summary ||
             reasons[0] ||
             (
               job.deepMatch
                 ? "Deep analysis saved from the portal page."
-                : job.aiRanking?.summary
-                  ? job.aiRanking.summary
-                  : "Open the job for full JobPilot analysis."
+                : "Open the job for full JobPilot analysis."
             )
           ) +
         "</div>" +

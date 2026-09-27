@@ -11,10 +11,10 @@
     <header class="topbar">
       <div>
         <div class="eyebrow">JOBPILOT</div>
-        <h1>Your job list.</h1>
+        <h1>Your AI-ranked job feed.</h1>
         <p class="lede">
-          The extension is now for job discovery and prioritization only.
-          Deep analysis happens directly on the job portal page.
+          JobPilot ranks captured jobs against your saved career profile and preferences.
+          Full job descriptions produce the strongest AI review.
         </p>
       </div>
       <div class="actions">
@@ -30,7 +30,7 @@
           <div class="kicker">ALL CAPTURED PORTALS</div>
           <h2 id="listingTitle">Waiting for job listings…</h2>
           <p id="listingMeta">Visit supported portal listing pages and JobPilot will combine them here.</p>
-          <label><input id="agentAuto" type="checkbox"> AI agent mode: automatically send my career profile, preferences and captured jobs to Puter for analysis while this list is open, and analyze opened job details.</label><p>Browse your saved searches to discover jobs. Strong matches appear in Recommended; uncertain jobs stay in Review. Scores estimate fit, not hiring chances.</p>
+          <label><input id="agentAuto" type="checkbox"> AI agent mode: automatically send my career profile, preferences and captured jobs to Puter for analysis while this list is open, and analyze opened job details.</label><p>Browse your saved searches to discover jobs. Recommended is now your AI-ranked feed: APPLY jobs first, then REVIEW jobs by priority and fit score. SKIP jobs stay separate. Scores estimate candidate-to-job fit, not hiring chances.</p>
           <p id="aiRankStatus" class="ai-rank-status">AI ranking has not run yet.</p>
         </div>
         <div class="status" id="listingStatus">Waiting</div>
@@ -133,7 +133,7 @@
         <div class="filters" id="portalFilters"></div>
       </div>
       <div class="filters result-filters">
-        <button class="filter active" data-mode="recommended" type="button">Recommended</button>
+        <button class="filter active" data-mode="recommended" type="button">AI Ranked</button>
         <button class="filter" data-mode="relevant" type="button">Relevant</button>
         <button class="filter" data-mode="review" type="button">Review</button>
         <button class="filter" data-mode="analyzed" type="button">Analyzed</button>
