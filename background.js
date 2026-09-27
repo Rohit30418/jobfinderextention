@@ -1,3 +1,4 @@
+import { discoveryBrowser } from "./core/discovery-browser.js";
 import { analysisRevision } from "./core/analysis-inputs.js";
 import "./core/portal-engine.js";
 import { runStorageOperation, persistPortalCapture, toggleJobApplied } from "./core/storage.js";
@@ -22,6 +23,7 @@ import {
   unmarkJobApplied
 } from "./core/storage.js";
 import {
+  planJobSearchesWithAi,
   analyzeJobBatchForCandidate,
   analyzeJobWithAi
 } from "./core/puter-client.js";
@@ -316,6 +318,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     promise.then(value => sendResponse({ ok: true, ...value }), error => sendResponse({ ok: false, error: error?.message || String(error) }));
     return true;
   };
+  if (message?.type === "jobpilot:discovery-plan") {
+    if (!isExtensionPage(sender)) { sendResponse({ok:false,error:'Discovery access denied.'}); return false; }
+    return respond(Promise.all([getState(),getPreferences()]).then(([state,preferences])=>planJobSearchesWithAi(state.profile,preferences)));
+  }
+  if (message?.type === "jobpilot:discovery-browser") {
+    if (!isExtensionPage(sender)) { sendResponse({ok:false,error:'Discovery access denied.'}); return false; }
+    return respond(discoveryBrowser(message));
+  }
   if (message?.type === "jobpilot:auth-begin") return respond(beginAuth(sender).then(state => ({ state })));
   if (message?.type === "jobpilot:auth-status") return respond(authStatus(message.state, sender));
   if (message?.type === "jobpilot:storage") {

@@ -1,3 +1,4 @@
+import { DISCOVERY_KEY } from "../core/discovery.js";
 import { recommendationFor, compareRecommendations } from "../core/agent-recommendation.js";
 import "../core/relevance-gate.js";
 import "../core/portal-engine.js";
@@ -96,6 +97,7 @@ let contextsState = {
 };
 
 let cache = {};
+let discoveryKeys = [];
 let insights = null;
 let skillVault = { version: 1, items: {}, updatedAt: null };
 let profileState = null;
@@ -186,6 +188,10 @@ function allCapturedJobs() {
     }
   }
 
+  for(const key of discoveryKeys) {
+    const job=cache[key];
+    if(job && !seen.has(key)){seen.add(key);output.push({...job,portalName:portalMeta(job.portal).name,relevance:globalThis.JobPilotRelevanceGate.evaluate(job,currentPreferences)});}
+  }
   return output;
 }
 
@@ -1065,6 +1071,7 @@ async function load() {
       getPreferences()
     ]);
 
+  discoveryKeys = (await chrome.storage.local.get(DISCOVERY_KEY))[DISCOVERY_KEY]?.jobs || [];
   document.querySelector('#agentAuto').checked = currentPreferences.agentEnabled === true;
   render();
   if (currentPreferences.agentEnabled && !agentRunning && !agentStopped && !agentError) {
@@ -1276,6 +1283,7 @@ chrome.storage.onChanged.addListener(
     if (
       area === "local" &&
       (
+        changes[DISCOVERY_KEY] ||
         changes["jobpilot.stage6.listingContexts"] ||
         changes["jobpilot.jobs.cache"] ||
         changes["jobpilot.insights.gapHistory"] ||

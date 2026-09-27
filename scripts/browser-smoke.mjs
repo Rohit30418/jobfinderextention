@@ -93,7 +93,8 @@ try {
    const prompt = JSON.parse(options.body).args.messages[0].content;
    const make = job => ({fitScore:job.title.includes('Best') ? 94 : 82,decision:job.title.includes('Backend') ? 'SKIP' : job.title.includes('Uncertain') ? 'REVIEW' : 'APPLY',roleFit:job.title.includes('Backend') ? 'MISMATCH' : 'MATCH',confidence:'HIGH',summary:'Fixture candidate comparison',whyApply:['React evidence in profile'],whyNotApply:['Verify role-specific requirements'],unknowns:['Salary not stated'],nextStep:'Review the posting',evidence:[{candidateQuote:'React',jobQuote:'React',explanation:'Explicit skill evidence'}],hardBlockers:[]});
    let output;
-   if(prompt.includes('\nJOBS:\n')) {
+   if(prompt.startsWith('Create up to 3')) { output={queries:['Frontend Developer'],reason:'Based on frontend experience and React skills'};
+   } else if(prompt.includes('\nJOBS:\n')) {
     const jobs=JSON.parse(prompt.split('\nJOBS:\n')[1]);output={results:jobs.map(job=>({key:job.key,recommendation:make(job)}))};
    } else {
     const job=JSON.parse(prompt.split('\nJOB_DATA:\n')[1].split('\nCANDIDATE_DATA:\n')[0]);output={requiredSkills:['React'],candidateRequirementMatches:[{requirement:'React',status:'EXACT',evidence:['React'],explanation:'Explicit skill'}],recommendation:make(job)};
@@ -136,7 +137,40 @@ try {
  await poll(async()=>await countResumed()===4,'automatic agent reanalysis');
  await page.locator('#agentAuto').uncheck();
  await poll(()=>page.evaluate(async()=>{const s=await import('../core/storage.js');const p=await s.getPreferences();return !p.agentEnabled && !p.automaticAi;}),'agent preference disabled');
+ // Automatic discovery: real extension-created tab, portal adapters, AI screening,
+ // full descriptions, challenge pause, Stop and resume after controller reload.
+ let blockDiscovery=true;
+ await context.route('https://in.indeed.com/**',route=>{
+  const url=new URL(route.request().url());
+  if(blockDiscovery)return route.fulfill({contentType:'text/html',body:'<!doctype html><title>Security check</title><h1>Verify you are human</h1>'});
+  if(url.pathname==='/jobs')return route.fulfill({contentType:'text/html',body:'<!doctype html><title>Frontend jobs</title>'+['Discovery Best Frontend','Discovery Good Frontend'].map((title,i)=>`<div class="job_seen_beacon" data-jk="discovery-${i}"><h2 class="jobTitle"><a class="jcs-JobTitle" data-jk="discovery-${i}" href="/viewjob?jk=discovery-${i}">${title}</a></h2><span data-testid="company-name">Fixture Company</span><span data-testid="text-location">Remote</span><div class="job-snippet">React CSS JavaScript frontend job development</div><span class="date">Just posted</span></div>`).join('')});
+  const best=url.searchParams.get('jk')==='discovery-0';
+  return route.fulfill({contentType:'text/html',body:`<!doctype html><title>Job details</title><h1 data-testid="jobsearch-JobInfoHeader-title">Discovery ${best?'Best':'Good'} Frontend</h1><div data-testid="inlineHeader-companyName">Fixture Company</div><div id="job-location">Remote</div><div id="jobDetailsSection">2-4 years experience</div><div id="jobDescriptionText">${'Build React frontend applications using CSS and JavaScript. '.repeat(15)}</div>`});
+ });
+ const discover=await context.newPage();await discover.goto(base+'stage6/discover.html');
+ await discover.locator('#suggest').click();await poll(()=>discover.locator('#planReason').innerText().then(x=>x.includes('React')),'AI search planning');
+ for(const portal of ['naukri','hirist'])await discover.locator(`[name="portal"][value="${portal}"]`).uncheck();
+ await discover.locator('#limit').fill('2');await discover.locator('#prepare').click();
+ await discover.locator('#start').click();
+ await poll(()=>discover.locator('#status').innerText().then(x=>x==='Paused'),'portal challenge pause');
+ assert.ok((await discover.locator('#message').innerText()).includes('security check'));
+ blockDiscovery=false;
+ await discover.locator('#start').click();await discover.locator('#stop').click();
+ await poll(()=>discover.locator('#status').innerText().then(x=>x==='Paused'),'discovery Stop');
+ await discover.reload();await discover.locator('#start').click();
+ await poll(()=>discover.locator('#status').innerText().then(x=>x==='Run complete'),'complete discovery pipeline',60000);
+ const discovery=await discover.evaluate(async()=>{const s=await import('../core/storage.js');const run=(await chrome.storage.local.get('jobpilot.discovery.run'))['jobpilot.discovery.run'];const cache=await s.getJobCache();return {run,jobs:run.jobs.map(key=>cache[key])};});
+ assert.equal(discovery.jobs.length,2);assert.equal(discovery.run.detailIndex,2);
+ for(const job of discovery.jobs){assert.ok(job.description.length>=300);assert.equal(job.aiAnalysis.recommendation.decision,'APPLY');}
+ await page.reload();await poll(async()=>await page.locator('#jobList').innerText().then(x=>x.includes('Discovery Best Frontend')),'discovered shortlist');
+ fs.mkdirSync('test-results',{recursive:true});
+ await discover.screenshot({path:'test-results/discovery.png',fullPage:true});
  fs.mkdirSync('test-results',{recursive:true});await page.screenshot({path:'test-results/job-list.png',fullPage:true});
  assert.deepEqual(errors,[],'Browser JavaScript errors');
  console.log('PASS: AI agent shortlist ordering, evidence, review/skip filters and shared detail score with controlled provider responses; real extension startup without storage RPC, cross-context Web Lock saves, preference control, Indeed vjk capture, local match, concurrent storage, backup/undo, and pinned bridge transport. Provider authentication remains a live release gate.');
+} catch(error) {
+ try {console.log('Discovery diagnostic',await worker.evaluate(async()=>{const state=(await chrome.storage.session.get('jobpilot.discovery.browser'))['jobpilot.discovery.browser'];if(!state)return 'No discovery session';const tab=await chrome.tabs.get(state.tabId);try{const {discoveryBrowser}=await import('./core/discovery-browser.js');return {tab:{url:tab.url,status:tab.status},result:await discoveryBrowser({action:'read',token:state.token})};}catch(error){return {tab:{url:tab.url,status:tab.status},error:error.message};}}));}catch{}
+ fs.mkdirSync('test-results',{recursive:true});
+ for(const [i,page] of context.pages().entries()){try{if(page.url().startsWith('chrome-extension:')){await page.screenshot({path:'test-results/failure-'+i+'.png',fullPage:true});console.log('Extension page diagnostic:',page.url(),(await page.locator('body').innerText()).slice(-2500));}}catch{}}
+ throw error;
 } finally {await context.close();fs.rmSync(temp,{recursive:true,force:true});}

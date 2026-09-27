@@ -1,3 +1,11 @@
+# 1.9.0 — Automatic discovery
+
+- AI search suggestions, editable portal search plan and bounded job collection.
+- Dedicated tab visits search pages, AI screens listings, then reads and analyzes promising full descriptions.
+- Saved progress, Stop/Resume, skip step and portal login/security-check pause. Profile changes require a new plan.
+- Captured discovery jobs appear in the shortlist across multiple searches. Existing installation ID/data remain unchanged.
+- Keep discovery open; first-page collection only, no scheduled background crawling or applications. Live portals/Puter still require user verification.
+
 # 1.8.0 — AI job finding agent
 
 - Shared AI recommendation for Job List and Job Intelligence, with estimated suitability, role alignment, confidence, reasons to apply/avoid, unknowns and quoted evidence.
