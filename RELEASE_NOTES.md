@@ -1,3 +1,14 @@
+# JobPilot 1.10.0 — Two-stage AI screening
+
+- Listing-page AI results are now explicitly PROVISIONAL.
+- Listing AI can shortlist or screen out, but it cannot produce a final APPLY verdict.
+- Full job-description analysis is explicitly FINAL and can return APPLY / REVIEW / SKIP.
+- Added 0–100 Frontend Relevance score.
+- Added role composition: FRONTEND_HEAVY, BALANCED_FULLSTACK, BACKEND_HEAVY, NON_FRONTEND, UNKNOWN.
+- Backend-heavy / non-frontend roles are capped at low frontend relevance.
+- Long listing snippets can no longer be mistaken for a full JD.
+- AI ranking now uses frontend relevance as an additional ordering signal.
+
 # JobPilot 1.9.0 — AI Job Agent Upgrade
 
 - AI-ranked job feed based on the saved candidate profile and job preferences.
