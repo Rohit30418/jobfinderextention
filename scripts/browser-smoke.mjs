@@ -168,4 +168,8 @@ try {
  fs.mkdirSync('test-results',{recursive:true});await page.screenshot({path:'test-results/job-list.png',fullPage:true});
  assert.deepEqual(errors,[],'Browser JavaScript errors');
  console.log('PASS: AI agent shortlist ordering, evidence, review/skip filters and shared detail score with controlled provider responses; real extension startup without storage RPC, cross-context Web Lock saves, preference control, Indeed vjk capture, local match, concurrent storage, backup/undo, and pinned bridge transport. Provider authentication remains a live release gate.');
+} catch(error) {
+ fs.mkdirSync('test-results',{recursive:true});
+ for(const [i,page] of context.pages().entries()){try{if(page.url().startsWith('chrome-extension:')){await page.screenshot({path:'test-results/failure-'+i+'.png',fullPage:true});console.log('Extension page diagnostic:',page.url(),(await page.locator('body').innerText()).slice(-2500));}}catch{}}
+ throw error;
 } finally {await context.close();fs.rmSync(temp,{recursive:true,force:true});}

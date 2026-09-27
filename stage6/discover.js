@@ -1,5 +1,4 @@
 import {getState,getPreferences,getNaukriNativeFilters,getJobCache,getAppliedJobs,getPuterToken,getAiAuthorized} from '../core/storage.js';
-import {planJobSearchesWithAi} from '../core/puter-client.js';
 import {DISCOVERY_KEY,buildDiscoveryPlan,addDiscoveredJobs,safeJobUrl} from '../core/discovery.js';
 import {analysisRevision} from '../core/analysis-inputs.js';
 import {recommendationFor,compareRecommendations} from '../core/agent-recommendation.js';
@@ -45,7 +44,7 @@ async function execute(){
    while(run.phase==='search' && run.searchIndex<run.searches.length && run.jobs.length<run.limit){
     checkpoint();await ensureInputs();const search=run.searches[run.searchIndex];message(`Searching ${search.portal}: ${search.query}`);await save();
     const captured=await visit(search.url,'search');
-    if(captured){const before=run.jobs.length;const applied=await getAppliedJobs();const cap=Math.max(2,Math.ceil(run.limit/Math.min(6,run.searches.length)));addDiscoveredJobs(run,captured.jobs.slice(0,cap),Object.keys(applied.items || {}));event(`${search.portal}: collected ${run.jobs.length-before} new jobs.`);}
+    if(captured){const before=run.jobs.length;const applied=await getAppliedJobs();const cap=Math.max(2,Math.ceil(run.limit/Math.min(6,run.searches.length)));addDiscoveredJobs(run,captured.jobs.filter(job=>!run.jobs.includes(job.key) && !applied.items?.[job.key]).slice(0,cap),Object.keys(applied.items || {}));event(`${search.portal}: collected ${run.jobs.length-before} new jobs.`);}
     else event(`${search.portal}: no readable listing within 35 seconds. This search was skipped.`);
     run.searchIndex++;await save();
    }
@@ -69,7 +68,7 @@ async function execute(){
   finally{busy=false;await save();}
  });
 }
-$('suggest').addEventListener('click',async()=>{try{$('suggest').disabled=true;message('AI is planning suitable role searches…');await inputs();const plan=await planJobSearchesWithAi(profile,preferences);$('queries').value=plan.queries.join('\n');$('planReason').textContent=plan.reason;message('Search suggestions ready. Build the plan to inspect portal searches.');}catch(error){message(error.message);}finally{$('suggest').disabled=false;}});
+$('suggest').addEventListener('click',async()=>{try{$('suggest').disabled=true;message('AI is planning suitable role searches…');await inputs();const plan=await rpc({type:'jobpilot:discovery-plan'});$('queries').value=plan.queries.join('\n');$('planReason').textContent=plan.reason;message('Search suggestions ready. Build the plan to inspect portal searches.');}catch(error){message(error.message);}finally{$('suggest').disabled=false;}});
 $('prepare').addEventListener('click',async()=>navigator.locks.request('jobpilot.discovery.runner',{ifAvailable:true},async lock=>{if(!lock){message('Stop the discovery running in another tab before replacing its plan.');return;}try{await inputs();run=buildDiscoveryPlan(profile,preferences,$('queries').value.split('\n'),[...document.querySelectorAll('[name=portal]:checked')].map(x=>x.value),$('limit').value,await getNaukriNativeFilters());run.inputRevision=analysisRevision(profile,preferences,{});await save();message('Plan ready. Start discovery to visit these searches and analyze the results.');}catch(error){message(error.message);}}));
 $('start').addEventListener('click',()=>execute().catch(error=>message(error.message)));
 $('stop').addEventListener('click',()=>{stopped=true;message('Stopping after the current operation. Progress will be saved.');});
