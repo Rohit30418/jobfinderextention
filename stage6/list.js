@@ -1,3 +1,4 @@
+import { recommendationFor, compareRecommendations } from "../core/agent-recommendation.js";
 import "../core/relevance-gate.js";
 import "../core/portal-engine.js";
 import {
@@ -12,6 +13,7 @@ import {
   getSkillVault,
   getState,
   getPreferences,
+  setPreferences,
   importJobPilotBackup,
   undoLastImport,
   markJobApplied,
@@ -104,6 +106,10 @@ let mode = "recommended";
 let portalMode = "all";
 let query = "";
 let latestContext = null;
+let agentRunning = false;
+let agentStopped = false;
+let agentTimer;
+let agentError = "";
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -164,6 +170,7 @@ function allCapturedJobs() {
 
       output.push({
         ...job,
+        ...(cached || {}),
         relevance: globalThis.JobPilotRelevanceGate.evaluate(job, currentPreferences),
         portal: job.portal || context.portal || "",
         portalName:
@@ -182,107 +189,25 @@ function allCapturedJobs() {
   return output;
 }
 
-function decisionRank(job) {
-  const deepAction = job.deepMatch?.applyDecision?.action;
-  const aiAction = job.aiRanking?.decision;
-  const relevance = job.relevance?.status || "review";
-  const numericScore = score(job);
-
-  if (deepAction === "SKIP") return 9;
-  if (!deepAction && aiAction === "SKIP") return 9;
-  // Deep matching takes precedence over broad AI ranking.
-  if (deepAction === "APPLY") return 0;
-  if (!deepAction && aiAction === "APPLY") return 1;
-
-  // Fresh jobs that passed the relevance gate should stay above weak
-  // REVIEW FIRST results when we do not yet have a stronger AI/deep signal.
-  if (
-    relevance === "relevant" &&
-    !deepAction &&
-    !aiAction
-  ) {
-    return 2;
-  }
-
-  // A REVIEW FIRST job with a genuinely strong score can still rank well.
-  if (
-    deepAction === "REVIEW FIRST" &&
-    Number.isFinite(numericScore) &&
-    numericScore >= 75
-  ) {
-    return 3;
-  }
-
-  if (
-    aiAction === "REVIEW" &&
-    Number.isFinite(numericScore) &&
-    numericScore >= 75
-  ) {
-    return 4;
-  }
-
-  if (deepAction === "REVIEW FIRST") return 5;
-  if (aiAction === "REVIEW") return 6;
-
-  if (
-    relevance === "review" &&
-    !deepAction &&
-    !aiAction
-  ) {
-    return 7;
-  }
-
-  if (deepAction === "SKIP" || aiAction === "SKIP") return 9;
-
-  return 8;
-}
-
-function score(job) {
-  const deep = job.deepMatch?.matchScore?.score;
-  if (Number.isFinite(deep)) return deep;
-
-  const ai = job.aiRanking?.fitScore;
-  return Number.isFinite(ai) ? ai : -1;
-}
-
+function score(job) { return recommendationFor(job)?.fitScore ?? -1; }
 function visible(job) {
-  const status = job.relevance?.status || "review";
-  const analyzed = Boolean(job.deepMatch);
-
-  if (
-    portalMode !== "all" &&
-    job.portal !== portalMode
-  ) {
-    return false;
-  }
-
-  if (mode === "relevant") return status === "relevant";
-  if (mode === "review") return status === "review";
-  if (mode === "analyzed") return analyzed;
-  if (mode === "recommended") {
-    const deepDecision = job.deepMatch?.applyDecision?.action;
-    const aiDecision = job.aiRanking?.decision;
-
-    if (deepDecision === "APPLY" || deepDecision === "REVIEW FIRST") {
-      return true;
-    }
-
-    if (deepDecision === "SKIP") {
-      return false;
-    }
-
-    if (aiDecision === "APPLY" || aiDecision === "REVIEW") {
-      return true;
-    }
-
-    if (aiDecision === "SKIP") {
-      return false;
-    }
-
-    return status === "relevant";
-  }
-
+  if (portalMode !== 'all' && job.portal !== portalMode) return false;
+  const rec = recommendationFor(job);
+  if (mode === 'recommended' || mode === 'relevant') return rec?.decision === 'APPLY';
+  if (mode === 'review') return rec?.decision === 'REVIEW';
+  if (mode === 'pending') return !rec;
+  if (mode === 'skip') return rec?.decision === 'SKIP';
+  if (mode === 'analyzed') return Boolean(rec);
   return true;
+}
+function agentDetails(job) {
+  const rec = recommendationFor(job);
+  if (!rec) return '<p class="reason">Waiting for AI analysis. Run the agent to evaluate this job.</p>';
+  const section = (title,items) => items.length ? '<strong>'+title+'</strong><ul>'+items.map(x=>'<li>'+escapeHtml(x)+'</li>').join('')+'</ul>' : '';
+  return '<details class="agent-explanation"><summary>Why apply / why not · '+escapeHtml(rec.confidence)+' confidence · '+(rec.basis === 'LISTING' ? 'Listing only' : 'Job description')+'</summary>'+
+    section('Why apply',rec.reasons)+section('Why not / gaps',rec.gaps)+section('Confirmed conflicts',rec.hardBlockers.map(x=>x.explanation))+
+    section('Check before applying',rec.unknowns)+section('Evidence',rec.evidence.map(x=>'Your profile: “'+x.candidateQuote+'” · Job: “'+x.jobQuote+'” — '+x.explanation))+
+    '<p>'+escapeHtml(rec.nextStep)+'</p><small>Estimated fit, not an interview or selection probability.</small></details>';
 }
 
 function matchesQuery(job) {
@@ -301,61 +226,9 @@ function matchesQuery(job) {
 }
 
 function badgeFor(job) {
-  const decision = job.deepMatch?.applyDecision?.action;
-
-  if (decision) {
-    const cls =
-      decision === "APPLY"
-        ? "apply"
-        : decision === "SKIP"
-          ? "skip"
-          : "review";
-
-    return (
-      '<span class="badge ' +
-      cls +
-      '">' +
-      escapeHtml(decision) +
-      "</span>"
-    );
-  }
-
-  const aiDecision = job.aiRanking?.decision;
-
-  if (aiDecision) {
-    const cls =
-      aiDecision === "APPLY"
-        ? "apply"
-        : aiDecision === "SKIP"
-          ? "skip"
-          : "review";
-
-    return (
-      '<span class="badge ' +
-      cls +
-      '">AI ' +
-      escapeHtml(aiDecision) +
-      "</span>"
-    );
-  }
-
-  const status = job.relevance?.status || "review";
-  const label =
-    status === "relevant"
-      ? "HIGH PRIORITY"
-      : status === "filtered"
-        ? "LOW PRIORITY"
-        : "REVIEW";
-
-  return (
-    '<span class="badge ' +
-    status +
-    '">' +
-    label +
-    "</span>"
-  );
+  const recommendation = recommendationFor(job);
+  return '<span class="badge '+(recommendation?.decision === 'APPLY' ? 'apply' : recommendation?.decision === 'SKIP' ? 'skip' : 'review')+'">'+escapeHtml(recommendation?.decision || 'PENDING AI')+'</span>';
 }
-
 function portalMeta(id) {
   return PORTALS.find((item) => item.id === id) || {
     id,
@@ -962,39 +835,12 @@ function renderJobs() {
   const jobs = all
     .filter(visible)
     .filter(matchesQuery)
-    .sort((a, b) => {
-      const rankDiff =
-        decisionRank(a) - decisionRank(b);
+    .sort((a,b)=>compareRecommendations(a,b) || String(b.listingCapturedAt || '').localeCompare(String(a.listingCapturedAt || '')));
 
-      if (rankDiff) return rankDiff;
-
-      const scoreDiff = score(b) - score(a);
-      if (scoreDiff) return scoreDiff;
-
-      const relevanceDiff =
-        (a.relevance?.status === "relevant" ? 0 : 1) -
-        (b.relevance?.status === "relevant" ? 0 : 1);
-
-      if (relevanceDiff) return relevanceDiff;
-
-      return String(b.listingCapturedAt || "")
-        .localeCompare(
-          String(a.listingCapturedAt || "")
-        );
-    });
-
-  const analyzed = all.filter((job) => job.deepMatch).length;
-  const relevant = all.filter(
-    (job) => job.relevance?.status === "relevant"
-  ).length;
-  const review = all.filter(
-    (job) =>
-      !job.relevance?.status ||
-      job.relevance?.status === "review"
-  ).length;
-  const filtered = all.filter(
-    (job) => job.relevance?.status === "filtered"
-  ).length;
+  const analyzed = all.filter(job=>recommendationFor(job)).length;
+  const relevant = all.filter(job=>recommendationFor(job)?.decision === 'APPLY').length;
+  const review = all.filter(job=>recommendationFor(job)?.decision === 'REVIEW').length;
+  const filtered = all.filter(job=>recommendationFor(job)?.decision === 'SKIP').length;
 
   els.totalCount.textContent = all.length;
   els.relevantCount.textContent = relevant;
@@ -1004,20 +850,14 @@ function renderJobs() {
 
   els.emptyState.classList.toggle(
     "hidden",
-    Boolean(all.length)
+    Boolean(jobs.length)
   );
 
   els.jobList.innerHTML = jobs.map((job) => {
-    const matchScore =
-      Number.isFinite(job.deepMatch?.matchScore?.score)
-        ? job.deepMatch.matchScore.score
-        : Number.isFinite(job.aiRanking?.fitScore)
-          ? job.aiRanking.fitScore
-          : null;
-
+    const matchScore = recommendationFor(job)?.fitScore;
     const reasons =
-      job.aiRanking?.reasons?.length
-        ? job.aiRanking.reasons
+      recommendationFor(job)?.reasons?.length
+        ? recommendationFor(job).reasons
         : job.relevance?.reasons || [];
 
     const portalName =
@@ -1049,7 +889,7 @@ function renderJobs() {
               Number.isFinite(matchScore)
                 ? '<span class="badge score">' +
                   matchScore +
-                  (job.deepMatch ? "% MATCH" : "% AI FIT") +
+                  "/100 EST. FIT" +
                   "</span>"
                 : ""
             ) +
@@ -1095,6 +935,7 @@ function renderJobs() {
           ) +
         "</div>" +
 
+        agentDetails(job) +
         '<div class="job-actions">' +
           '<span class="deep-note">' +
             (
@@ -1189,16 +1030,16 @@ function renderHeader() {
   els.openSourceBtn.disabled =
     !latestContext?.sourceUrl;
 
-  const aiRanked = all.filter((job) => job.aiRanking).length;
-  if (els.aiRankStatus) {
-    els.aiRankStatus.textContent =
+  const aiRanked = all.filter(job=>recommendationFor(job)).length;
+  if (els.aiRankStatus && !agentRunning) {
+    els.aiRankStatus.textContent = agentError || (
       aiRanked
         ? aiRanked + " job" + (aiRanked === 1 ? "" : "s") + " AI-ranked. Recommended is sorted by fit."
-        : "AI ranking has not run yet.";
+        : "Run the AI agent to build your shortlist. Unanalyzed jobs are in Pending.");
   }
 
   if (els.aiRankBtn) {
-    els.aiRankBtn.disabled = !all.length;
+    els.aiRankBtn.disabled = agentRunning || !all.length;
   }
 }
 
@@ -1224,7 +1065,12 @@ async function load() {
       getPreferences()
     ]);
 
+  document.querySelector('#agentAuto').checked = currentPreferences.agentEnabled === true;
   render();
+  if (currentPreferences.agentEnabled && !agentRunning && !agentStopped && !agentError) {
+    clearTimeout(agentTimer);
+    agentTimer = setTimeout(()=>{if(currentPreferences.agentEnabled && !agentStopped) runAgent();}, 800);
+  }
 }
 
 
@@ -1341,56 +1187,44 @@ for (const button of document.querySelectorAll("[data-vault-mode]")) {
   });
 }
 
-els.aiRankBtn?.addEventListener("click", async () => {
-  const jobs = allCapturedJobs()
-    .filter((job) => job.relevance?.status !== "filtered")
-    .slice(0, 120)
-    .map((job) => ({
-      key: job.key,
-      portal: job.portal,
-      title: job.title,
-      company: job.company,
-      location: job.location,
-      experienceText: job.experienceText,
-      salaryText: job.salaryText,
-      skills: job.skills || [],
-      snippet: job.snippet || "",
-      postedAge: job.postedAge || ""
-    }));
-
+async function runAgent() {
+  if (agentRunning) return;
+  const jobs = allCapturedJobs().filter(job=>!recommendationFor(job) && !jobAppliedRecord(job));
   if (!jobs.length) return;
-
+  agentRunning = true; agentStopped = false; agentError = '';
   els.aiRankBtn.disabled = true;
-  els.aiRankBtn.textContent = "AI Ranking…";
-  if (els.aiRankStatus) {
-    els.aiRankStatus.textContent = "AI is comparing captured jobs with your saved profile and preferences.";
-  }
-
+  els.aiRankBtn.textContent = 'Analyzing…';
+  document.querySelector('#agentStopBtn').disabled = false;
+  let completed = 0;
   try {
-    const response = await chrome.runtime.sendMessage({
-      type: "jobpilot:rank-list-ai",
-      jobs
-    });
-
-    if (!response?.ok) {
-      throw new Error(response?.error || "AI ranking failed.");
+    for (let index=0; index<jobs.length && !agentStopped; index+=2) {
+      els.aiRankStatus.textContent = 'AI agent: '+completed+' / '+jobs.length+' jobs analyzed. You can stop after the current batch.';
+      const response = await chrome.runtime.sendMessage({type:'jobpilot:rank-list-ai',jobs:jobs.slice(index,index+2).map(job=>({key:job.key}))});
+      if (!response?.ok) throw new Error(response?.error || 'AI unavailable. Your jobs are saved; retry when connected.');
+      completed += response.count;
+      await load();
     }
-
-    if (els.aiRankStatus) {
-      els.aiRankStatus.textContent =
-        "AI ranked " + Number(response.count || 0) + " jobs. Best fits are now first.";
-    }
-
-    await load();
-  } catch (error) {
-    if (els.aiRankStatus) {
-      els.aiRankStatus.textContent = error?.message || String(error);
-    }
-  } finally {
-    els.aiRankBtn.disabled = false;
-    els.aiRankBtn.textContent = "AI Rank Jobs";
+  } catch(error) { agentError = error?.message || String(error); }
+  finally {
+    agentRunning = false;
+    els.aiRankBtn.disabled = false; els.aiRankBtn.textContent = 'Run AI Agent';
+    document.querySelector('#agentStopBtn').disabled = true;
+    if(currentPreferences.agentEnabled && !agentStopped && !agentError) await load();
+    els.aiRankStatus.textContent = agentError || (agentStopped ? 'Agent paused. ' : 'Analysis complete. ')+completed+' jobs analyzed. Strong matches are in Recommended; uncertain jobs are in Review.';
   }
+}
+els.aiRankBtn?.addEventListener('click', ()=>{agentStopped=false;agentError='';runAgent();});
+document.querySelector('#agentStopBtn')?.addEventListener('click',()=>{agentStopped=true;els.aiRankStatus.textContent='Stopping after the current request…';});
+document.querySelector('#agentAuto')?.addEventListener('change',async event=>{
+  const enabled=event.target.checked;
+  clearTimeout(agentTimer); agentStopped=!enabled;
+  try {
+    await setPreferences({...currentPreferences,agentEnabled:enabled,automaticAi:enabled});
+    agentStopped=!enabled; agentError=''; await load();
+    if(enabled) runAgent();
+  } catch(error) {event.target.checked=!enabled;els.aiRankStatus.textContent=error.message;}
 });
+
 
 els.openSourceBtn.addEventListener(
   "click",

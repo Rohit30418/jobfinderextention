@@ -100,10 +100,8 @@ test('profile changes invalidate cached and late analysis',async()=>{
  const stale={...job,aiAnalysis:{inputRevision:revision,requiredSkills:['React'],candidateRequirementMatches:[{requirement:'React',status:'EXACT'}]}};
  assert.deepEqual(evaluateDeepMatch({...profile,skills:[]},prefs,stale).skills.required.exact,[]);
 });
-test('deep SKIP takes precedence over AI APPLY and CSV neutralizes formulas',()=>{
+test('CSV neutralizes spreadsheet formulas',()=>{
  const code=read('stage6/list.js');const ctx={};
- vm.runInNewContext(code.slice(code.indexOf('function decisionRank('),code.indexOf('function visible('))+';globalThis.rank=decisionRank;',ctx);
- assert.ok(ctx.rank({deepMatch:{applyDecision:{action:'SKIP'}},aiRanking:{decision:'APPLY'}})>ctx.rank({relevance:{status:'relevant'}}));
  vm.runInNewContext(code.slice(code.indexOf('function csvCell('),code.indexOf('function appliedJobsToCsv('))+';globalThis.csv=csvCell;',ctx);
  for(const value of ['=1+1',' +SUM(A1)','@cmd','-2','\t=cmd']) assert.ok(ctx.csv(value).startsWith('"\''));
  assert.equal(ctx.csv('Engineer'),'"Engineer"');assert.equal(ctx.csv('A"B'),'"A""B"');
@@ -187,4 +185,13 @@ test('extension page reads and saves without a background storage response',asyn
   delete globalThis.document;globalThis.location=oldLocation;delete chrome.runtime.sendMessage;
   if(descriptor)Object.defineProperty(navigator,'locks',descriptor);else delete navigator.locks;
  }
+});
+
+test('agent mode toggles retain recommendations while actual preference edits invalidate them',async()=>{
+ await store.setState({profile});await store.setPreferences({targetRoles:['Frontend Developer']});
+ await store.persistPortalCapture({portal:'indeed',pageType:'detail',detail:job,jobs:[]});
+ const preferences=await store.getPreferences();const cached=(await store.getJobCache())[job.key];
+ await store.saveJobAiRankings([{key:job.key,inputRevision:analysisRevision(profile,preferences,cached),version:1,decision:'APPLY',fitScore:85}]);
+ await store.setPreferences({...preferences,agentEnabled:true,automaticAi:true});assert.equal((await store.getJobCache())[job.key].aiRanking.fitScore,85);
+ await store.setPreferences({...preferences,targetRoles:['Backend Developer']});assert.equal((await store.getJobCache())[job.key].aiRanking,undefined);
 });

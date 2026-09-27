@@ -98,6 +98,7 @@ async function _getPreferences() {
 }
 
 async function _setPreferences(preferences) {
+  const previous = await _getPreferences();
   const next = {
     ...emptyPreferences(),
     ...preferences,
@@ -105,7 +106,7 @@ async function _setPreferences(preferences) {
     updatedAt: new Date().toISOString()
   };
   await chrome.storage.local.set({ [PREFERENCES_KEY]: next });
-  await invalidateMatches();
+  if (analysisRevision(null, previous, {}) !== analysisRevision(null, next, {})) await invalidateMatches();
   return next;
 }
 

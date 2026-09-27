@@ -364,30 +364,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }
 
         const cache = await getJobCache();
-        const jobs = Array.isArray(message.jobs)
-          ? message.jobs.slice(0, 120).map(job => cache[job?.key]).filter(Boolean)
-          : [];
-
-        if (!jobs.length) {
-          throw new Error("No captured jobs are available to rank.");
-        }
-
-        const rankings = [];
-        const batchSize = 20;
-
-        for (let index = 0; index < jobs.length; index += batchSize) {
-          const batch = jobs.slice(index, index + batchSize);
-
-          const batchRankings = await analyzeJobBatchForCandidate(
-            state.profile,
-            preferences,
-            batch
-          );
-
-          rankings.push(...batchRankings);
-          await saveJobAiRankings(batchRankings);
-        }
-
+        const jobs = [...new Set((Array.isArray(message.jobs) ? message.jobs : []).map(job=>job?.key))]
+          .slice(0, 2).map(key=>cache[key]).filter(Boolean);
+        if (!jobs.length) throw new Error("No captured jobs are available to analyze.");
+        const rankings = await analyzeJobBatchForCandidate(state.profile, preferences, jobs);
+        const saved = await saveJobAiRankings(rankings);
+        if (rankings.some(row=>saved[row.key]?.aiRanking?.inputRevision !== row.inputRevision)) throw new Error("Your profile or job details changed during analysis. Run the agent again.");
         sendResponse({
           ok: true,
           rankings,

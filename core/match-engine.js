@@ -1,3 +1,4 @@
+import { recommendationFor } from "./agent-recommendation.js";
 import { analysisRevision } from "./analysis-inputs.js";
 function clean(value) {
   return String(value || "")
@@ -1062,6 +1063,7 @@ export function evaluateDeepMatch(profile, preferences, job) {
 
   const inputRevision = analysisRevision(profile, preferences, job);
   if (job.aiAnalysis?.inputRevision !== inputRevision) job = { ...job, aiAnalysis: null };
+  if (job.aiRanking?.inputRevision !== inputRevision) job = { ...job, aiRanking: null };
   const candidateSkillList = candidateSkills(profile);
 
   const requiredSkills = unique(
@@ -1358,7 +1360,7 @@ export function evaluateDeepMatch(profile, preferences, job) {
 
   const confidence = evidenceConfidence(job, requiredSkills, role);
 
-  const matchScore = buildMatchScore({
+  let matchScore = buildMatchScore({
     preferences,
     role,
     requiredSkills,
@@ -1373,7 +1375,7 @@ export function evaluateDeepMatch(profile, preferences, job) {
     confidence
   });
 
-  const applyDecision = buildApplyDecision({
+  let applyDecision = buildApplyDecision({
     verdict,
     blockers,
     strengths,
@@ -1389,14 +1391,28 @@ export function evaluateDeepMatch(profile, preferences, job) {
     explicitDisqualifiers
   });
 
+  const recommendation = recommendationFor(job);
+  if (recommendation) {
+    matchScore = {...matchScore, score:recommendation.fitScore, label:'AI ESTIMATED FIT', source:'puter-ai-agent'};
+    const items = values => values.map(detail=>({label:detail,detail:''}));
+    applyDecision = {
+      action:recommendation.decision === 'REVIEW' ? 'REVIEW FIRST' : recommendation.decision,
+      tone:recommendation.decision === 'APPLY' ? 'success' : recommendation.decision === 'SKIP' ? 'danger' : 'warning',
+      headline:recommendation.summary,summary:recommendation.summary,
+      reasons:items(recommendation.reasons),cautions:items([...recommendation.gaps,...recommendation.unknowns,...recommendation.hardBlockers.map(x=>x.explanation)]),
+      confidence:recommendation.confidence,nextStep:recommendation.nextStep
+    };
+  }
+
   return {
-    version: 3,
+    version: 4,
+    recommendation,
     inputRevision,
     jobKey: job.key || "",
     matchScore,
     portal: job.portal || "",
-    verdict,
-    confidence,
+    verdict: recommendation ? ({APPLY:"STRONG FIT",REVIEW:"POSSIBLE FIT",SKIP:"WEAK FIT"}[recommendation.decision]) : verdict,
+    confidence: recommendation ? {...confidence,level:recommendation.confidence} : confidence,
 
     role,
     experience,

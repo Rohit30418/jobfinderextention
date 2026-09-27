@@ -34,3 +34,19 @@ test('changed profile never reuses prior semantic evidence',async()=>{
  await store.setState({profile:{...profile,skills:[]}});
  const result=await send({type:'jobpilot:inline-analyze',job});assert.deepEqual(result.match.skills.required.exact,[]);
 });
+
+test('AI agent receives full descriptions and rejects duplicate or omitted batch rows',async()=>{
+ await store.setPuterToken('synthetic');await store.setAiAuthorized(true);
+ let prompt='';globalThis.fetch=async(_,options)=>{prompt=JSON.parse(options.body).args.messages[0].content;return {ok:true,status:200,json:async()=>({result:{message:{content:JSON.stringify({results:[]})}}})};};
+ const result=await send({type:'jobpilot:rank-list-ai',jobs:[{key:job.key}]});
+ assert.equal(result.ok,false);assert.match(result.error,/incomplete/);assert.ok(prompt.includes(job.description));
+ assert.equal((await store.getJobCache())[job.key].aiRanking,undefined);
+});
+test('agent persists validated recommendation, but refuses a late response after profile changes',async()=>{
+ await store.setPuterToken('synthetic');await store.setAiAuthorized(true);
+ const output={results:[{key:job.key,recommendation:{decision:'APPLY',fitScore:85,roleFit:'MATCH',confidence:'HIGH',whyApply:['React match'],evidence:[{candidateQuote:'React',jobQuote:'React',explanation:'Explicit React skill'}]}}]};
+ globalThis.fetch=async()=>({ok:true,status:200,json:async()=>({result:{message:{content:JSON.stringify(output)}}})});
+ const result=await send({type:'jobpilot:rank-list-ai',jobs:[{key:job.key}]});assert.equal(result.ok,true);assert.equal((await store.getJobCache())[job.key].aiRanking.decision,'APPLY');
+ globalThis.fetch=async()=>{await store.setState({profile:{...profile,skills:[]}});return {ok:true,status:200,json:async()=>({result:{message:{content:JSON.stringify(output)}}})};};
+ const late=await send({type:'jobpilot:rank-list-ai',jobs:[{key:job.key}]});assert.equal(late.ok,false);assert.equal((await store.getJobCache())[job.key].aiRanking,undefined);
+});

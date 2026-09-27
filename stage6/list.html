@@ -18,7 +18,7 @@
         </p>
       </div>
       <div class="actions">
-        <button class="btn ai-rank-btn" id="aiRankBtn" type="button">AI Rank Jobs</button>
+        <button class="btn ai-rank-btn" id="aiRankBtn" type="button">Run AI Agent</button><button class="btn" id="agentStopBtn" type="button" disabled>Stop</button>
         <button class="btn" id="openSourceBtn" type="button">Open last search</button>
         <a class="btn ghost" href="../stage3/naukri.html">Search settings</a>
       </div>
@@ -30,6 +30,7 @@
           <div class="kicker">ALL CAPTURED PORTALS</div>
           <h2 id="listingTitle">Waiting for job listings…</h2>
           <p id="listingMeta">Visit supported portal listing pages and JobPilot will combine them here.</p>
+          <label><input id="agentAuto" type="checkbox"> AI agent mode: automatically send my career profile, preferences and captured jobs to Puter for analysis while this list is open, and analyze opened job details.</label><p>Browse your saved searches to discover jobs. Strong matches appear in Recommended; uncertain jobs stay in Review. Scores estimate fit, not hiring chances.</p>
           <p id="aiRankStatus" class="ai-rank-status">AI ranking has not run yet.</p>
         </div>
         <div class="status" id="listingStatus">Waiting</div>
@@ -39,7 +40,7 @@
         <div><strong id="totalCount">0</strong><span>Total</span></div>
         <div><strong id="relevantCount">0</strong><span>Relevant</span></div>
         <div><strong id="reviewCount">0</strong><span>Review</span></div>
-        <div><strong id="filteredCount">0</strong><span>Filtered</span></div>
+        <div><strong id="filteredCount">0</strong><span>Not recommended</span></div>
         <div><strong id="analyzedCount">0</strong><span>Deep analyzed</span></div>
         <div><strong id="appliedCount">0</strong><span>Applied</span></div>
       </div>
@@ -136,6 +137,8 @@
         <button class="filter" data-mode="relevant" type="button">Relevant</button>
         <button class="filter" data-mode="review" type="button">Review</button>
         <button class="filter" data-mode="analyzed" type="button">Analyzed</button>
+        <button class="filter" data-mode="pending" type="button">Pending AI</button>
+        <button class="filter" data-mode="skip" type="button">Not recommended</button>
         <button class="filter" data-mode="all" type="button">All</button>
       </div>
       <input id="searchInput" type="search" placeholder="Search title, company, skill…">
@@ -144,8 +147,8 @@
     <main class="job-list" id="jobList"></main>
 
     <section class="empty panel hidden" id="emptyState">
-      <strong>No captured jobs yet.</strong>
-      <span>Visit Naukri, Foundit, LinkedIn Jobs, Indeed or Hirist listing pages. JobPilot will combine the captured jobs here.</span>
+      <strong>No jobs in this view yet.</strong>
+      <span>Browse supported portals, then Run AI Agent. Check Pending AI, Review or All to see jobs outside your shortlist.</span>
     </section>
   </div>
 
