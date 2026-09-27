@@ -490,3 +490,6 @@ input{
 .ai-disclaimer{display:block;margin-top:12px;color:#72849a}
 @media(max-width:900px){.ai-score-grid{grid-template-columns:1fr 1fr 1fr}.ai-review-columns{grid-template-columns:1fr}}
 @media(max-width:600px){.ai-verdict,.ai-score-grid{grid-template-columns:1fr}.agent-explanation summary{align-items:flex-start;flex-direction:column}.ai-review-summary-meta{text-align:left}}
+
+.badge.frontend{color:#9fd0ff;border-color:rgba(142,178,255,.45);background:rgba(142,178,255,.06)}
+.badge.composition{color:#c8b7ff;border-color:rgba(180,150,255,.38);background:rgba(180,150,255,.05)}
