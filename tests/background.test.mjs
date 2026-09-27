@@ -16,10 +16,21 @@ test('content scripts cannot call privileged storage or start authentication',as
  assert.equal((await send({type:'jobpilot:storage',name:'getPuterToken',args:[]})).ok,false);
  assert.equal((await send({type:'jobpilot:auth-begin'})).ok,false);
 });
-test('local analysis works without AI and automatic transmission is off by default',async()=>{
+test('short/incomplete detail stays local even when Puter is connected',async()=>{
  await store.setPuterToken('synthetic');await store.setAiAuthorized(true);let calls=0;
  globalThis.fetch=async()=>{calls++;throw new Error('Should not call AI');};
- const result=await send({type:'jobpilot:inline-analyze',job});assert.equal(result.ok,true);assert.equal(result.aiStatus,'local');assert.equal(calls,0);assert.ok(result.match);
+ const result=await send({type:'jobpilot:inline-analyze',job});assert.equal(result.ok,true);assert.equal(result.aiStatus,'waiting-for-jd');assert.equal(calls,0);assert.ok(result.match);
+});
+test('full JD automatically runs AI once and then reuses the cached final analysis',async()=>{
+ await store.setPuterToken('synthetic');await store.setAiAuthorized(true);
+ const fullJob={...job,description:'React frontend developer responsibilities and requirements. '.repeat(12)};
+ let calls=0;
+ const output={requiredSkills:['React'],candidateRequirementMatches:[{requirement:'React',status:'EXACT',evidence:['React'],explanation:'Explicit React skill'}],recommendation:{decision:'APPLY',fitScore:88,frontendRelevanceScore:94,roleComposition:'FRONTEND_HEAVY',roleFit:'MATCH',confidence:'HIGH',whyApply:['React match'],whyNotApply:[],unknowns:[],nextStep:'Apply after reviewing company details',evidence:[{candidateQuote:'React',jobQuote:'React',explanation:'Explicit React skill'}],hardBlockers:[]}};
+ globalThis.fetch=async()=>{calls++;return {ok:true,status:200,json:async()=>({result:{message:{content:JSON.stringify(output)}}})};};
+ const first=await send({type:'jobpilot:inline-analyze',job:fullJob});
+ assert.equal(first.ok,true);assert.equal(first.aiStatus,'completed');assert.equal(first.match.applyDecision.action,'APPLY');assert.equal(calls,1);
+ const second=await send({type:'jobpilot:inline-analyze',job:fullJob});
+ assert.equal(second.ok,true);assert.equal(second.aiStatus,'cached');assert.equal(calls,1);
 });
 test('AI failures return local match and concurrent requests share one request',async()=>{
  await store.setPuterToken('synthetic');await store.setAiAuthorized(true);
