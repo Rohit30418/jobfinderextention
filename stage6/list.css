@@ -461,3 +461,32 @@ input{
 .agent-explanation summary { cursor: pointer; font-weight: 600; }
 .agent-explanation strong { display: block; margin-top: 12px; }
 .agent-explanation ul { padding-left: 22px; }
+
+
+/* AI Job Agent v1.9 */
+.badge.rank{color:#d7e4ff;border-color:rgba(142,178,255,.48);background:rgba(142,178,255,.08)}
+.badge.priority.high{color:#94f8b8;border-color:rgba(111,240,160,.42)}
+.badge.priority.medium{color:#f4cd74;border-color:rgba(239,186,75,.42)}
+.badge.priority.low,.badge.priority.hold{color:#b9c8d9;border-color:#35445a}
+.ai-card-summary{font-size:13px;line-height:1.6;color:#b7c7d9}
+.agent-explanation{background:#091019;border-color:#2a3a50}
+.agent-explanation summary{display:flex;justify-content:space-between;gap:14px;align-items:center;list-style:none}
+.agent-explanation summary::-webkit-details-marker{display:none}
+.ai-review-summary-meta{color:#8fa0b7;font-size:11px;font-weight:700;text-align:right}
+.ai-verdict{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:14px 0}
+.ai-verdict>div,.ai-score-item{border:1px solid #213047;border-radius:10px;padding:10px;background:#0d151f}
+.ai-verdict span,.ai-score-item span{display:block;color:#7f91a8;font-size:9px;text-transform:uppercase;letter-spacing:.08em}
+.ai-verdict strong,.ai-score-item strong{display:block;margin-top:4px;font-size:12px}
+.ai-summary{margin:8px 0 14px;color:#c2d0df}
+.ai-score-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:12px 0 14px}
+.ai-score-item small{display:block;margin-top:5px;color:#7f91a8;font-size:9px;line-height:1.4}
+.ai-review-columns{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.ai-review-section{border-top:1px solid #1d2a3a;padding-top:10px;margin-top:10px}
+.ai-review-section>strong{margin-top:0;color:#dce7f5}
+.ai-review-section ul{margin:7px 0 0}
+.ai-review-section li{margin:5px 0;color:#aebdd0}
+.ai-next-step{display:grid;gap:4px;margin-top:14px;padding:11px;border:1px solid rgba(111,240,160,.24);border-radius:10px;background:rgba(111,240,160,.04)}
+.ai-next-step span{color:#b8c9dc}
+.ai-disclaimer{display:block;margin-top:12px;color:#72849a}
+@media(max-width:900px){.ai-score-grid{grid-template-columns:1fr 1fr 1fr}.ai-review-columns{grid-template-columns:1fr}}
+@media(max-width:600px){.ai-verdict,.ai-score-grid{grid-template-columns:1fr}.agent-explanation summary{align-items:flex-start;flex-direction:column}.ai-review-summary-meta{text-align:left}}
