@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "JobPilot - Universal Job Portal Assistant",
-  "version": "1.6.2",
-  "description": "JobPilot 1.6.2: fixes application queue ranking so strong relevant jobs outrank weak REVIEW FIRST results.",
+  "version": "1.7.0",
+  "description": "Capture jobs, compare requirements with your profile, and track applications with optional Puter AI.",
   "permissions": [
     "storage",
     "unlimitedStorage",
@@ -142,5 +142,12 @@
       ],
       "run_at": "document_idle"
     }
-  ]
+  ],
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtTxBdxSDr4iOudly3ywZqCPSG+X9jxudLwIxqhY7e4BuzMXRx7HI9H3Sn91R6Soqhf0x962IDW2jKnwnQ5cffIFp7mKMzllSmHZiBWg7xAD8Z9ojvs7ovgOPt3xozutepHXGuirf309d4u6OOVv+LKSo17IsuNLhZA6iIjpMhNtZzpvCsOCTCFrd6JyNQFcJ+DNFKgKKsCEPNMjg5HZVqMnVZnkW9Qa4yGEnVb/9drPoCWN8M28B403LS+132B4ypHHL446IBONzIWy9l2MibFtrlwb7UXXUSgr7LlGkgPqY75nylccrHjczf1GbWPE91NCVhAWJ3l06i9pZ5jKMaQIDAQAB",
+  "minimum_chrome_version": "120",
+  "externally_connectable": {
+    "matches": [
+      "https://rohit30418.github.io/*"
+    ]
+  }
 }

@@ -1,4 +1,5 @@
 (() => {
+  const EXTENSION_ID = "oilahhhnnieglaenjegdhogkaceaiibc";
   const AI_PERMISSION = "driver:puter-chat-completion:complete";
 
   const params = new URLSearchParams(location.search);
@@ -23,7 +24,7 @@
     return;
   }
 
-  if (!window.opener) {
+  if (!globalThis.chrome?.runtime?.sendMessage) {
     fail("JobPilot did not open this bridge window. Close it and use Connect Puter inside JobPilot.");
     return;
   }
@@ -36,6 +37,8 @@
         throw new Error("Puter.js did not load. Check your connection and try again.");
       }
 
+      const ready = await chrome.runtime.sendMessage(EXTENSION_ID, { type: "jobpilot:auth-check", state });
+      if (!ready?.ok) throw new Error("This sign-in request has expired. Start again inside JobPilot.");
       setStatus("Opening Puter sign-in…");
 
       const result = await puter.auth.signIn({
@@ -60,15 +63,10 @@
 
       setStatus("Connected. Returning to JobPilot…", "success");
 
-      window.opener.postMessage(
-        {
-          type: "jobpilot.puter.bridge.complete",
-          state,
-          token,
-          aiAuthorized: true
-        },
-        "*"
-      );
+      const saved = await chrome.runtime.sendMessage(EXTENSION_ID, {
+        type: "jobpilot:auth-complete", state, token, aiAuthorized: true
+      });
+      if (!saved?.ok) throw new Error("JobPilot could not accept this sign-in. Start again inside the extension.");
 
       setTimeout(() => window.close(), 500);
     } catch (error) {

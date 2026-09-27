@@ -23,6 +23,7 @@ const els = {
   excludedKeywords: $("#excludedKeywords"),
   minimumSalary: $("#minimumSalary"),
   salaryCurrency: $("#salaryCurrency"),
+  automaticAi: $("#automaticAi"),
   strictFreshness: $("#strictFreshness"),
   strictExperience: $("#strictExperience"),
   hideExcludedTitles: $("#hideExcludedTitles"),
@@ -130,6 +131,7 @@ function fillForm(pref) {
   els.excludedKeywords.value = listText(pref.excludedKeywords);
   els.minimumSalary.value = pref.minimumSalary ?? "";
   els.salaryCurrency.value = pref.salaryCurrency || "INR";
+  els.automaticAi.checked = pref.automaticAi === true;
   els.strictFreshness.checked = pref.strictFreshness !== false;
   els.strictExperience.checked = pref.strictExperience === true;
   els.hideExcludedTitles.checked = pref.hideExcludedTitles !== false;
@@ -150,6 +152,7 @@ function readForm() {
     excludedKeywords: splitList(els.excludedKeywords.value),
     minimumSalary: nullableNumber(els.minimumSalary.value),
     salaryCurrency: els.salaryCurrency.value,
+    automaticAi: els.automaticAi.checked,
     strictFreshness: els.strictFreshness.checked,
     strictExperience: els.strictExperience.checked,
     hideExcludedTitles: els.hideExcludedTitles.checked

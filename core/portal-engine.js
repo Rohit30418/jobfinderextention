@@ -50,9 +50,32 @@
     return (hash >>> 0).toString(36);
   }
 
+  function canonicalIdentity(value) {
+    try {
+      const url = new URL(String(value || ""));
+      const id = url.searchParams.get("vjk") || url.searchParams.get("jk") || url.searchParams.get("currentJobId") || url.searchParams.get("jobId");
+      if (id) return url.hostname.toLowerCase() + ":job:" + id;
+      url.hash = "";
+      for (const key of [...url.searchParams.keys()]) {
+        if (/^(utm_|ref$|source$|trackingId$)/i.test(key)) url.searchParams.delete(key);
+      }
+      url.searchParams.sort();
+      return url.origin + url.pathname.replace(/\/+$/, "") + url.search;
+    } catch (_) { return ""; }
+  }
+
+  function sameJob(a, b) {
+    if (!a || !b || a.portal !== b.portal) return false;
+    if (a.portalJobId && b.portalJobId) return String(a.portalJobId) === String(b.portalJobId);
+    const aUrl = canonicalIdentity(a.canonicalUrl);
+    const bUrl = canonicalIdentity(b.canonicalUrl);
+    if (aUrl && bUrl) return aUrl === bUrl;
+    return Boolean(a.key && a.key === b.key);
+  }
+
   function parseExperience(text) {
     const value = clean(text, 200);
-    const range = value.match(/(\d+)\s*(?:-|–|to)\s*(\d+)\s*(?:yrs?|years?)/i);
+    const range = value.match(/(\d+(?:\.\d+)?)\s*(?:-|–|to)\s*(\d+(?:\.\d+)?)\s*(?:yrs?|years?)/i);
     if (range) {
       return {
         text: value,
@@ -61,7 +84,7 @@
       };
     }
 
-    const single = value.match(/(\d+)\+?\s*(?:yrs?|years?)/i);
+    const single = value.match(/(\d+(?:\.\d+)?)\+?\s*(?:yrs?|years?)/i);
     if (single) {
       return {
         text: value,
@@ -70,7 +93,7 @@
       };
     }
 
-    const monthsRange = value.match(/(\d+)\s*(?:-|–|to)\s*(\d+)\s*months?/i);
+    const monthsRange = value.match(/(\d+(?:\.\d+)?)\s*(?:-|–|to)\s*(\d+(?:\.\d+)?)\s*months?/i);
     if (monthsRange) {
       return {
         text: value,
@@ -79,7 +102,7 @@
       };
     }
 
-    const months = value.match(/(\d+)\s*months?/i);
+    const months = value.match(/(\d+(?:\.\d+)?)\s*months?/i);
     if (months) {
       const years = Math.round((Number(months[1]) / 12) * 10) / 10;
       return {
@@ -306,6 +329,15 @@
       ], 50);
     }
 
+    if (!incoming.experienceText) {
+      next.experienceMin = existing.experienceMin ?? null;
+      next.experienceMax = existing.experienceMax ?? null;
+    }
+    if (incoming.description && incoming.description !== existing.description) {
+      delete next.aiAnalysis;
+      delete next.aiRanking;
+      delete next.deepMatch;
+    }
     return next;
   }
 
@@ -329,6 +361,8 @@
   }
 
   globalThis.JobPilotPortalEngine = {
+    canonicalIdentity,
+    sameJob,
     registerAdapter,
     detectAdapter,
     normalizeJob,

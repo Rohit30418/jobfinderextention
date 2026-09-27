@@ -30,6 +30,7 @@
   }
 
   function jsonLdJob() {
+    const candidates = [];
     for (const script of document.querySelectorAll('script[type="application/ld+json"]')) {
       try {
         const parsed = JSON.parse(script.textContent || "null");
@@ -39,13 +40,15 @@
           if (!item || typeof item !== "object") continue;
           const type = item["@type"];
           if (type === "JobPosting" || (Array.isArray(type) && type.includes("JobPosting"))) {
-            return item;
+            candidates.push(item);
           }
           if (Array.isArray(item["@graph"])) queue.push(...item["@graph"]);
         }
       } catch (_) {}
     }
-    return null;
+    const selected = identifierFromUrl(location.href);
+    if (selected) return candidates.find(item => String(item.identifier?.value || item.identifier?.name || "") === selected || identifierFromUrl(item.url) === selected) || null;
+    return candidates.length === 1 ? candidates[0] : null;
   }
 
   function stripHtml(value) {
@@ -100,7 +103,7 @@
   function identifierFromUrl(url) {
     const source = String(url || "");
     const patterns = [
-      /[?&](?:jk|jobId|currentJobId)=([a-z0-9_-]+)/i,
+      /[?&](?:vjk|jk|jobId|currentJobId)=([a-z0-9_-]+)/i,
       /\/jobs\/view\/([a-z0-9_-]+)/i,
       /\/j\/[^/?#]*-(\d{5,})/i,
       /\/job(?:-detail)?\/[^/?#]*?(\d{5,})(?:[/?#]|$)/i,

@@ -35,9 +35,9 @@ function cleanObjects(value, keys) {
 
 export function normalizeAiProfile(value) {
   const source = value && typeof value === "object" ? value : {};
-  const totalExperienceMonths = Number.isFinite(Number(source.totalExperienceMonths))
+  const totalExperienceMonths = source.totalExperienceMonths != null && source.totalExperienceMonths !== "" && Number.isFinite(Number(source.totalExperienceMonths))
     ? Math.max(0, Math.round(Number(source.totalExperienceMonths)))
-    : 0;
+    : null;
 
   return {
     name: cleanString(source.name),
@@ -84,12 +84,15 @@ export function profileFromForm(form) {
     name: cleanString(form.name),
     headline: cleanString(form.headline),
     currentRole: cleanString(form.currentRole),
-    totalExperienceMonths: Math.round(years * 12 + months),
+    totalExperienceMonths: form.experienceYears === "" && form.experienceMonths === "" ? null : Math.round(years * 12 + months),
+    workExperience: Array.isArray(form.originalProfile?.workExperience) ? form.originalProfile.workExperience : [],
     skills: splitList(form.skills),
     targetRoles: splitList(form.targetRoles),
     education: lines(form.education),
     certifications: lines(form.certifications),
-    projects: lines(form.projects),
+    projects: lines(form.projects).map(line => (form.originalProfile?.projects || []).find(item =>
+      typeof item === "object" && [item.name, item.description].filter(Boolean).join(" — ") === line
+    ) || line),
     resumeKeywords: splitList(form.resumeKeywords),
     source: form.source || "manual"
   };

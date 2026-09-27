@@ -1,3 +1,5 @@
+import "../core/relevance-gate.js";
+import "../core/portal-engine.js";
 import {
   addSkillToProfile,
   dismissSkillFromVault,
@@ -9,7 +11,9 @@ import {
   getListingContexts,
   getSkillVault,
   getState,
+  getPreferences,
   importJobPilotBackup,
+  undoLastImport,
   markJobApplied,
   removeSkillFromProfile,
   restoreSkillInVault,
@@ -93,6 +97,7 @@ let cache = {};
 let insights = null;
 let skillVault = { version: 1, items: {}, updatedAt: null };
 let profileState = null;
+let currentPreferences = {};
 let appliedJobsState = { version: 1, items: {}, updatedAt: null };
 let vaultMode = "missing";
 let mode = "recommended";
@@ -124,31 +129,7 @@ function comparableUrl(value) {
 }
 
 function cachedFor(job) {
-  if (job?.key && cache[job.key]) return cache[job.key];
-
-  const id = String(job?.portalJobId || "");
-  const url = comparableUrl(job?.canonicalUrl);
-
-  for (const item of Object.values(cache)) {
-    if (!item || item.portal !== job?.portal) continue;
-
-    if (
-      id &&
-      item.portalJobId &&
-      String(item.portalJobId) === id
-    ) {
-      return item;
-    }
-
-    if (
-      url &&
-      comparableUrl(item.canonicalUrl) === url
-    ) {
-      return item;
-    }
-  }
-
-  return null;
+  return Object.values(cache).find(item => globalThis.JobPilotPortalEngine.sameJob(item, job)) || null;
 }
 
 function portalContexts() {
@@ -183,6 +164,7 @@ function allCapturedJobs() {
 
       output.push({
         ...job,
+        relevance: globalThis.JobPilotRelevanceGate.evaluate(job, currentPreferences),
         portal: job.portal || context.portal || "",
         portalName:
           context.portalName ||
@@ -206,9 +188,11 @@ function decisionRank(job) {
   const relevance = job.relevance?.status || "review";
   const numericScore = score(job);
 
-  // Strong positive decisions always lead.
+  if (deepAction === "SKIP") return 9;
+  if (!deepAction && aiAction === "SKIP") return 9;
+  // Deep matching takes precedence over broad AI ranking.
   if (deepAction === "APPLY") return 0;
-  if (aiAction === "APPLY") return 1;
+  if (!deepAction && aiAction === "APPLY") return 1;
 
   // Fresh jobs that passed the relevance gate should stay above weak
   // REVIEW FIRST results when we do not yet have a stronger AI/deep signal.
@@ -655,7 +639,8 @@ function csvCell(value) {
     ? value.join(", ")
     : String(value ?? "");
 
-  return '"' + text.replace(/"/g, '""') + '"';
+  const safe = /^[\s]*[=+@-]|^[\t\r\n]/.test(text) ? "'" + text : text;
+  return '"' + safe.replace(/"/g, '""') + '"';
 }
 
 function appliedJobsToCsv(items) {
@@ -806,7 +791,7 @@ function renderSkillVault() {
 
   if (els.skillVaultStatus) {
     els.skillVaultStatus.textContent =
-      items.length + " saved";
+      items.length + " saved · " + (skillVault?.syncStatus === "synced" ? "Sync copy saved" : "Saved on this device; export a backup to transfer") + (skillVault?.syncError ? " · " + skillVault.syncError : "");
   }
 
   if (els.vaultMissingCount) {
@@ -1228,14 +1213,15 @@ function render() {
 }
 
 async function load() {
-  [contextsState, cache, insights, skillVault, profileState, appliedJobsState] =
+  [contextsState, cache, insights, skillVault, profileState, appliedJobsState, currentPreferences] =
     await Promise.all([
       getListingContexts(),
       getJobCache(),
       getGapInsights(7),
       getSkillVault(),
       getState(),
-      getAppliedJobs()
+      getAppliedJobs(),
+      getPreferences()
     ]);
 
   render();
@@ -1328,6 +1314,7 @@ els.importBackupInput?.addEventListener("change", async () => {
   if (!file) return;
 
   try {
+    if (file.size > 20 * 1024 * 1024) throw new Error("Backup is too large (maximum 20 MB).");
     const text = await file.text();
     const payload = JSON.parse(text);
     await importJobPilotBackup(payload);
@@ -1460,7 +1447,8 @@ chrome.storage.onChanged.addListener(
         changes["jobpilot.insights.gapHistory"] ||
         changes["jobpilot.skills.vault"] ||
         changes["jobpilot.jobs.applied"] ||
-        changes["jobpilot.stage1.state"]
+        changes["jobpilot.stage1.state"] ||
+        changes["jobpilot.stage2.preferences"]
       )
     ) {
       load().catch(() => {});
@@ -1476,4 +1464,9 @@ load().catch((error) => {
     error?.message || String(error);
 
   els.listingStatus.textContent = "Error";
+});
+
+document.getElementById("undoImportBtn")?.addEventListener("click", async () => {
+  try { await undoLastImport(); await load(); els.skillVaultStatus.textContent = "Last restore undone"; }
+  catch (error) { els.skillVaultStatus.textContent = error?.message || "Could not undo restore"; }
 });

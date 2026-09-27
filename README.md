@@ -1,3 +1,11 @@
+# JobPilot 1.7.0
+
+See [release notes and upgrade steps](RELEASE_NOTES.md) before installing over an existing unpacked build. Export your old backup first; the secure sign-in bridge now uses a stable extension ID.
+
+Development checks: `npm test` and `npm run check`. Build the installable ZIP with `npm run package`. No runtime npm dependencies are required. See [privacy](PRIVACY.md) and the [production checklist](tests/production-checklist.md).
+
+---
+
 # JobPilot
 
 JobPilot is being built in verified stages.

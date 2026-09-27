@@ -1,3 +1,13 @@
+import { analysisRevision } from "./core/analysis-inputs.js";
+import "./core/portal-engine.js";
+import { runStorageOperation, persistPortalCapture, toggleJobApplied } from "./core/storage.js";
+import { beginAuth, authStatus, acceptBridge, isExtensionPage } from "./core/auth-bridge.js";
+// Remove legacy persistent credentials. New credentials live only in trusted session storage.
+chrome.storage.local.remove(["jobpilot.puter.token", "jobpilot.puter.ai.authorized"]);
+chrome.runtime.onMessageExternal.addListener((message, sender, respond) => {
+  acceptBridge(message, sender).then(respond, () => respond({ ok: false }));
+  return true;
+});
 import {
   getAiAuthorized,
   getJobCache,
@@ -145,38 +155,10 @@ function comparableJobUrl(value) {
 }
 
 function findCachedJob(cache, incoming) {
-  if (!incoming || !cache) return null;
-
-  if (incoming.key && cache[incoming.key]) {
-    return cache[incoming.key];
-  }
-
-  const incomingId = String(incoming.portalJobId || "");
-  const incomingUrl = comparableJobUrl(incoming.canonicalUrl);
-
-  for (const job of Object.values(cache)) {
-    if (!job || job.portal !== incoming.portal) continue;
-
-    if (
-      incomingId &&
-      job.portalJobId &&
-      String(job.portalJobId) === incomingId
-    ) {
-      return job;
-    }
-
-    if (
-      incomingUrl &&
-      comparableJobUrl(job.canonicalUrl) === incomingUrl
-    ) {
-      return job;
-    }
-  }
-
-  return null;
+  return Object.values(cache || {}).find(job => globalThis.JobPilotPortalEngine.sameJob(job, incoming)) || null;
 }
 
-async function buildInlineIntelligence(incomingJob, forceAi = false) {
+async function calculateInlineIntelligence(incomingJob, forceAi = false) {
   if (!incomingJob || !incomingJob.title) {
     throw new Error("The detail job is not ready yet.");
   }
@@ -205,42 +187,24 @@ async function buildInlineIntelligence(incomingJob, forceAi = false) {
 
   const cached = findCachedJob(cache, incomingJob);
 
-  let job = {
-    ...(cached || {}),
-    ...incomingJob,
-    aiAnalysis: cached?.aiAnalysis || incomingJob.aiAnalysis || null,
-    aiAnalyzedAt: cached?.aiAnalyzedAt || incomingJob.aiAnalyzedAt || null
-  };
+  let job = globalThis.JobPilotPortalEngine.mergeJob(cached, incomingJob);
 
-  let aiStatus = "not-connected";
-
-  if (token && aiAuthorized) {
-    const semanticReady =
-      job.aiAnalysis?.analysisVersion >= 2 &&
-      Array.isArray(job.aiAnalysis?.candidateRequirementMatches);
-
-    aiStatus =
-      job.aiAnalysis && semanticReady && !forceAi
-        ? "cached"
-        : "analyzing";
-
-    if (!job.aiAnalysis || !semanticReady || forceAi) {
-      const analysis = await analyzeJobWithAi(
-        job,
-        state.profile,
-        preferences
-      );
-      job = {
-        ...job,
-        aiAnalysis: analysis,
-        aiAnalyzedAt: analysis.analyzedAt || new Date().toISOString()
-      };
-
+  const inputRevision = analysisRevision(state.profile, preferences, job);
+  if (job.aiAnalysis?.inputRevision !== inputRevision) job.aiAnalysis = null;
+  let aiStatus = job.aiAnalysis ? "cached" : "local";
+  if (token && aiAuthorized && (forceAi || preferences.automaticAi === true) && (!job.aiAnalysis || forceAi)) {
+    try {
+      const analysis = await analyzeJobWithAi(job, state.profile, preferences);
+      const current = await getState();
+      const currentPreferences = await getPreferences();
+      if (analysisRevision(current.profile, currentPreferences, job) !== inputRevision) throw new Error("Profile changed during analysis. Refresh this job.");
+      job = { ...job, aiAnalysis: analysis, aiAnalyzedAt: analysis.analyzedAt };
       await saveJobAiAnalysis(job.key, analysis);
       aiStatus = "completed";
+    } catch (error) {
+      aiStatus = "unavailable";
+      job.aiError = error?.message || "AI unavailable";
     }
-  } else if (job.aiAnalysis) {
-    aiStatus = "cached";
   }
 
   const deepMatch = evaluateDeepMatch(
@@ -273,6 +237,18 @@ async function buildInlineIntelligence(incomingJob, forceAi = false) {
     aiStatus,
     puterReady: Boolean(token && aiAuthorized)
   };
+}
+
+const inlineRequests = new Map();
+async function buildInlineIntelligence(job, forceAi = false) {
+  const state = await getState();
+  const preferences = await getPreferences();
+  const key = analysisRevision(state.profile, preferences, job) + ":" + forceAi;
+  if (!inlineRequests.has(key)) {
+    const pending = calculateInlineIntelligence(job, forceAi).finally(() => inlineRequests.delete(key));
+    inlineRequests.set(key, pending);
+  }
+  return inlineRequests.get(key);
 }
 
 async function setInjectionStatus(payload) {
@@ -335,6 +311,20 @@ async function injectJobPilotIntoPortal(tabId, url, reason = "background") {
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (sender.id !== chrome.runtime.id) return false;
+  const respond = promise => {
+    promise.then(value => sendResponse({ ok: true, ...value }), error => sendResponse({ ok: false, error: error?.message || String(error) }));
+    return true;
+  };
+  if (message?.type === "jobpilot:auth-begin") return respond(beginAuth(sender).then(state => ({ state })));
+  if (message?.type === "jobpilot:auth-status") return respond(authStatus(message.state, sender));
+  if (message?.type === "jobpilot:storage") {
+    if (!isExtensionPage(sender)) { sendResponse({ ok: false, error: "Storage access denied." }); return false; }
+    return respond(runStorageOperation(message.name, message.args).then(value => ({ value })));
+  }
+  if (!isExtensionPage(sender) && !isSupportedPortalUrl(sender.url)) return false;
+  if (message?.type === "jobpilot:capture") return respond(persistPortalCapture(message.data).then(() => ({})));
+
   if (message?.type === "jobpilot:toggle-applied") {
     (async () => {
       try {
@@ -344,22 +334,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           throw new Error("Job data is required.");
         }
 
-        const applied = await isJobApplied(job);
-
-        if (applied) {
-          await unmarkJobApplied(job);
-          sendResponse({ ok: true, applied: false });
-        } else {
-          const record = await markJobApplied(job, {
-            source: message.source || "job-detail"
-          });
-
-          sendResponse({
-            ok: true,
-            applied: true,
-            record
-          });
-        }
+        const result = await toggleJobApplied(job, { source: message.source || "job-detail" });
+        sendResponse({ ok: true, ...result });
       } catch (error) {
         sendResponse({
           ok: false,
@@ -387,8 +363,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           throw new Error("Save your Stage 2 preferences first.");
         }
 
+        const cache = await getJobCache();
         const jobs = Array.isArray(message.jobs)
-          ? message.jobs.slice(0, 120)
+          ? message.jobs.slice(0, 120).map(job => cache[job?.key]).filter(Boolean)
           : [];
 
         if (!jobs.length) {

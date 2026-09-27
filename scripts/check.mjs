@@ -1,0 +1,12 @@
+import fs from 'node:fs';
+import {execFileSync} from 'node:child_process';
+import assert from 'node:assert/strict';
+const files = fs.readdirSync('.', {recursive:true}).filter(path => path.endsWith('.js') || path.endsWith('.mjs')).filter(path => !path.startsWith('node_modules/') && !path.startsWith('vendor/'));
+for (const file of files) execFileSync(process.execPath, ['--check', file], {stdio:'pipe'});
+const manifest = JSON.parse(fs.readFileSync('manifest.json'));
+const references = [manifest.background.service_worker,manifest.options_page,...manifest.content_scripts.flatMap(row => [...row.js, ...(row.css || [])])];
+for (const ref of references) assert.ok(fs.existsSync(ref), `Missing manifest resource: ${ref}`);
+assert.equal(manifest.version, JSON.parse(fs.readFileSync('package.json')).version);
+assert.ok(fs.existsSync('vendor/pdf.worker.min.js'));
+assert.ok(!fs.readFileSync('site/puter-auth.js','utf8').includes('postMessage('), 'Tokens must not be sent to window.opener');
+console.log(`Syntax verified for ${files.length} files; manifest resources and release version verified.`);

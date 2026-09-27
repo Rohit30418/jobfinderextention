@@ -177,7 +177,22 @@ async function inflateRaw(bytes) {
   }
 
   const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
-  return new Uint8Array(await new Response(stream).arrayBuffer());
+  const reader = stream.getReader();
+  const chunks = [];
+  let size = 0;
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > 8 * 1024 * 1024) throw new Error("DOCX content is too large. Paste resume text instead.");
+      chunks.push(value);
+    }
+  } finally { await reader.cancel(); }
+  const result = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) { result.set(chunk, offset); offset += chunk.length; }
+  return result;
 }
 
 async function extractZipEntry(buffer, wantedName) {
@@ -200,6 +215,7 @@ async function extractZipEntry(buffer, wantedName) {
 
     const method = view.getUint16(offset + 10, true);
     const compressedSize = view.getUint32(offset + 20, true);
+    const uncompressedSize = view.getUint32(offset + 24, true);
     const fileNameLength = view.getUint16(offset + 28, true);
     const extraLength = view.getUint16(offset + 30, true);
     const commentLength = view.getUint16(offset + 32, true);
@@ -208,6 +224,7 @@ async function extractZipEntry(buffer, wantedName) {
     const fileName = decoder.decode(nameBytes);
 
     if (fileName === wantedName) {
+      if (uncompressedSize > 8 * 1024 * 1024 || compressedSize > 8 * 1024 * 1024) throw new Error("DOCX document is too large.");
       if (view.getUint32(localOffset, true) !== 0x04034b50) {
         throw new Error("The DOCX entry header is invalid.");
       }

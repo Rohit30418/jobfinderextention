@@ -1,3 +1,4 @@
+import { analysisRevision } from "./analysis-inputs.js";
 function clean(value) {
   return String(value || "")
     .toLowerCase()
@@ -258,21 +259,7 @@ function skillMatch(candidateSkillList, jobSkillList, semanticMatches = [], base
     const normalized = clean(skill);
     if (!normalized) return null;
 
-    return semantic.find((item) => {
-      if (item.requirementNormalized === normalized) return true;
-
-      const a = tokens(item.requirementNormalized);
-      const b = tokens(normalized);
-      if (!a.length || !b.length) return false;
-
-      const aSet = new Set(a);
-      const bSet = new Set(b);
-
-      return (
-        a.every((token) => bSet.has(token)) ||
-        b.every((token) => aSet.has(token))
-      );
-    }) || null;
+    return semantic.find(item => item.requirementNormalized === normalized) || null;
   }
 
   for (const skill of unique(jobSkillList, 80)) {
@@ -282,26 +269,6 @@ function skillMatch(candidateSkillList, jobSkillList, semanticMatches = [], base
     const directHit = candidateNormalized.some((candidate) => {
       if (!candidate.normalized) return false;
       if (candidate.normalized === normalized) return true;
-
-      const candidateTokens = tokens(candidate.normalized);
-      const jobTokens = tokens(normalized);
-
-      const candidateSet = new Set(candidateTokens);
-      const jobSet = new Set(jobTokens);
-
-      if (
-        jobTokens.length &&
-        jobTokens.every((token) => candidateSet.has(token))
-      ) {
-        return true;
-      }
-
-      if (
-        candidateTokens.length &&
-        candidateTokens.every((token) => jobSet.has(token))
-      ) {
-        return true;
-      }
 
       return false;
     });
@@ -320,7 +287,8 @@ function skillMatch(candidateSkillList, jobSkillList, semanticMatches = [], base
     const semanticHit = semanticFor(skill);
     const baselineHit = baselineEvidence[normalized] || null;
     const effectiveHit = semanticHit || baselineHit;
-    const status = String(effectiveHit?.status || "").toUpperCase();
+    const rawStatus = String(effectiveHit?.status || "").toUpperCase();
+    const status = semanticHit && rawStatus === "EXACT" ? "INFERRED" : rawStatus;
 
     if (status === "EXACT") {
       matched.push(skill);
@@ -414,7 +382,7 @@ function roleCompatibility(profile, preferences, job) {
 }
 
 function candidateExperienceYears(profile) {
-  const months = Number(profile?.totalExperienceMonths);
+  const months = profile?.totalExperienceMonths == null || profile.totalExperienceMonths === "" ? NaN : Number(profile.totalExperienceMonths);
   return Number.isFinite(months) ? Math.round((months / 12) * 10) / 10 : null;
 }
 
@@ -1092,6 +1060,8 @@ export function evaluateDeepMatch(profile, preferences, job) {
     throw new Error("Open a captured job-detail page first.");
   }
 
+  const inputRevision = analysisRevision(profile, preferences, job);
+  if (job.aiAnalysis?.inputRevision !== inputRevision) job = { ...job, aiAnalysis: null };
   const candidateSkillList = candidateSkills(profile);
 
   const requiredSkills = unique(
@@ -1421,6 +1391,7 @@ export function evaluateDeepMatch(profile, preferences, job) {
 
   return {
     version: 3,
+    inputRevision,
     jobKey: job.key || "",
     matchScore,
     portal: job.portal || "",
