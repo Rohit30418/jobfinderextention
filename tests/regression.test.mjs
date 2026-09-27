@@ -162,3 +162,12 @@ test('full analyzed-job backup can be restored without schema conflicts',async()
  const prefs=await store.getPreferences();await store.saveJobDeepMatch(job.key,evaluateDeepMatch(profile,prefs,job));
  const backup=await store.exportJobPilotBackup();await store.importJobPilotBackup(backup);assert.equal((await store.getState()).profile.currentRole,profile.currentRole);
 });
+
+
+test('normalized portal detail education text roundtrips alongside profile education arrays',async()=>{
+ const detail=engine.normalizeJob({...job,education:'Bachelor degree',description:'Build accessible frontend applications'},{portal:'indeed',pageType:'detail'});
+ await store.setState({profile:{...profile,education:[{qualification:'BSc'}]}});
+ await store.persistPortalCapture({portal:'indeed',pageType:'detail',jobs:[],detail});
+ const backup=await store.exportJobPilotBackup();await store.importJobPilotBackup(backup);
+ assert.equal((await store.getPortalCapture()).detail.education,'Bachelor degree');
+});
