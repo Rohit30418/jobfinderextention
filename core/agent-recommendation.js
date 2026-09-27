@@ -143,9 +143,14 @@ export function normalizeRecommendation(raw, profile, preferences, job) {
     : "MEDIUM";
 
   const unknowns = list(raw.unknowns, 10);
-  const basis = String(job?.description || "").trim().length >= 300
-    ? "JOB_DESCRIPTION"
-    : "LISTING";
+  const explicitStage = String(job?.analysisStage || "").toUpperCase();
+  const basis = explicitStage === "LISTING"
+    ? "LISTING"
+    : explicitStage === "FULL_JD"
+      ? "JOB_DESCRIPTION"
+      : String(job?.description || "").trim().length >= 300
+        ? "JOB_DESCRIPTION"
+        : "LISTING";
 
   if (basis === "LISTING") {
     confidence = confidence === "HIGH" ? "MEDIUM" : confidence;
