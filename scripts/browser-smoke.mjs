@@ -169,6 +169,7 @@ try {
  assert.deepEqual(errors,[],'Browser JavaScript errors');
  console.log('PASS: AI agent shortlist ordering, evidence, review/skip filters and shared detail score with controlled provider responses; real extension startup without storage RPC, cross-context Web Lock saves, preference control, Indeed vjk capture, local match, concurrent storage, backup/undo, and pinned bridge transport. Provider authentication remains a live release gate.');
 } catch(error) {
+ try {console.log('Discovery diagnostic',await worker.evaluate(async()=>{const state=(await chrome.storage.session.get('jobpilot.discovery.browser'))['jobpilot.discovery.browser'];if(!state)return 'No discovery session';const tab=await chrome.tabs.get(state.tabId);try{const {discoveryBrowser}=await import('./core/discovery-browser.js');return {tab:{url:tab.url,status:tab.status},result:await discoveryBrowser({action:'read',token:state.token})};}catch(error){return {tab:{url:tab.url,status:tab.status},error:error.message};}}));}catch{}
  fs.mkdirSync('test-results',{recursive:true});
  for(const [i,page] of context.pages().entries()){try{if(page.url().startsWith('chrome-extension:')){await page.screenshot({path:'test-results/failure-'+i+'.png',fullPage:true});console.log('Extension page diagnostic:',page.url(),(await page.locator('body').innerText()).slice(-2500));}}catch{}}
  throw error;

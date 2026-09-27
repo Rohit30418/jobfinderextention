@@ -24,13 +24,15 @@ async function ensureInputs(){await inputs();if(run.inputRevision!==analysisRevi
 async function visit(url,kind,expectedJob=null){
  checkpoint();await browser('open',{url});
  const deadline=Date.now()+35000;
+ let lastReadError=null;
  while(Date.now()<deadline){
   checkpoint();await new Promise(resolve=>setTimeout(resolve,1200));checkpoint();
-  let captured;try{captured=await browser('read');}catch(error){if(/No tab|tab was closed/i.test(error.message))throw error;continue;}
+  let captured;try{captured=await browser('read');}catch(error){lastReadError=error;if(/No tab|tab was closed/i.test(error.message))throw error;message('Waiting for portal capture: '+error.message);continue;}
   if(captured.blocked)throw new Error(captured.reason);
   if(kind==='search' && captured.jobs?.length)return captured;
   if(kind==='detail' && captured.ready && captured.detail?.description?.length>=300 && globalThis.JobPilotPortalEngine.sameJob(captured.detail,expectedJob))return captured;
  }
+ if(lastReadError)throw lastReadError;
  return null;
 }
 async function execute(){
