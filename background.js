@@ -198,9 +198,21 @@ async function calculateInlineIntelligence(incomingJob, forceAi = false) {
       ? "waiting-for-jd"
       : "local";
 
+  // Persist the latest detail before AI so the cached recommendation is tied
+  // to the same JD revision that produced it.
+  if (fullJdReady && job.portal) {
+    await persistPortalCapture({
+      portal: job.portal,
+      pageType: "detail",
+      jobs: [],
+      detail: job
+    });
+  }
+
   // Full job-detail pages automatically run AI once when Puter is connected.
+  // Manual Refresh can force AI even if the portal exposed a shorter JD.
   // Cached analysis is reused until the profile/preferences/JD revision changes.
-  if (token && aiAuthorized && fullJdReady && (!job.aiAnalysis || forceAi)) {
+  if (token && aiAuthorized && (fullJdReady || forceAi) && (!job.aiAnalysis || forceAi)) {
     try {
       const analysis = await analyzeJobWithAi(job, state.profile, preferences);
       const current = await getState();
