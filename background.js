@@ -191,7 +191,11 @@ async function calculateInlineIntelligence(incomingJob, forceAi = false) {
 
   const inputRevision = analysisRevision(state.profile, preferences, job);
   if (job.aiAnalysis?.inputRevision !== inputRevision) job.aiAnalysis = null;
-  const fullJdReady = String(job.description || "").trim().length >= 250;
+  const descriptionLength = String(job.description || "").trim().length;
+  const fullJdReady = Boolean(
+    job.status?.detailLoaded &&
+    descriptionLength >= 80
+  );
   let aiStatus = job.aiAnalysis
     ? "cached"
     : token && aiAuthorized && !fullJdReady

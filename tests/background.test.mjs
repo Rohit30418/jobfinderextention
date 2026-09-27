@@ -23,7 +23,7 @@ test('short/incomplete detail stays local even when Puter is connected',async()=
 });
 test('full JD automatically runs AI once and then reuses the cached final analysis',async()=>{
  await store.setPuterToken('synthetic');await store.setAiAuthorized(true);
- const fullJob={...job,description:'React frontend developer responsibilities and requirements. '.repeat(12)};
+ const fullJob={...job,status:{detailLoaded:true},description:'React frontend developer responsibilities and requirements. '.repeat(12)};
  let calls=0;
  const output={requiredSkills:['React'],candidateRequirementMatches:[{requirement:'React',status:'EXACT',evidence:['React'],explanation:'Explicit React skill'}],recommendation:{decision:'APPLY',fitScore:88,frontendRelevanceScore:94,roleComposition:'FRONTEND_HEAVY',roleFit:'MATCH',confidence:'HIGH',whyApply:['React match'],whyNotApply:[],unknowns:[],nextStep:'Apply after reviewing company details',evidence:[{candidateQuote:'React',jobQuote:'React',explanation:'Explicit React skill'}],hardBlockers:[]}};
  globalThis.fetch=async()=>{calls++;return {ok:true,status:200,json:async()=>({result:{message:{content:JSON.stringify(output)}}})};};
@@ -31,6 +31,15 @@ test('full JD automatically runs AI once and then reuses the cached final analys
  assert.equal(first.ok,true);assert.equal(first.aiStatus,'completed');assert.equal(first.match.applyDecision.action,'APPLY');assert.equal(calls,1);
  const second=await send({type:'jobpilot:inline-analyze',job:fullJob});
  assert.equal(second.ok,true);assert.equal(second.aiStatus,'cached');assert.equal(calls,1);
+});
+test('detail-ready JD under 250 characters still auto-runs AI',async()=>{
+ await store.setPuterToken('synthetic');await store.setAiAuthorized(true);
+ const shortReady={...job,status:{detailLoaded:true},description:'React frontend role. Build accessible interfaces with React, JavaScript and CSS. Collaborate with designers.'};
+ let calls=0;
+ const output={requiredSkills:['React'],candidateRequirementMatches:[{requirement:'React',status:'EXACT',evidence:['React'],explanation:'Explicit React skill'}],recommendation:{decision:'APPLY',fitScore:84,frontendRelevanceScore:92,roleComposition:'FRONTEND_HEAVY',roleFit:'MATCH',confidence:'HIGH',whyApply:['React match'],whyNotApply:[],unknowns:[],nextStep:'Apply after review',evidence:[{candidateQuote:'React',jobQuote:'React',explanation:'Explicit React skill'}],hardBlockers:[]}};
+ globalThis.fetch=async()=>{calls++;return {ok:true,status:200,json:async()=>({result:{message:{content:JSON.stringify(output)}}})};};
+ const result=await send({type:'jobpilot:inline-analyze',job:shortReady});
+ assert.equal(result.ok,true);assert.equal(result.aiStatus,'completed');assert.equal(calls,1);
 });
 test('AI failures return local match and concurrent requests share one request',async()=>{
  await store.setPuterToken('synthetic');await store.setAiAuthorized(true);
