@@ -113,7 +113,7 @@ try {
  await page.locator('#jobList .agent-explanation summary').first().click();
  assert.ok((await page.locator('#jobList').innerText()).includes('Why you may not want to apply'));
  await page.locator('[data-mode="skip"]').click();assert.equal(await page.locator('#jobList .job h3').innerText(),'Backend Java');
- await page.locator('[data-mode="review"]').click();assert.equal(await page.locator('#jobList .job h3').innerText(),'Uncertain Frontend');
+ await page.locator('[data-mode="review"]').click();assert.deepEqual(await page.locator('#jobList .job h3').allTextContents(),['Best Frontend','Good Frontend','Uncertain Frontend']);
  const detail = await page.evaluate(async()=>{const s=await import('../core/storage.js');const job=(await s.getJobCache())['indeed:agent-0'];return chrome.runtime.sendMessage({type:'jobpilot:inline-analyze',job,forceAi:true});});
  assert.equal(detail.ok,true);assert.equal(detail.aiStatus,'completed');assert.equal(detail.match.matchScore.score,94);assert.equal(detail.match.applyDecision.action,'APPLY');
  await page.locator('[data-mode="recommended"]').click();
