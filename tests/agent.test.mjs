@@ -29,3 +29,24 @@ test('detail score and decision use the same AI recommendation as job list',()=>
  const match=evaluateDeepMatch(profile,preferences,analyzed);
  assert.equal(match.matchScore.score,recommendation.fitScore);assert.equal(match.applyDecision.action,recommendation.decision);assert.equal(match.confidence.level,recommendation.confidence);
 });
+
+test('listing stage is always provisional and cannot return final APPLY',()=>{
+ const listingJob={...job,analysisStage:'LISTING'};
+ const r=rec({...good,frontendRelevanceScore:92,roleComposition:'FRONTEND_HEAVY'},listingJob);
+ assert.equal(r.stage,'PROVISIONAL');
+ assert.equal(r.finalVerdict,false);
+ assert.equal(r.decision,'REVIEW');
+ assert.equal(r.frontendRelevanceScore,92);
+ assert.equal(r.roleComposition,'FRONTEND_HEAVY');
+});
+test('full JD stage may produce final APPLY',()=>{
+ const fullJob={...job,analysisStage:'FULL_JD'};
+ const r=rec({...good,frontendRelevanceScore:95,roleComposition:'FRONTEND_HEAVY'},fullJob);
+ assert.equal(r.stage,'FINAL');
+ assert.equal(r.finalVerdict,true);
+ assert.equal(r.decision,'APPLY');
+});
+test('backend-heavy classification caps frontend relevance',()=>{
+ const r=rec({...good,decision:'REVIEW',frontendRelevanceScore:88,roleComposition:'BACKEND_HEAVY'},{...job,analysisStage:'LISTING'});
+ assert.equal(r.frontendRelevanceScore,49);
+});
