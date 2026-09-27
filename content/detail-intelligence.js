@@ -908,6 +908,39 @@
           color: #8290a3;
         }
 
+        .skills-empty {
+          width: 100%;
+          border: 1px dashed #314158;
+          border-radius: 10px;
+          padding: 10px 12px;
+          color: #8fa0b5;
+          font-size: 11px;
+          line-height: 1.5;
+          background: rgba(255,255,255,.02);
+        }
+
+        .ai-fallback-warning {
+          display: grid;
+          gap: 5px;
+          margin-top: 12px;
+          padding: 11px 12px;
+          border: 1px solid rgba(240, 180, 70, .45);
+          border-radius: 11px;
+          background: rgba(240, 180, 70, .07);
+        }
+
+        .ai-fallback-warning strong {
+          color: #f3c45c;
+          font-size: 11px;
+        }
+
+        .ai-fallback-warning span,
+        .ai-fallback-warning small {
+          color: #aebed0;
+          font-size: 10px;
+          line-height: 1.5;
+        }
+
         .dot {
           display: inline-block;
           width: 8px;
@@ -988,10 +1021,6 @@
   function renderSkills(values, kind) {
     const list = Array.isArray(values) ? values : [];
 
-    if (!list.length) {
-      return '<span class="skill">None</span>';
-    }
-
     return list
       .slice(0, 12)
       .map(
@@ -999,6 +1028,18 @@
           `<span class="skill ${kind}">${escapeHtml(value)}</span>`
       )
       .join("");
+  }
+
+  function renderSkillGroup(groups, emptyText) {
+    const html = groups
+      .map(([values, kind]) => renderSkills(values, kind))
+      .filter(Boolean)
+      .join("");
+
+    return html ||
+      '<div class="skills-empty">' +
+        escapeHtml(emptyText) +
+      '</div>';
   }
 
   function renderScoreBreakdown(match) {
@@ -1133,16 +1174,18 @@
     const semanticEvidence =
       match.skills?.required?.evidence || {};
 
+    const aiUnavailable = result.aiStatus === "unavailable";
+    const aiError = result.aiError || result.job?.aiError || "";
     const aiLabel =
-      result.aiStatus === "unavailable"
-        ? "AI unavailable · local match shown"
+      aiUnavailable
+        ? "AI unavailable · local fallback only"
         : result.aiStatus === "completed"
-        ? "Puter AI analyzed"
+        ? "Puter AI analyzed · final"
         : result.aiStatus === "cached"
           ? "Puter AI cached"
           : result.puterReady
             ? "Puter AI ready"
-            : "Local match only";
+            : "Local fallback only";
 
     const scoreValue =
       Number.isFinite(match.matchScore?.score)
@@ -1153,7 +1196,9 @@
     const scoreWidth =
       scoreValue === null ? 0 : scoreValue;
     const scoreLabel =
-      match.matchScore?.label || "INSUFFICIENT DATA";
+      aiUnavailable && !match.recommendation
+        ? "LOCAL FALLBACK · NOT FINAL"
+        : match.matchScore?.label || "INSUFFICIENT DATA";
 
     const job = result.job || {};
     const ai = job.aiAnalysis || {};
@@ -1186,6 +1231,14 @@
           <span class="pill">${escapeHtml(decision.confidence || match.confidence?.level || "LOW")} evidence</span>
           <span class="pill">${escapeHtml(aiLabel)}</span>
         </div>
+
+        ${aiUnavailable ? `
+          <div class="ai-fallback-warning">
+            <strong>AI analysis did not complete.</strong>
+            <span>${escapeHtml(aiError || "Puter AI could not complete this request.")}</span>
+            <small>The score shown above is a local fallback estimate only. Retry AI before treating this as a final application decision.</small>
+          </div>
+        ` : ""}
       </div>
 
       ${match.recommendation ? `<div class="section"><h4>AI application advice</h4>
@@ -1198,10 +1251,17 @@
       <div class="section">
         <h4>Required skills</h4>
         <div class="skills">
-          ${renderSkills(requiredExact, "good")}
-          ${renderSkills(requiredInferred, "info")}
-          ${renderSkills(requiredPartial, "warn")}
-          ${renderSkills(requiredMissing, "bad")}
+          ${renderSkillGroup(
+            [
+              [requiredExact, "good"],
+              [requiredInferred, "info"],
+              [requiredPartial, "warn"],
+              [requiredMissing, "bad"]
+            ],
+            aiUnavailable
+              ? "AI could not reliably extract required skills. Retry AI for full-JD skill analysis."
+              : "No reliable required skills were extracted from this job."
+          )}
         </div>
         <div class="legend">
           <span><i class="dot green"></i>Exact</span>
@@ -1214,10 +1274,17 @@
       <div class="section">
         <h4>Preferred / nice to have</h4>
         <div class="skills">
-          ${renderSkills(preferredExact, "good")}
-          ${renderSkills(preferredInferred, "info")}
-          ${renderSkills(preferredPartial, "warn")}
-          ${renderSkills(preferredMissing, "bad")}
+          ${renderSkillGroup(
+            [
+              [preferredExact, "good"],
+              [preferredInferred, "info"],
+              [preferredPartial, "warn"],
+              [preferredMissing, "bad"]
+            ],
+            aiUnavailable
+              ? "Preferred skills are unavailable until AI analysis succeeds."
+              : "No preferred or nice-to-have skills were extracted."
+          )}
         </div>
       </div>
 
