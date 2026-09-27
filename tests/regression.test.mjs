@@ -167,7 +167,7 @@ test('full analyzed-job backup can be restored without schema conflicts',async()
 test('normalized portal detail education text roundtrips alongside profile education arrays',async()=>{
  const detail=engine.normalizeJob({...job,education:'Bachelor degree',sources:{skills:'dom',education:'jsonld'},description:'Build accessible frontend applications'},{portal:'indeed',pageType:'detail'});
  await store.setState({profile:{...profile,education:[{qualification:'BSc'}]}});
- await store.persistPortalCapture({portal:'indeed',pageType:'detail',jobs:[],detail});
+ await store.persistPortalCapture({portal:'indeed',pageType:'detail',jobs:[],detail,readiness:{signals:{skills:3,education:true}}});
  const backup=await store.exportJobPilotBackup();await store.importJobPilotBackup(backup);
  assert.equal((await store.getPortalCapture()).detail.education,'Bachelor degree');
 });
