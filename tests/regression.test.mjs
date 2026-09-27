@@ -100,10 +100,8 @@ test('profile changes invalidate cached and late analysis',async()=>{
  const stale={...job,aiAnalysis:{inputRevision:revision,requiredSkills:['React'],candidateRequirementMatches:[{requirement:'React',status:'EXACT'}]}};
  assert.deepEqual(evaluateDeepMatch({...profile,skills:[]},prefs,stale).skills.required.exact,[]);
 });
-test('deep SKIP takes precedence over AI APPLY and CSV neutralizes formulas',()=>{
+test('CSV neutralizes spreadsheet formulas',()=>{
  const code=read('stage6/list.js');const ctx={};
- vm.runInNewContext(code.slice(code.indexOf('function decisionRank('),code.indexOf('function visible('))+';globalThis.rank=decisionRank;',ctx);
- assert.ok(ctx.rank({deepMatch:{applyDecision:{action:'SKIP'}},aiRanking:{decision:'APPLY'}})>ctx.rank({relevance:{status:'relevant'}}));
  vm.runInNewContext(code.slice(code.indexOf('function csvCell('),code.indexOf('function appliedJobsToCsv('))+';globalThis.csv=csvCell;',ctx);
  for(const value of ['=1+1',' +SUM(A1)','@cmd','-2','\t=cmd']) assert.ok(ctx.csv(value).startsWith('"\''));
  assert.equal(ctx.csv('Engineer'),'"Engineer"');assert.equal(ctx.csv('A"B'),'"A""B"');

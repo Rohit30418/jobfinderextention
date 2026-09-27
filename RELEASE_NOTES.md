@@ -1,3 +1,11 @@
+# 1.8.0 — AI job finding agent
+
+- Shared AI recommendation for Job List and Job Intelligence, with estimated suitability, role alignment, confidence, reasons to apply/avoid, unknowns and quoted evidence.
+- Uses captured full descriptions where available; listing-only advice is marked provisional. Verifies evidence quotes and downgrades unsupported recommendations.
+- Recommended shows APPLY only, ordered by score; Review, Pending AI and Not recommended preserve visibility of other jobs.
+- Resumable two-job batches, progress, stop, saved results and opt-in automatic analysis while Job List is open. Job details use AI automatically in agent mode. No automatic applications.
+- Prior analysis is invalidated for the new model; profile, applications and skills are preserved. Replace files in the same folder and Reload; do not uninstall.
+
 # JobPilot 1.7.1 hotfix
 
 Fixes setup initialization when background storage messaging returns no response. Extension pages now access storage under the same origin-wide Web Lock as the service worker, preserving concurrent-write protection without requiring a background RPC for every profile read/save.

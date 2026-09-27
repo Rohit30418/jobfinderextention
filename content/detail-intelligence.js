@@ -1149,7 +1149,7 @@
         ? match.matchScore.score
         : null;
     const scoreText =
-      scoreValue === null ? "--" : scoreValue + "%";
+      scoreValue === null ? "--" : scoreValue + "/100";
     const scoreWidth =
       scoreValue === null ? 0 : scoreValue;
     const scoreLabel =
@@ -1172,7 +1172,7 @@
 
         <div class="scorebox">
           <div class="scoreline">
-            <span>Profile match</span>
+            <span>${match.recommendation ? "AI estimated fit" : "Local estimated fit"}</span>
             <strong>${escapeHtml(scoreText)}</strong>
           </div>
           <div class="scorelabel">${escapeHtml(scoreLabel)}</div>
@@ -1188,6 +1188,13 @@
         </div>
       </div>
 
+      ${match.recommendation ? `<div class="section"><h4>AI application advice</h4>
+        <p>Estimated suitability, not the probability of getting hired.</p>
+        <h4>Why apply</h4><ul>${match.recommendation.reasons.map(x=>`<li>${escapeHtml(x)}</li>`).join('')}</ul>
+        <h4>Why not / gaps</h4><ul>${[...match.recommendation.gaps,...match.recommendation.hardBlockers.map(x=>x.explanation)].map(x=>`<li>${escapeHtml(x)}</li>`).join('')}</ul>
+        <h4>Check first</h4><ul>${match.recommendation.unknowns.map(x=>`<li>${escapeHtml(x)}</li>`).join('')}</ul>
+        <h4>Evidence</h4><ul>${match.recommendation.evidence.map(x=>`<li>Your profile: “${escapeHtml(x.candidateQuote)}” · Job: “${escapeHtml(x.jobQuote)}” — ${escapeHtml(x.explanation)}</li>`).join('')}</ul>
+        <p>${escapeHtml(match.recommendation.nextStep)}</p></div>` : ''}
       <div class="section">
         <h4>Required skills</h4>
         <div class="skills">

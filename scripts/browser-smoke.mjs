@@ -87,7 +87,37 @@ try {
  const bridge=await context.newPage();await bridge.goto('https://rohit30418.github.io/jobfinderextention/puter-auth.html?state='+state);await bridge.locator('#connectBtn').click();
  await poll(()=>page.evaluate(async()=>{const x=await chrome.storage.session.get('jobpilot.puter.token');return x['jobpilot.puter.token']==='synthetic-browser-test';}), 'bridge token acceptance');
  const auth=await page.evaluate(async state=>chrome.runtime.sendMessage({type:'jobpilot:auth-status',state}),state);assert.equal(auth.completed,true);
+ // Exercise the complete agent UI with controlled AI responses (no provider billing).
+ await worker.evaluate(() => {
+  globalThis.fetch = async (_url, options) => {
+   const prompt = JSON.parse(options.body).args.messages[0].content;
+   const make = job => ({fitScore:job.title.includes('Best') ? 94 : 82,decision:job.title.includes('Backend') ? 'SKIP' : job.title.includes('Uncertain') ? 'REVIEW' : 'APPLY',roleFit:job.title.includes('Backend') ? 'MISMATCH' : 'MATCH',confidence:'HIGH',summary:'Fixture candidate comparison',whyApply:['React evidence in profile'],whyNotApply:['Verify role-specific requirements'],unknowns:['Salary not stated'],nextStep:'Review the posting',evidence:[{candidateQuote:'React',jobQuote:'React',explanation:'Explicit skill evidence'}],hardBlockers:[]});
+   let output;
+   if(prompt.includes('\nJOBS:\n')) {
+    const jobs=JSON.parse(prompt.split('\nJOBS:\n')[1]);output={results:jobs.map(job=>({key:job.key,recommendation:make(job)}))};
+   } else {
+    const job=JSON.parse(prompt.split('\nJOB_DATA:\n')[1].split('\nCANDIDATE_DATA:\n')[0]);output={requiredSkills:['React'],candidateRequirementMatches:[{requirement:'React',status:'EXACT',evidence:['React'],explanation:'Explicit skill'}],recommendation:make(job)};
+   }
+   return {ok:true,status:200,json:async()=>({result:{message:{content:JSON.stringify(output)}}})};
+  };
+ });
+ await page.evaluate(async job=>{
+  const s=await import('../core/storage.js');await s.setAiAuthorized(true);
+  const jobs=['Best Frontend','Good Frontend','Backend Java','Uncertain Frontend'].map((title,i)=>({...job,key:'indeed:agent-'+i,portalJobId:'agent-'+i,canonicalUrl:'https://in.indeed.com/viewjob?jk=agent-'+i,title,description:'React job responsibilities and qualifications. '.repeat(15)}));
+  await s.persistPortalCapture({portal:'indeed',pageType:'listing',jobs});
+ },captured);
+ await page.locator('#aiRankBtn').click();
+ await poll(()=>page.evaluate(async()=>{const x=await chrome.storage.local.get('jobpilot.jobs.cache');return Object.values(x['jobpilot.jobs.cache'] || {}).filter(job=>job.key.startsWith('indeed:agent-') && job.aiRanking).length===4;}),'AI agent complete');
+ await poll(async()=>await page.locator('#jobList .job h3').count()===2,'AI shortlist rendering');
+ assert.deepEqual(await page.locator('#jobList .job h3').allTextContents(),['Best Frontend','Good Frontend']);
+ await page.locator('#jobList .agent-explanation summary').first().click();
+ assert.ok((await page.locator('#jobList').innerText()).includes('Why not / gaps'));
+ await page.locator('[data-mode="skip"]').click();assert.equal(await page.locator('#jobList .job h3').innerText(),'Backend Java');
+ await page.locator('[data-mode="review"]').click();assert.equal(await page.locator('#jobList .job h3').innerText(),'Uncertain Frontend');
+ const detail = await page.evaluate(async()=>{const s=await import('../core/storage.js');const job=(await s.getJobCache())['indeed:agent-0'];return chrome.runtime.sendMessage({type:'jobpilot:inline-analyze',job,forceAi:true});});
+ assert.equal(detail.ok,true);assert.equal(detail.aiStatus,'completed');assert.equal(detail.match.matchScore.score,94);assert.equal(detail.match.applyDecision.action,'APPLY');
+ await page.locator('[data-mode="recommended"]').click();
  fs.mkdirSync('test-results',{recursive:true});await page.screenshot({path:'test-results/job-list.png',fullPage:true});
  assert.deepEqual(errors,[],'Browser JavaScript errors');
- console.log('PASS: real extension startup without storage RPC, cross-context Web Lock saves, preference control, Indeed vjk capture, local match, concurrent storage, backup/undo, and pinned bridge transport. Provider authentication remains a live release gate.');
+ console.log('PASS: AI agent shortlist ordering, evidence, review/skip filters and shared detail score with controlled provider responses; real extension startup without storage RPC, cross-context Web Lock saves, preference control, Indeed vjk capture, local match, concurrent storage, backup/undo, and pinned bridge transport. Provider authentication remains a live release gate.');
 } finally {await context.close();fs.rmSync(temp,{recursive:true,force:true});}

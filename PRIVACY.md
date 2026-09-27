@@ -1,6 +1,6 @@
 # JobPilot privacy
 
-Updated 27 September 2026 for version 1.7.0.
+Updated 27 September 2026 for version 1.8.0.
 
 ## Data on your device
 
@@ -12,7 +12,7 @@ JobPilot reads supported job-portal pages that you visit. It does not submit app
 
 Uploading a resume does not itself send it to Puter. Clicking the resume AI analysis button sends the validated resume text to Puter after sign-in and AI authorization. The profile suggestions require your review.
 
-Clicking AI Rank Jobs or refreshing AI on a job sends the relevant job text, saved profile evidence, and preferences to Puter. The "Automatically send..." preference, off by default, enables this transfer when opening job details while connected. Turn it off to keep automatic matching local. AI answers may be inaccurate; review important eligibility claims yourself.
+Clicking Run AI Agent or refreshing AI on a job sends the relevant job text, saved profile evidence, and preferences to Puter. AI agent mode sends captured listings/descriptions and career profile information automatically while Job List is open and enables AI for opened job details. Stop pauses after the current batch; disable agent mode to turn off both automatic flows. The "Automatically send..." preference, off by default, enables this transfer when opening job details while connected. Turn it off to keep automatic matching local. AI answers may be inaccurate; review important eligibility claims yourself.
 
 The HTTPS sign-in page loads Puter's official JavaScript. Its sign-in and permission prompts communicate with Puter. The bridge sends the token directly to the pinned JobPilot extension ID and accepts only a short-lived sign-in challenge created inside the extension. Tokens and authorization state are kept in trusted extension session storage, excluded from backups, and cleared when the browser session ends or you disconnect. Reconnect after a browser restart. Puter processes transmitted data under its own terms and privacy policy.
 

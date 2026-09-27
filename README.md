@@ -1,4 +1,4 @@
-# JobPilot 1.7.1
+# JobPilot 1.8.0
 
 See [release notes and upgrade steps](RELEASE_NOTES.md) before installing over an existing unpacked build. Export your old backup first; the secure sign-in bridge now uses a stable extension ID.
 
@@ -492,3 +492,9 @@ Notably:
 - Naukri continues to reuse learned native experience/city values instead of inventing them.
 
 After the search tabs load, the existing portal adapters capture listings into the combined Stage 6 Job List.
+
+## AI job finding agent
+
+Connect and authorize Puter in Profile. Browse supported portals using your searches, then open Job List and choose Run AI Agent. Enable AI agent mode to analyze new captured jobs while the list is open and job descriptions when opened. Stop pauses after the current request; rerunning resumes jobs without current recommendations. Completed results are saved. Provider failures leave pending jobs available for retry.
+
+Recommended contains AI APPLY decisions only, sorted by estimated fit. Review retains uncertain/adjacent jobs; Pending AI and Not recommended keep all captured jobs accessible. Expand Why apply / why not for evidence, gaps and next steps. Listing advice is provisional; opening a full description improves the available evidence. AI cannot guarantee correct decisions or hiring odds. This is an assisted discovery and evaluation agent for pages you browse, not an unattended crawler or an automatic application submitter.
