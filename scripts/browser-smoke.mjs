@@ -25,6 +25,11 @@ try {
  const worker=context.serviceWorkers()[0] || await context.waitForEvent('serviceworker');
  const id=new URL(worker.url()).host;const base=`chrome-extension://${id}/`;
  const page=await context.newPage();
+ await page.addInitScript(() => {
+  const original = chrome.runtime.sendMessage.bind(chrome.runtime);
+  chrome.runtime.sendMessage = (message, ...args) => message?.type === 'jobpilot:storage'
+    ? Promise.resolve(undefined) : original(message, ...args);
+ });
  await page.goto(base+'onboarding/onboarding.html');
  await page.locator('#resumeFile').waitFor({state:'attached'});
  await page.evaluate(async()=>{
@@ -58,6 +63,20 @@ try {
   const applied=await s.getAppliedJobs();if(Object.keys(applied.items).length!==2)throw new Error('Lost applied write');
   const backup=await s.exportJobPilotBackup();await s.importJobPilotBackup(backup);await s.undoLastImport();
  },captured);
+ // Coordinate writes across two extension documents and the worker even with
+ // storage RPC unavailable in the primary document.
+ const second = await context.newPage();await second.goto(base+'stage6/list.html');
+ await Promise.all([
+  page.evaluate(async job=>{const s=await import('../core/storage.js');await Promise.all([0,1].map(i=>s.markJobApplied({...job,key:'lock-page-a-'+i})));},captured),
+  second.evaluate(async job=>{const s=await import('../core/storage.js');await Promise.all([0,1].map(i=>s.markJobApplied({...job,key:'lock-page-b-'+i})));},captured),
+  page.evaluate(async job=>{await Promise.all([0,1].map(i=>chrome.runtime.sendMessage({type:'jobpilot:toggle-applied',job:{...job,key:'lock-worker-'+i}})));},captured)
+ ]);
+ await page.evaluate(async()=>{
+  const s=await import('../core/storage.js');const saved=await s.getAppliedJobs();
+  if(Object.keys(saved.items).length!==8)throw new Error('Cross-context write lost');
+  await Promise.all(Object.keys(saved.items).filter(key=>key.startsWith('lock-')).map(key=>s.unmarkJobApplied(key)));
+ });
+ await second.close();
  // Auth transport tested with a synthetic provider at the allowed bridge origin.
  const state=await page.evaluate(async()=>{const result=await chrome.runtime.sendMessage({type:'jobpilot:auth-begin'});if(!result.ok)throw new Error(result.error);return result.state;});
  await context.route('https://rohit30418.github.io/jobfinderextention/**',route=>{
@@ -70,5 +89,5 @@ try {
  const auth=await page.evaluate(async state=>chrome.runtime.sendMessage({type:'jobpilot:auth-status',state}),state);assert.equal(auth.completed,true);
  fs.mkdirSync('test-results',{recursive:true});await page.screenshot({path:'test-results/job-list.png',fullPage:true});
  assert.deepEqual(errors,[],'Browser JavaScript errors');
- console.log('PASS: real extension startup, preference control, Indeed vjk capture, local match, concurrent storage, backup/undo, and pinned bridge transport. Provider authentication remains a live release gate.');
+ console.log('PASS: real extension startup without storage RPC, cross-context Web Lock saves, preference control, Indeed vjk capture, local match, concurrent storage, backup/undo, and pinned bridge transport. Provider authentication remains a live release gate.');
 } finally {await context.close();fs.rmSync(temp,{recursive:true,force:true});}

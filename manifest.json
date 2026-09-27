@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "JobPilot - Universal Job Portal Assistant",
-  "version": "1.7.0",
+  "version": "1.7.1",
   "description": "Capture jobs, compare requirements with your profile, and track applications with optional Puter AI.",
   "permissions": [
     "storage",

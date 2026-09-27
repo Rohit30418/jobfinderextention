@@ -171,3 +171,20 @@ test('normalized portal detail education text roundtrips alongside profile educa
  const backup=await store.exportJobPilotBackup();await store.importJobPilotBackup(backup);
  assert.equal((await store.getPortalCapture()).detail.education,'Bachelor degree');
 });
+
+test('extension page reads and saves without a background storage response',async()=>{
+ const oldLocation=globalThis.location;
+ const descriptor=Object.getOwnPropertyDescriptor(navigator,'locks');
+ globalThis.document={};globalThis.location={href:chrome.runtime.getURL('onboarding/onboarding.html')};
+ let calls=0,locks=0;
+ chrome.runtime.sendMessage=async()=>{calls++;return undefined;};
+ Object.defineProperty(navigator,'locks',{configurable:true,value:{request:async(name,run)=>{assert.equal(name,'jobpilot.storage.v1');locks++;return run();}}});
+ try {
+  assert.equal((await store.getState()).profile,null);
+  await store.setState({profile});assert.deepEqual((await store.getState()).profile,profile);
+  assert.equal(calls,0);assert.ok(locks>=3);
+ } finally {
+  delete globalThis.document;globalThis.location=oldLocation;delete chrome.runtime.sendMessage;
+  if(descriptor)Object.defineProperty(navigator,'locks',descriptor);else delete navigator.locks;
+ }
+});

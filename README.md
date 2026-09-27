@@ -1,4 +1,4 @@
-# JobPilot 1.7.0
+# JobPilot 1.7.1
 
 See [release notes and upgrade steps](RELEASE_NOTES.md) before installing over an existing unpacked build. Export your old backup first; the secure sign-in bridge now uses a stable extension ID.
 
