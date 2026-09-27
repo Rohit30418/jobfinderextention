@@ -108,10 +108,10 @@ try {
  },captured);
  await page.locator('#aiRankBtn').click();
  await poll(()=>page.evaluate(async()=>{const x=await chrome.storage.local.get('jobpilot.jobs.cache');return Object.values(x['jobpilot.jobs.cache'] || {}).filter(job=>job.key.startsWith('indeed:agent-') && job.aiRanking).length===4;}),'AI agent complete');
- await poll(async()=>await page.locator('#jobList .job h3').count()===2,'AI shortlist rendering');
- assert.deepEqual(await page.locator('#jobList .job h3').allTextContents(),['Best Frontend','Good Frontend']);
+ await poll(async()=>await page.locator('#jobList .job h3').count()===3,'AI ranked feed rendering');
+ assert.deepEqual(await page.locator('#jobList .job h3').allTextContents(),['Best Frontend','Good Frontend','Uncertain Frontend']);
  await page.locator('#jobList .agent-explanation summary').first().click();
- assert.ok((await page.locator('#jobList').innerText()).includes('Why not / gaps'));
+ assert.ok((await page.locator('#jobList').innerText()).includes('Why you may not want to apply'));
  await page.locator('[data-mode="skip"]').click();assert.equal(await page.locator('#jobList .job h3').innerText(),'Backend Java');
  await page.locator('[data-mode="review"]').click();assert.equal(await page.locator('#jobList .job h3').innerText(),'Uncertain Frontend');
  const detail = await page.evaluate(async()=>{const s=await import('../core/storage.js');const job=(await s.getJobCache())['indeed:agent-0'];return chrome.runtime.sendMessage({type:'jobpilot:inline-analyze',job,forceAi:true});});
