@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "JobPilot - Universal Job Portal Assistant",
-  "version": "1.8.0",
-  "description": "Capture jobs, compare requirements with your profile, and track applications with optional Puter AI.",
+  "version": "1.9.0",
+  "description": "AI-rank captured jobs against your career profile with evidence-grounded fit scores, full reviews, and optional Puter AI.",
   "permissions": [
     "storage",
     "unlimitedStorage",
