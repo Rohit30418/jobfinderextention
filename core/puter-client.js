@@ -342,6 +342,7 @@ export async function analyzeJobWithAi(job, profile = null, preferences = null) 
   const safeJob = job && typeof job === "object" ? job : {};
 
   const payload = {
+    analysisStage: "FULL_JD",
     portal: cleanAiString(safeJob.portal, 80),
     title: cleanAiString(safeJob.title, 300),
     company: cleanAiString(safeJob.company, 300),
@@ -484,7 +485,10 @@ export async function analyzeJobBatchForCandidate(profile, preferences, jobs) {
   if (!inputJobs.length) return [];
   // Send relevant career information; omit contact details and raw resume text.
   const candidate = Object.fromEntries(['currentRole','headline','totalExperienceMonths','skills','workExperience','projects','education','certifications','resumeKeywords'].map(key => [key, profile?.[key]]));
-  const payload = inputJobs.map(job => Object.fromEntries(['key','title','company','description','snippet','skills','requiredSkills','preferredSkills','requirementStatements','preferredStatements','responsibilities','experienceText','experienceMin','experienceMax','location','salaryText','education','workMode','employmentType','postedAge','datePosted'].map(key => [key, key === 'description' ? String(job[key] || '').slice(0,16000) : job[key]])));
+  const payload = inputJobs.map(job => ({
+    ...Object.fromEntries(['key','title','company','description','snippet','skills','requiredSkills','preferredSkills','requirementStatements','preferredStatements','responsibilities','experienceText','experienceMin','experienceMax','location','salaryText','education','workMode','employmentType','postedAge','datePosted'].map(key => [key, key === 'description' ? String(job[key] || '').slice(0,16000) : job[key]])),
+    analysisStage: "LISTING"
+  }));
   const prompt = [
     recommendationInstructions,
     "This is LISTING-STAGE screening. You usually do NOT have the full JD.",
