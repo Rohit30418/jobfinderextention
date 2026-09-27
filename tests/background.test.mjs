@@ -25,7 +25,7 @@ test('AI failures return local match and concurrent requests share one request',
  await store.setPuterToken('synthetic');await store.setAiAuthorized(true);
  let calls=0;globalThis.fetch=async()=>{calls++;await new Promise(resolve=>setTimeout(resolve,15));throw new Error('Provider offline');};
  const results=await Promise.all(Array.from({length:4},()=>send({type:'jobpilot:inline-analyze',job,forceAi:true})));
- assert.equal(calls,1);for(const result of results){assert.equal(result.ok,true);assert.equal(result.aiStatus,'unavailable');assert.ok(result.match);}
+ assert.equal(calls,1);for(const result of results){assert.equal(result.ok,true);assert.equal(result.aiStatus,'unavailable');assert.match(result.aiError,/Provider offline/);assert.ok(result.match);}
 });
 test('changed profile never reuses prior semantic evidence',async()=>{
  await store.setPuterToken('synthetic');await store.setAiAuthorized(true);
