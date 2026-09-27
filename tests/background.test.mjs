@@ -46,7 +46,7 @@ test('agent persists validated recommendation, but refuses a late response after
  await store.setPuterToken('synthetic');await store.setAiAuthorized(true);
  const output={results:[{key:job.key,recommendation:{decision:'APPLY',fitScore:85,roleFit:'MATCH',confidence:'HIGH',whyApply:['React match'],evidence:[{candidateQuote:'React',jobQuote:'React',explanation:'Explicit React skill'}]}}]};
  globalThis.fetch=async()=>({ok:true,status:200,json:async()=>({result:{message:{content:JSON.stringify(output)}}})});
- const result=await send({type:'jobpilot:rank-list-ai',jobs:[{key:job.key}]});assert.equal(result.ok,true);assert.equal((await store.getJobCache())[job.key].aiRanking.decision,'APPLY');
+ const result=await send({type:'jobpilot:rank-list-ai',jobs:[{key:job.key}]});assert.equal(result.ok,true);assert.equal((await store.getJobCache())[job.key].aiRanking.decision,'REVIEW');assert.equal((await store.getJobCache())[job.key].aiRanking.stage,'PROVISIONAL');
  globalThis.fetch=async()=>{await store.setState({profile:{...profile,skills:[]}});return {ok:true,status:200,json:async()=>({result:{message:{content:JSON.stringify(output)}}})};};
  const late=await send({type:'jobpilot:rank-list-ai',jobs:[{key:job.key}]});assert.equal(late.ok,false);assert.equal((await store.getJobCache())[job.key].aiRanking,undefined);
 });
