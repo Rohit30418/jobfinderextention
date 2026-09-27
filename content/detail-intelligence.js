@@ -1182,10 +1182,12 @@
         : result.aiStatus === "completed"
         ? "Puter AI analyzed · final"
         : result.aiStatus === "cached"
-          ? "Puter AI cached"
-          : result.puterReady
-            ? "Puter AI ready"
-            : "Local fallback only";
+          ? "Puter AI cached · final"
+          : result.aiStatus === "waiting-for-jd"
+            ? "Waiting for full JD"
+            : result.puterReady
+              ? "Puter AI ready"
+              : "Local fallback only";
 
     const scoreValue =
       Number.isFinite(match.matchScore?.score)
@@ -1196,7 +1198,7 @@
     const scoreWidth =
       scoreValue === null ? 0 : scoreValue;
     const scoreLabel =
-      aiUnavailable && !match.recommendation
+      (aiUnavailable || result.aiStatus === "waiting-for-jd") && !match.recommendation
         ? "LOCAL FALLBACK · NOT FINAL"
         : match.matchScore?.label || "INSUFFICIENT DATA";
 
@@ -1237,6 +1239,12 @@
             <strong>AI analysis did not complete.</strong>
             <span>${escapeHtml(aiError || "Puter AI could not complete this request.")}</span>
             <small>The score shown above is a local fallback estimate only. Retry AI before treating this as a final application decision.</small>
+          </div>
+        ` : result.aiStatus === "waiting-for-jd" ? `
+          <div class="ai-fallback-warning">
+            <strong>Waiting for the full job description.</strong>
+            <span>JobPilot is connected to Puter, but this page has not exposed enough JD text yet.</span>
+            <small>AI will run automatically once the full description is available.</small>
           </div>
         ` : ""}
       </div>

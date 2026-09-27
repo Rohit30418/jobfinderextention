@@ -1,3 +1,10 @@
+# JobPilot 1.11.0 — Automatic full-JD AI
+
+- Opening a complete job-detail page now automatically runs Puter AI when connected.
+- AI runs once per profile/preferences/JD revision and reuses the cached final result on later views.
+- Incomplete job pages stay local and show “Waiting for full JD” instead of sending partial text.
+- Manual Refresh still forces a fresh AI analysis.
+
 # JobPilot 1.10.0 — Two-stage AI screening
 
 - Listing-page AI results are now explicitly PROVISIONAL.

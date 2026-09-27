@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "JobPilot - Universal Job Portal Assistant",
-  "version": "1.10.0",
-  "description": "Two-stage AI job screening: provisional listing relevance plus final full-JD fit analysis.",
+  "version": "1.11.0",
+  "description": "Automatically run cached Puter AI analysis on full job descriptions, with provisional local fallback while the JD is incomplete.",
   "permissions": [
     "storage",
     "unlimitedStorage",
