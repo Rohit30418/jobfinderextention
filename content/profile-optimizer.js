@@ -30,16 +30,16 @@
 
   const root = document.createElement("div");
   root.id = id;
-  root.style.cssText = "position:fixed;right:18px;bottom:18px;z-index:2147483646;font-family:Inter,Arial,sans-serif";
+  root.style.cssText = "position:fixed;right:18px;top:118px;bottom:18px;z-index:2147483646;font-family:Inter,Arial,sans-serif;display:flex;align-items:stretch;max-height:calc(100vh - 136px)";
   const shadow = root.attachShadow({mode:"open"});
 
   shadow.innerHTML = `
     <style>
       *{box-sizing:border-box}
-      .wrap{width:340px;background:#07111c;color:#edf5ff;border:1px solid #233a52;border-radius:18px;box-shadow:0 18px 60px rgba(0,0,0,.35);overflow:hidden}
+      .wrap{width:340px;max-height:100%;background:#07111c;color:#edf5ff;border:1px solid #233a52;border-radius:18px;box-shadow:0 18px 60px rgba(0,0,0,.35);overflow:hidden;display:flex;flex-direction:column}
       .head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid #203247;background:#0a1523}
       .brand{font-weight:800}.brand b{color:#69f0a8}.close{border:0;background:#142235;color:#cfe0f2;width:30px;height:30px;border-radius:9px;cursor:pointer}
-      .body{padding:15px}.intro{font-size:12px;line-height:1.55;color:#aebed0;margin:0 0 12px}
+      .body{padding:15px;flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#294560 transparent}.body::-webkit-scrollbar{width:8px}.body::-webkit-scrollbar-track{background:transparent}.body::-webkit-scrollbar-thumb{background:#294560;border-radius:999px}.body::-webkit-scrollbar-thumb:hover{background:#3b6286}.intro{font-size:12px;line-height:1.55;color:#aebed0;margin:0 0 12px}
       .run{width:100%;border:0;border-radius:11px;padding:12px;background:#69f0a8;color:#04120a;font-weight:800;cursor:pointer}
       .run:disabled{opacity:.55;cursor:wait}.score{display:flex;align-items:end;gap:8px;margin:5px 0 10px}.score strong{font-size:40px;line-height:1;color:#69f0a8}.score span{font-size:13px;color:#aebed0;padding-bottom:4px}
       .label{font-weight:800;margin-bottom:12px}.box{background:#0c1928;border:1px solid #223852;border-radius:12px;padding:11px;margin-top:10px}
