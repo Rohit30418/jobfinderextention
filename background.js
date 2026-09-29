@@ -25,7 +25,8 @@ import {
 } from "./core/storage.js";
 import {
   analyzeJobBatchForCandidate,
-  analyzeJobWithAi
+  analyzeJobWithAi,
+  optimizeProfileWithAi
 } from "./core/puter-client.js";
 import { evaluateDeepMatch } from "./core/match-engine.js";
 
@@ -282,16 +283,19 @@ function profileContains(text, value) {
 }
 
 async function buildProfileOptimization(page = {}) {
-  const [state, preferences, appliedStore, gaps] = await Promise.all([
+  const [state, preferences, appliedStore, gaps, token, aiAuthorized] = await Promise.all([
     getState(),
     getPreferences(),
     getAppliedJobs(),
-    getGapInsights(30)
+    getGapInsights(30),
+    getPuterToken(),
+    getAiAuthorized()
   ]);
 
   if (!state?.profile) throw new Error("Save your JobPilot profile first.");
 
-  const text = normalizeProfileText(page.text || "");
+  const visibleText = String(page.text || "").replace(/\s+/g, " ").trim().slice(0, 30000);
+  const text = normalizeProfileText(visibleText);
   if (text.length < 80) throw new Error("Not enough visible profile text was found on this page.");
 
   const applied = Object.values(appliedStore?.items || {})
@@ -333,7 +337,7 @@ async function buildProfileOptimization(page = {}) {
   const hasSkillsSignal = /skills|key skills|technical skills/.test(text);
   const completeness = [hasSummarySignal, hasExperienceSignal, hasSkillsSignal].filter(Boolean).length / 3;
 
-  const score = Math.max(0, Math.min(100, Math.round(
+  const localScore = Math.max(0, Math.min(100, Math.round(
     savedCoverage * 35 +
     marketCoverage * 35 +
     roleCoverage * 20 +
@@ -363,27 +367,27 @@ async function buildProfileOptimization(page = {}) {
     .filter(skill => topAppliedSkills.some(row => row.skill.toLowerCase() === skill.toLowerCase()))
     .slice(0, 4);
 
-  const suggestedHeadline = [
+  const localHeadline = [
     targetRoles[0] || state.profile.currentRole || "Frontend Developer",
     ...headlineSkills
   ].filter(Boolean).join(" | ");
 
-  const ideas = [];
+  const localIdeas = [];
   if (!roleCovered.length && targetRoles.length) {
-    ideas.push("Use your primary target role wording in the headline or About section: " + targetRoles.slice(0,2).join(" / ") + ".");
+    localIdeas.push("Use your primary target role wording in the headline or About section: " + targetRoles.slice(0,2).join(" / ") + ".");
   }
   if (missingButOwned.length) {
-    ideas.push("You already have these skills in JobPilot but they are hard to find on this profile: " + missingButOwned.slice(0,6).join(", ") + ".");
+    localIdeas.push("You already have these skills in JobPilot but they are hard to find on this profile: " + missingButOwned.slice(0,6).join(", ") + ".");
   }
   if (frequentMissing.length) {
-    ideas.push("Frequently seen in your applied jobs but not visible on this page: " + frequentMissing.slice(0,6).map(x=>x.skill).join(", ") + ". Add only the ones you genuinely use.");
+    localIdeas.push("Frequently seen in your applied jobs but not visible on this page: " + frequentMissing.slice(0,6).map(x=>x.skill).join(", ") + ". Add only the ones you genuinely use.");
   }
-  if (!hasSummarySignal) ideas.push("Strengthen the profile summary/About section with role, years of experience, strongest frontend skills and measurable work.");
-  if (!hasSkillsSignal) ideas.push("Make the Skills/Key Skills section explicit so recruiter keyword search can find your real capabilities.");
+  if (!hasSummarySignal) localIdeas.push("Strengthen the profile summary/About section with role, years of experience, strongest frontend skills and measurable work.");
+  if (!hasSkillsSignal) localIdeas.push("Make the Skills/Key Skills section explicit so recruiter keyword search can find your real capabilities.");
 
-  return {
-    score,
-    label: score >= 80 ? "Strong coverage" : score >= 65 ? "Good, improve keywords" : score >= 45 ? "Needs optimization" : "Low profile coverage",
+  const localResult = {
+    score: localScore,
+    label: localScore >= 80 ? "Strong coverage" : localScore >= 65 ? "Good, improve keywords" : localScore >= 45 ? "Needs optimization" : "Low profile coverage",
     portal: String(page.portal || ""),
     analyzedAt: new Date().toISOString(),
     evidence: {
@@ -395,12 +399,54 @@ async function buildProfileOptimization(page = {}) {
       targetRoles: targetRoles.length,
       targetRolesVisible: roleCovered.length
     },
-    suggestedHeadline,
+    suggestedHeadline: localHeadline,
     missingButOwned,
     frequentMissing,
     learningTargets,
-    ideas
+    ideas: localIdeas,
+    strengths: [],
+    source: "local-evidence",
+    aiStatus: token && aiAuthorized ? "ready" : "not-connected",
+    aiError: ""
   };
+
+  if (!token || !aiAuthorized) return localResult;
+
+  try {
+    const ai = await optimizeProfileWithAi({
+      portal: page.portal,
+      visibleText,
+      profile: state.profile,
+      targetRoles,
+      recurringAppliedSkills: topAppliedSkills,
+      recurringSkillGaps: learningTargets
+    });
+
+    const mergedIdeas = [...new Set([...(ai.ideas || []), ...localIdeas])].slice(0, 8);
+
+    return {
+      ...localResult,
+      score: ai.score ?? localScore,
+      label: ai.label || localResult.label,
+      suggestedHeadline: ai.suggestedHeadline || localHeadline,
+      missingButOwned: ai.missingOwnedSkills?.length ? ai.missingOwnedSkills : missingButOwned,
+      frequentMissing: ai.recurringKeywordsMissing?.length ? ai.recurringKeywordsMissing : frequentMissing,
+      learningTargets: ai.learningTargets?.length ? ai.learningTargets : learningTargets,
+      ideas: mergedIdeas,
+      strengths: ai.strengths || [],
+      aiEvidence: ai.evidence || [],
+      source: "puter-ai",
+      analyzedAt: ai.analyzedAt || new Date().toISOString(),
+      aiStatus: "completed",
+      aiError: ""
+    };
+  } catch (error) {
+    return {
+      ...localResult,
+      aiStatus: "unavailable",
+      aiError: error?.message || String(error)
+    };
+  }
 }
 
 const inlineRequests = new Map();
