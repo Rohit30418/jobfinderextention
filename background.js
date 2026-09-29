@@ -10,6 +10,8 @@ chrome.runtime.onMessageExternal.addListener((message, sender, respond) => {
 });
 import {
   getAiAuthorized,
+  getAppliedJobs,
+  getGapInsights,
   getJobCache,
   getPuterToken,
   isJobApplied,
@@ -264,6 +266,143 @@ async function calculateInlineIntelligence(incomingJob, forceAi = false) {
   };
 }
 
+
+function normalizeProfileText(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9+#.\-\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function profileContains(text, value) {
+  const needle = normalizeProfileText(value);
+  if (!needle || needle.length < 2) return false;
+  return (" " + text + " ").includes(" " + needle + " ") || text.includes(needle);
+}
+
+async function buildProfileOptimization(page = {}) {
+  const [state, preferences, appliedStore, gaps] = await Promise.all([
+    getState(),
+    getPreferences(),
+    getAppliedJobs(),
+    getGapInsights(30)
+  ]);
+
+  if (!state?.profile) throw new Error("Save your JobPilot profile first.");
+
+  const text = normalizeProfileText(page.text || "");
+  if (text.length < 80) throw new Error("Not enough visible profile text was found on this page.");
+
+  const applied = Object.values(appliedStore?.items || {})
+    .filter(item => item?.status === "applied")
+    .sort((a,b) => String(b.appliedAt || "").localeCompare(String(a.appliedAt || "")))
+    .slice(0, 60);
+
+  const frequency = new Map();
+  for (const job of applied) {
+    for (const raw of job.skills || []) {
+      const skill = String(raw || "").trim();
+      if (!skill) continue;
+      const key = skill.toLowerCase();
+      const row = frequency.get(key) || { skill, count: 0 };
+      row.count += 1;
+      frequency.set(key, row);
+    }
+  }
+
+  const topAppliedSkills = [...frequency.values()]
+    .sort((a,b) => b.count - a.count || a.skill.localeCompare(b.skill))
+    .slice(0, 24);
+
+  const savedSkills = [...new Set((state.profile.skills || []).map(x => String(x || "").trim()).filter(Boolean))];
+  const targetRoles = [...new Set((preferences.targetRoles || []).map(x => String(x || "").trim()).filter(Boolean))];
+
+  const savedCovered = savedSkills.filter(skill => profileContains(text, skill));
+  const frequentCovered = topAppliedSkills.filter(row => profileContains(text, row.skill));
+  const roleCovered = targetRoles.filter(role => profileContains(text, role));
+
+  const savedCoverage = savedSkills.length ? savedCovered.length / Math.min(savedSkills.length, 30) : 0;
+  const frequentWeight = topAppliedSkills.reduce((sum,row) => sum + row.count, 0);
+  const frequentCoveredWeight = frequentCovered.reduce((sum,row) => sum + row.count, 0);
+  const marketCoverage = frequentWeight ? frequentCoveredWeight / frequentWeight : 0;
+  const roleCoverage = targetRoles.length ? roleCovered.length / targetRoles.length : 0;
+
+  const hasSummarySignal = /summary|about|profile|overview/.test(text);
+  const hasExperienceSignal = /experience|employment|work history|professional/.test(text);
+  const hasSkillsSignal = /skills|key skills|technical skills/.test(text);
+  const completeness = [hasSummarySignal, hasExperienceSignal, hasSkillsSignal].filter(Boolean).length / 3;
+
+  const score = Math.max(0, Math.min(100, Math.round(
+    savedCoverage * 35 +
+    marketCoverage * 35 +
+    roleCoverage * 20 +
+    completeness * 10
+  )));
+
+  const missingButOwned = savedSkills
+    .filter(skill => !profileContains(text, skill))
+    .filter(skill => topAppliedSkills.some(row => row.skill.toLowerCase() === skill.toLowerCase()))
+    .slice(0, 10);
+
+  const frequentMissing = topAppliedSkills
+    .filter(row => !profileContains(text, row.skill))
+    .slice(0, 10);
+
+  const learningTargets = [
+    ...(gaps?.missingRequired || []).map(x => ({...x, kind:"required"})),
+    ...(gaps?.missingPreferred || []).map(x => ({...x, kind:"preferred"}))
+  ]
+    .sort((a,b) => (b.count || 0) - (a.count || 0))
+    .filter((item,index,array) =>
+      array.findIndex(x => String(x.value).toLowerCase() === String(item.value).toLowerCase()) === index
+    )
+    .slice(0, 10);
+
+  const headlineSkills = savedSkills
+    .filter(skill => topAppliedSkills.some(row => row.skill.toLowerCase() === skill.toLowerCase()))
+    .slice(0, 4);
+
+  const suggestedHeadline = [
+    targetRoles[0] || state.profile.currentRole || "Frontend Developer",
+    ...headlineSkills
+  ].filter(Boolean).join(" | ");
+
+  const ideas = [];
+  if (!roleCovered.length && targetRoles.length) {
+    ideas.push("Use your primary target role wording in the headline or About section: " + targetRoles.slice(0,2).join(" / ") + ".");
+  }
+  if (missingButOwned.length) {
+    ideas.push("You already have these skills in JobPilot but they are hard to find on this profile: " + missingButOwned.slice(0,6).join(", ") + ".");
+  }
+  if (frequentMissing.length) {
+    ideas.push("Frequently seen in your applied jobs but not visible on this page: " + frequentMissing.slice(0,6).map(x=>x.skill).join(", ") + ". Add only the ones you genuinely use.");
+  }
+  if (!hasSummarySignal) ideas.push("Strengthen the profile summary/About section with role, years of experience, strongest frontend skills and measurable work.");
+  if (!hasSkillsSignal) ideas.push("Make the Skills/Key Skills section explicit so recruiter keyword search can find your real capabilities.");
+
+  return {
+    score,
+    label: score >= 80 ? "Strong coverage" : score >= 65 ? "Good, improve keywords" : score >= 45 ? "Needs optimization" : "Low profile coverage",
+    portal: String(page.portal || ""),
+    analyzedAt: new Date().toISOString(),
+    evidence: {
+      appliedJobsUsed: applied.length,
+      savedSkills: savedSkills.length,
+      savedSkillsVisible: savedCovered.length,
+      recurringAppliedSkills: topAppliedSkills.length,
+      recurringSkillsVisible: frequentCovered.length,
+      targetRoles: targetRoles.length,
+      targetRolesVisible: roleCovered.length
+    },
+    suggestedHeadline,
+    missingButOwned,
+    frequentMissing,
+    learningTargets,
+    ideas
+  };
+}
+
 const inlineRequests = new Map();
 async function buildInlineIntelligence(job, forceAi = false) {
   const state = await getState();
@@ -409,6 +548,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     })();
 
     return true;
+  }
+
+  if (message?.type === "jobpilot:profile-optimize") {
+    return respond(buildProfileOptimization(message.page || {}).then(result => ({ result })));
   }
 
   if (message?.type === "jobpilot:inline-analyze") {
