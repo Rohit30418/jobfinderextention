@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "JobPilot - Universal Job Portal Assistant",
-  "version": "1.11.1",
+  "version": "1.11.2",
   "description": "Reliable Puter AI analysis with retry handling and fixed job application tracking.",
   "permissions": [
     "storage",
