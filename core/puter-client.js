@@ -146,29 +146,61 @@ export async function callPuterAi(prompt) {
     throw new Error("Authorize Puter AI first.");
   }
 
-  const response = await fetch(API_ORIGIN + "/drivers/call", {
-    signal: AbortSignal.timeout(25000),
-    method: "POST",
-    credentials: "include",
-    headers: {
-      "Content-Type": "text/plain;actually=json"
+  const requestBody = JSON.stringify({
+    interface: "puter-chat-completion",
+    driver: "ai-chat",
+    method: "complete",
+    args: {
+      messages: [
+        {
+          content: prompt
+        }
+      ],
+      temperature: 0.1,
+      max_tokens: 6000
     },
-    body: JSON.stringify({
-      interface: "puter-chat-completion",
-      driver: "ai-chat",
-      method: "complete",
-      args: {
-        messages: [
-          {
-            content: prompt
-          }
-        ],
-        temperature: 0.1,
-        max_tokens: 6000
-      },
-      auth_token: token
-    })
+    auth_token: token
   });
+
+  let response = null;
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const timeoutMs = attempt === 0 ? 60000 : 90000;
+
+    try {
+      response = await fetch(API_ORIGIN + "/drivers/call", {
+        signal: AbortSignal.timeout(timeoutMs),
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "text/plain;actually=json"
+        },
+        body: requestBody
+      });
+
+      break;
+    } catch (error) {
+      const message = String(error?.message || error || "");
+      const isTimeout =
+        error?.name === "TimeoutError" ||
+        /signal timed out|timed out|abort/i.test(message);
+
+      if (attempt === 0) {
+        await new Promise(resolve => setTimeout(resolve, 700));
+        continue;
+      }
+
+      throw new Error(
+        isTimeout
+          ? "Puter AI timed out after retry. Please retry the analysis; your local fallback remains available."
+          : "Could not reach Puter AI. Check your connection and retry."
+      );
+    }
+  }
+
+  if (!response) {
+    throw new Error("Puter AI did not return a response.");
+  }
 
   let payload = null;
 
