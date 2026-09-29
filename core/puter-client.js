@@ -131,7 +131,22 @@ function extractJson(text) {
     throw new Error("AI did not return a JSON profile.");
   }
 
-  return JSON.parse(cleaned.slice(start, end + 1));
+  const candidate = cleaned.slice(start, end + 1);
+
+  try {
+    return JSON.parse(candidate);
+  } catch (firstError) {
+    const repaired = candidate
+      .replace(/[\u201C\u201D]/g, '"')
+      .replace(/[\u2018\u2019]/g, "'")
+      .replace(/,\s*([}\]])/g, "$1");
+
+    try {
+      return JSON.parse(repaired);
+    } catch (_) {
+      throw new Error("AI returned malformed JSON. Retry AI analysis.");
+    }
+  }
 }
 
 export async function callPuterAi(prompt) {
