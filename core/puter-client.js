@@ -149,6 +149,38 @@ function extractJson(text) {
   }
 }
 
+async function parseAiJson(result, purpose = "analysis") {
+  const raw = responseText(result);
+
+  try {
+    return extractJson(raw);
+  } catch (firstError) {
+    const clipped = String(raw || "").slice(0, 28000);
+    if (!clipped.trim()) {
+      throw new Error("Puter AI returned an empty response. Retry AI analysis.");
+    }
+
+    const repairPrompt = [
+      "Repair the following model output into ONE valid JSON object.",
+      "Do not add new facts, explanations, markdown, or commentary.",
+      "Preserve the original keys and values whenever possible.",
+      "If the text was truncated and cannot be repaired safely, return {\"_repairFailed\":true}.",
+      "Purpose: " + purpose,
+      "BROKEN_OUTPUT:",
+      clipped
+    ].join("\n");
+
+    const repairedResult = await callPuterAi(repairPrompt);
+    const repaired = extractJson(responseText(repairedResult));
+
+    if (repaired?._repairFailed === true) {
+      throw new Error("Puter AI response was truncated. Retry AI analysis.");
+    }
+
+    return repaired;
+  }
+}
+
 export async function callPuterAi(prompt) {
   const token = await getPuterToken();
   const authorized = await getAiAuthorized();
@@ -168,11 +200,16 @@ export async function callPuterAi(prompt) {
     args: {
       messages: [
         {
+          role: "user",
           content: prompt
         }
       ],
-      temperature: 0.1,
-      max_tokens: 6000
+      model: "gpt-5.6-luna",
+      normalize: true,
+      reasoning_effort: "low",
+      verbosity: "low",
+      temperature: 0,
+      max_tokens: 5000
     },
     auth_token: token
   });
@@ -192,6 +229,11 @@ export async function callPuterAi(prompt) {
         },
         body: requestBody
       });
+
+      if ((response.status === 429 || response.status >= 500) && attempt === 0) {
+        await new Promise(resolve => setTimeout(resolve, 900));
+        continue;
+      }
 
       break;
     } catch (error) {
@@ -262,7 +304,7 @@ export async function analyzeResumeWithAi(resumeText) {
     "You are extracting a candidate profile from a resume for a universal job-search tool.",
     "Extract facts only. Do not invent skills, employers, dates, education, projects, certifications, seniority, or experience.",
     "If a field is unknown, use an empty string, zero, or an empty array.",
-    "Return ONLY one valid JSON object. No markdown.",
+    "Return ONLY one compact valid JSON object. No markdown, comments, trailing commas, or unescaped quotes.",
     "Schema:",
     "{",
     "  \"name\": \"\",",
@@ -283,7 +325,7 @@ export async function analyzeResumeWithAi(resumeText) {
   ].join("\n");
 
   const result = await callPuterAi(prompt);
-  const parsed = extractJson(responseText(result));
+  const parsed = await parseAiJson(result, "resume profile extraction");
   return normalizeAiProfile(parsed);
 }
 
@@ -475,7 +517,7 @@ export async function analyzeJobWithAi(job, profile = null, preferences = null) 
     "MISSING = no credible candidate evidence.",
     "Do not infer a match merely because technologies are commonly related. Require concrete resume/project/work evidence.",
     "Do not upgrade years of experience, certifications, degrees, frameworks, languages, or tools that are not actually evidenced.",
-    "Return ONLY one valid JSON object. No markdown.",
+    "Return ONLY one compact valid JSON object. No markdown, comments, trailing commas, or unescaped quotes.",
     "Schema:",
     "{",
     '  "roleFamily": "",',
@@ -516,7 +558,7 @@ export async function analyzeJobWithAi(job, profile = null, preferences = null) 
   ].join("\n");
 
   const result = await callPuterAi(prompt);
-  const parsed = extractJson(responseText(result));
+  const parsed = await parseAiJson(result, "job-detail analysis");
   const analysis = normalizeJobAiAnalysis(parsed);
   const evidenceText = JSON.stringify(profile || {}).toLowerCase().replace(/\s+/g, " ");
   analysis.candidateRequirementMatches = analysis.candidateRequirementMatches.map(item => {
@@ -547,7 +589,7 @@ export async function analyzeJobBatchForCandidate(profile, preferences, jobs) {
     "PREFERENCES:", JSON.stringify(preferences),
     "JOBS:", JSON.stringify(payload)
   ].join('\n');
-  const parsed = extractJson(responseText(await callPuterAi(prompt)));
+  const parsed = await parseAiJson(await callPuterAi(prompt), "job-list ranking");
   if (!Array.isArray(parsed.results)) throw new Error('AI returned no job recommendations. Retry.');
   const keys = new Set(inputJobs.map(job => job.key));
   if (parsed.results.length !== inputJobs.length || new Set(parsed.results.map(row=>row.key)).size !== inputJobs.length || parsed.results.some(row=>!keys.has(row.key))) throw new Error('AI returned incomplete or duplicate job results. Retry this batch.');
