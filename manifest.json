@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "JobPilot - Universal Job Portal Assistant",
-  "version": "1.11.2",
+  "version": "1.12.0",
   "description": "Reliable Puter AI analysis with retry handling and fixed job application tracking.",
   "permissions": [
     "storage",
@@ -54,7 +54,8 @@
         "portals/naukri/adapter.js",
         "core/relevance-gate.js",
         "content/portal-runtime.js",
-        "content/detail-intelligence.js"
+        "content/detail-intelligence.js",
+        "content/profile-optimizer.js"
       ],
       "css": [
         "content/portal-runtime.css"
@@ -75,7 +76,8 @@
         "portals/foundit/adapter.js",
         "core/relevance-gate.js",
         "content/portal-runtime.js",
-        "content/detail-intelligence.js"
+        "content/detail-intelligence.js",
+        "content/profile-optimizer.js"
       ],
       "css": [
         "content/portal-runtime.css"
@@ -95,7 +97,8 @@
         "portals/linkedin/adapter.js",
         "core/relevance-gate.js",
         "content/portal-runtime.js",
-        "content/detail-intelligence.js"
+        "content/detail-intelligence.js",
+        "content/profile-optimizer.js"
       ],
       "css": [
         "content/portal-runtime.css"
@@ -115,7 +118,8 @@
         "portals/indeed/adapter.js",
         "core/relevance-gate.js",
         "content/portal-runtime.js",
-        "content/detail-intelligence.js"
+        "content/detail-intelligence.js",
+        "content/profile-optimizer.js"
       ],
       "css": [
         "content/portal-runtime.css"
@@ -135,7 +139,8 @@
         "portals/hirist/adapter.js",
         "core/relevance-gate.js",
         "content/portal-runtime.js",
-        "content/detail-intelligence.js"
+        "content/detail-intelligence.js",
+        "content/profile-optimizer.js"
       ],
       "css": [
         "content/portal-runtime.css"
