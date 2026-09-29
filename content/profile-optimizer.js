@@ -50,7 +50,7 @@
       <div class="head"><div class="brand"><b>JOBPILOT</b> Profile Optimizer</div><button class="close" title="Close">×</button></div>
       <div class="body">
         <p class="intro">Compare this visible profile with your saved JobPilot profile, applied-job history and recurring skill gaps.</p>
-        <button class="run">Scan my profile</button>
+        <button class="run">AI scan my profile</button>
         <div class="result"></div>
       </div>
     </div>
@@ -76,14 +76,16 @@
       const r=response.result;
       result.innerHTML=`
         <div class="score"><strong>${esc(r.score)}/100</strong><span>profile coverage</span></div>
-        <div class="label">${esc(r.label)}</div>
+        <div class="label">${esc(r.label)}${r.source==="puter-ai" ? " · AI analyzed" : " · Local fallback"}</div>
+        ${r.aiStatus==="unavailable" && r.aiError ? `<div class="box"><p class="warn">AI unavailable: ${esc(r.aiError)}. Showing evidence-based local analysis instead.</p></div>` : ""}
         <div class="box"><h4>Suggested headline</h4><p>${esc(r.suggestedHeadline||"Keep your current headline if it is already specific.")}</p></div>
-        <div class="box"><h4>Best improvements</h4><ul>${(r.ideas||[]).slice(0,5).map(x=>`<li>${esc(x)}</li>`).join("")||"<li>No major wording issue detected.</li>"}</ul></div>
+        ${(r.strengths||[]).length ? `<div class="box"><h4>AI-detected strengths</h4><ul>${r.strengths.slice(0,5).map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>` : ""}
+        <div class="box"><h4>Best improvements</h4><ul>${(r.ideas||[]).slice(0,6).map(x=>`<li>${esc(x)}</li>`).join("")||"<li>No major wording issue detected.</li>"}</ul></div>
         <div class="box"><h4>Recurring JD keywords missing here</h4><ul>${(r.frequentMissing||[]).slice(0,8).map(x=>`<li>${esc(x.skill)} <span class="warn">(${esc(x.count)} applied jobs)</span></li>`).join("")||"<li>Good coverage of recurring job keywords.</li>"}</ul></div>
         <div class="box"><h4>Learning / verify first</h4><ul>${(r.learningTargets||[]).slice(0,6).map(x=>`<li>${esc(x.value)} <span class="warn">(${esc(x.count)} recent jobs)</span></li>`).join("")||"<li>No recurring skill-gap signal yet.</li>"}</ul></div>
         <p class="muted">This is a profile keyword/coverage score, not a recruiter-search ranking. Add only skills and claims you can genuinely support.</p>
       `;
     }catch(e){result.innerHTML=`<div class="box"><p class="warn">${esc(e?.message||String(e))}</p></div>`;}
-    finally{btn.disabled=false;btn.textContent="Scan again";}
+    finally{btn.disabled=false;btn.textContent="AI scan again";}
   });
 })();
