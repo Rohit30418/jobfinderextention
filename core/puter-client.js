@@ -258,17 +258,22 @@ export async function callPuterAi(prompt) {
       const isTimeout =
         error?.name === "TimeoutError" ||
         /signal timed out|timed out|abort/i.test(message);
+      const isNetworkFailure =
+        error instanceof TypeError ||
+        /failed to fetch|network error|networkerror|load failed|connection reset/i.test(message);
 
-      if (attempt === 0) {
+      if (attempt === 0 && (isTimeout || isNetworkFailure)) {
         await new Promise(resolve => setTimeout(resolve, 700));
         continue;
       }
 
-      throw new Error(
-        isTimeout
-          ? "Puter AI timed out after retry. Please retry the analysis; your local fallback remains available."
-          : "Could not reach Puter AI. Check your connection and retry."
-      );
+      if (isTimeout) {
+        throw new Error("Puter AI timed out after retry. Please retry the analysis; your local fallback remains available.");
+      }
+
+      // Preserve provider/runtime messages because they are much more useful
+      // than collapsing every failure into a generic network error.
+      throw new Error(message || "Could not reach Puter AI. Check your connection and retry.");
     }
   }
 
@@ -277,11 +282,18 @@ export async function callPuterAi(prompt) {
   }
 
   let payload = null;
-  let rawText = "";
 
   try {
-    rawText = await response.text();
-    payload = rawText ? JSON.parse(rawText) : null;
+    if (typeof response.text === "function") {
+      const rawText = await response.text();
+      payload = rawText ? JSON.parse(rawText) : null;
+    } else if (typeof response.json === "function") {
+      // Keeps the client compatible with lightweight test doubles and other
+      // fetch-compatible runtimes that expose json() but not text().
+      payload = await response.json();
+    } else {
+      throw new Error("No readable response body");
+    }
   } catch (_) {
     if (!response.ok) {
       throw new Error("Puter returned HTTP " + response.status + " with an unreadable error response.");
