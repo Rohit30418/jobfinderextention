@@ -1466,6 +1466,9 @@
         button.disabled = true;
         button.textContent = "Saving…";
 
+        const actionGeneration = generation;
+        const actionUrl = location.href;
+
         try {
           const response = await chrome.runtime.sendMessage({
             type: "jobpilot:toggle-applied",
@@ -1473,8 +1476,9 @@
             source: "job-detail"
           });
 
-          if (requestGeneration !== generation || requestUrl !== location.href) return;
-      if (!response?.ok) {
+          if (actionGeneration !== generation || actionUrl !== location.href) return;
+
+          if (!response?.ok) {
             throw new Error(
               response?.error || "Could not update applied status."
             );
