@@ -206,136 +206,111 @@ export async function callPuterAi(prompt) {
     throw new Error("Authorize Puter AI first.");
   }
 
-  const messages = [
-    {
-      role: "user",
-      content: String(prompt || "")
-    }
-  ];
-
-  // Match Puter's current SDK behavior as closely as possible. The direct
-  // ai-chat route can occasionally fail provider routing with HTTP 400, so we
-  // retry with the explicit OpenAI delegate and finally a broadly available
-  // fallback model. Keep args intentionally minimal to avoid provider-specific
-  // option incompatibilities.
-  const requestVariants = [
-    { driver: "ai-chat", model: "gpt-5.6-luna" },
-    { driver: "openai-completion", model: "gpt-5.6-luna" },
-    { driver: "openai-completion", model: "gpt-5-nano" }
-  ];
-
-  const providerErrors = [];
-
-  for (const variant of requestVariants) {
-    const requestBody = JSON.stringify({
-      interface: "puter-chat-completion",
-      driver: variant.driver,
-      test_mode: false,
-      method: "complete",
-      args: {
-        messages,
-        model: variant.model,
-        normalize: true
-      }
-    });
-
-    let response = null;
-
-    for (let attempt = 0; attempt < 2; attempt += 1) {
-      const timeoutMs = attempt === 0 ? 60000 : 90000;
-
-      try {
-        response = await fetch(API_ORIGIN + "/drivers/call", {
-          signal: AbortSignal.timeout(timeoutMs),
-          method: "POST",
-          credentials: "omit",
-          headers: {
-            "Authorization": "Bearer " + token,
-            "Content-Type": "application/json",
-            "Accept": "application/json"
-          },
-          body: requestBody
-        });
-
-        if ((response.status === 429 || response.status >= 500) && attempt === 0) {
-          await new Promise(resolve => setTimeout(resolve, 900));
-          continue;
+  // Important: do not pin a model/provider here.
+  // The original working JobPilot implementation used Puter's ai-chat router
+  // without a model, allowing Puter to choose an available provider/model.
+  // Pinning gpt-5.6-luna caused "All AI providers failed" on accounts/routes
+  // where that model currently has no available backend.
+  const requestBody = JSON.stringify({
+    interface: "puter-chat-completion",
+    driver: "ai-chat",
+    method: "complete",
+    args: {
+      messages: [
+        {
+          role: "user",
+          content: String(prompt || "")
         }
+      ],
+      normalize: true
+    },
+    auth_token: token
+  });
 
-        break;
-      } catch (error) {
-        const message = String(error?.message || error || "");
-        const isTimeout =
-          error?.name === "TimeoutError" ||
-          /signal timed out|timed out|abort/i.test(message);
-        const isNetworkFailure =
-          error instanceof TypeError ||
-          /failed to fetch|network error|networkerror|load failed|connection reset/i.test(message);
+  let response = null;
 
-        if (attempt === 0 && (isTimeout || isNetworkFailure)) {
-          await new Promise(resolve => setTimeout(resolve, 700));
-          continue;
-        }
-
-        if (isTimeout) {
-          throw new Error("Puter AI timed out after retry. Please retry the analysis; your local fallback remains available.");
-        }
-
-        throw new Error(message || "Could not reach Puter AI. Check your connection and retry.");
-      }
-    }
-
-    if (!response) continue;
-
-    let payload = null;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const timeoutMs = attempt === 0 ? 60000 : 90000;
 
     try {
-      if (typeof response.text === "function") {
-        const rawText = await response.text();
-        payload = rawText ? JSON.parse(rawText) : null;
-      } else if (typeof response.json === "function") {
-        payload = await response.json();
-      } else {
-        throw new Error("No readable response body");
-      }
-    } catch (_) {
-      if (!response.ok) {
-        providerErrors.push(variant.model + " via " + variant.driver + ": HTTP " + response.status + " unreadable response");
+      response = await fetch(API_ORIGIN + "/drivers/call", {
+        signal: AbortSignal.timeout(timeoutMs),
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "text/plain;actually=json",
+          "Accept": "application/json"
+        },
+        body: requestBody
+      });
+
+      if ((response.status === 429 || response.status >= 500) && attempt === 0) {
+        await new Promise(resolve => setTimeout(resolve, 900));
         continue;
       }
-      throw new Error("Puter returned an unreadable response.");
+
+      break;
+    } catch (error) {
+      const message = String(error?.message || error || "");
+      const isTimeout =
+        error?.name === "TimeoutError" ||
+        /signal timed out|timed out|abort/i.test(message);
+      const isNetworkFailure =
+        error instanceof TypeError ||
+        /failed to fetch|network error|networkerror|load failed|connection reset/i.test(message);
+
+      if (attempt === 0 && (isTimeout || isNetworkFailure)) {
+        await new Promise(resolve => setTimeout(resolve, 700));
+        continue;
+      }
+
+      if (isTimeout) {
+        throw new Error("Puter AI timed out after retry. Please retry the analysis; your local fallback remains available.");
+      }
+
+      throw new Error(message || "Could not reach Puter AI. Check your connection and retry.");
     }
-
-    const code = payload?.error?.code || payload?.code || "";
-
-    if (response.status === 401 || code === "token_auth_failed") {
-      await clearPuterToken();
-      throw new Error("Puter session expired. Connect Puter again.");
-    }
-
-    if (response.status === 403 || code === "permission_denied") {
-      await setAiAuthorized(false);
-      throw new Error("Puter AI permission is no longer available. Authorize it again.");
-    }
-
-    if (response.ok && payload?.success !== false) {
-      return payload && payload.result !== undefined ? payload.result : payload;
-    }
-
-    const message = puterErrorMessage(payload, response.status);
-    providerErrors.push(variant.model + " via " + variant.driver + ": " + message);
-
-    // Auth/rate-limit/server errors are not model-routing problems. Surface
-    // them immediately instead of multiplying requests.
-    if (response.status === 429 || response.status >= 500) {
-      throw new Error(message);
-    }
-
-    // HTTP 400/provider-routing failures move to the next compatible variant.
   }
 
-  const detail = providerErrors.filter(Boolean).slice(0, 3).join(" | ");
-  throw new Error(detail ? "Puter AI providers failed: " + detail : "Puter AI providers failed.");
+  if (!response) {
+    throw new Error("Puter AI did not return a response.");
+  }
+
+  let payload = null;
+
+  try {
+    if (typeof response.text === "function") {
+      const rawText = await response.text();
+      payload = rawText ? JSON.parse(rawText) : null;
+    } else if (typeof response.json === "function") {
+      payload = await response.json();
+    } else {
+      throw new Error("No readable response body");
+    }
+  } catch (_) {
+    if (!response.ok) {
+      throw new Error("Puter returned HTTP " + response.status + " with an unreadable error response.");
+    }
+    throw new Error("Puter returned an unreadable response.");
+  }
+
+  const code = payload?.error?.code || payload?.code || "";
+
+  if (response.status === 401 || code === "token_auth_failed") {
+    await clearPuterToken();
+    throw new Error("Puter session expired. Connect Puter again.");
+  }
+
+  if (response.status === 403 || code === "permission_denied") {
+    await setAiAuthorized(false);
+    throw new Error("Puter AI permission is no longer available. Authorize it again.");
+  }
+
+  if (!response.ok || payload?.success === false) {
+    throw new Error(puterErrorMessage(payload, response.status));
+  }
+
+  return payload && payload.result !== undefined ? payload.result : payload;
 }
 
 export async function analyzeResumeWithAi(resumeText) {
