@@ -67,10 +67,12 @@
   btn.addEventListener("click", async()=>{
     btn.disabled=true; btn.textContent="Analyzing…"; result.innerHTML="";
     try{
-      const raw=(document.body?.innerText||"").replace(/\s+/g," ").trim().slice(0,30000);
+      const raw=(document.body?.innerText||"").trim().slice(0,30000);
+      const headings=[...document.querySelectorAll("h1,h2,h3,h4,h5,h6,[role=heading]")]
+        .map(node=>(node.innerText||node.textContent||"").trim()).filter(Boolean).slice(0,50);
       const response=await chrome.runtime.sendMessage({
         type:"jobpilot:profile-optimize",
-        page:{portal:portalName(),url:location.href,title:document.title,text:raw}
+        page:{portal:portalName(),url:location.href,title:document.title,text:raw,headings}
       });
       if(!response?.ok) throw new Error(response?.error||"Profile scan failed.");
       const r=response.result;
