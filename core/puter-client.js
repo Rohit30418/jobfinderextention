@@ -705,8 +705,11 @@ export async function optimizeProfileWithAi(context = {}) {
 }
 
 
+// Limit per-request payload size and reduce AI timeouts/incomplete batch responses.
+export const MAX_AI_BATCH = 2;
+
 export async function analyzeJobBatchForCandidate(profile, preferences, jobs) {
-  const inputJobs = Array.isArray(jobs) ? jobs.slice(0, 2) : [];
+  const inputJobs = Array.isArray(jobs) ? jobs.slice(0, MAX_AI_BATCH) : [];
   if (!inputJobs.length) return [];
   // Send relevant career information; omit contact details and raw resume text.
   const candidate = Object.fromEntries(['currentRole','headline','totalExperienceMonths','skills','workExperience','projects','education','certifications','resumeKeywords'].map(key => [key, profile?.[key]]));
