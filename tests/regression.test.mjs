@@ -195,3 +195,90 @@ test('agent mode toggles retain recommendations while actual preference edits in
  await store.setPreferences({...preferences,agentEnabled:true,automaticAi:true});assert.equal((await store.getJobCache())[job.key].aiRanking.fitScore,85);
  await store.setPreferences({...preferences,targetRoles:['Backend Developer']});assert.equal((await store.getJobCache())[job.key].aiRanking,undefined);
 });
+
+
+function profileOptimizationHarness(services = {}) {
+ const code=read('background.js');
+ const start=code.indexOf('function normalizeProfileText(');
+ const end=code.indexOf('const inlineRequests =',start);
+ assert.ok(start>=0 && end>start);
+ const context={
+  getState:async()=>({profile:{skills:[],currentRole:'Frontend Developer'}}),
+  getPreferences:async()=>({targetRoles:[]}),
+  getAppliedJobs:async()=>({items:{}}),
+  getGapInsights:async()=>({missingRequired:[],missingPreferred:[]}),
+  getPuterToken:async()=>null,
+  getAiAuthorized:async()=>false,
+  ...services
+ };
+ vm.runInNewContext(code.slice(start,end)+';globalThis.contains=profileContains;globalThis.optimize=buildProfileOptimization;',context);
+ return context;
+}
+test('profile skill matching uses token boundaries, including punctuation-bearing skills',()=>{
+ const {contains}=profileOptimizationHarness();
+ assert.equal(contains('JavaScript TypeScript Google', 'Java'),false);
+ assert.equal(contains('JavaScript TypeScript Google', 'Go'),false);
+ assert.equal(contains('React.js C++', 'C#'),false);
+ for(const skill of ['C#','C++','Node.js','.NET','Java','Go']){
+  assert.equal(contains('Worked with ('+skill+'), React and CSS',skill),true,skill);
+ }
+ assert.equal(contains('NodeXjs','Node.js'),false);
+ assert.equal(contains('C++','C#'),false);
+});
+
+test('profile saved coverage stays at most 100% and section words require heading context',async()=>{
+ const skills=Array.from({length:35},(_,i)=>'Skill'+(i+1));
+ const context=profileOptimizationHarness({getState:async()=>({profile:{skills,currentRole:'Frontend Developer'}})});
+ const text=skills.join(' ')+' I wrote a long professional profile about frontend skills and experience, but this sentence is not a section heading.';
+ const withoutHeadings=await context.optimize({text,headings:[]});
+ assert.equal(withoutHeadings.evidence.savedSkillsVisible,35);
+ assert.equal(withoutHeadings.score,35,'35/30 coverage must be capped at 1');
+ assert.ok(withoutHeadings.ideas.some(idea=>idea.includes('summary/About')));
+ assert.ok(withoutHeadings.ideas.some(idea=>idea.includes('Skills/Key Skills')));
+ const withHeadings=await context.optimize({text,headings:['About','Experience','Skills']});
+ assert.equal(withHeadings.score,45);
+ assert.ok(!withHeadings.ideas.some(idea=>idea.includes('summary/About')));
+ assert.ok(!withHeadings.ideas.some(idea=>idea.includes('Skills/Key Skills')));
+ const lineHeadings=await context.optimize({text:text+'\nProfessional Summary\nEmployment History\nTechnical Skills'});
+ assert.equal(lineHeadings.score,45);
+});
+
+test('LinkedIn profile content script has no job-capture dependencies or blanket hosts',()=>{
+ const manifest=JSON.parse(read('manifest.json'));
+ const profileEntry=manifest.content_scripts.find(entry=>entry.matches.includes('https://www.linkedin.com/in/*'));
+ assert.ok(profileEntry);
+ assert.deepEqual(profileEntry.js,['content/profile-optimizer.js']);
+ assert.equal((profileEntry.css||[]).length,0);
+ for(const host of ['https://www.linkedin.com/*','https://linkedin.com/*']){
+  assert.equal(manifest.host_permissions.includes(host),false);
+ }
+ assert.ok(manifest.host_permissions.includes('https://www.linkedin.com/jobs/*'));
+ const bg=read('background.js');
+ assert.ok(bg.includes('"content/profile-optimizer.js"\n];'),'dynamic runtime injection must load the optimizer');
+ const optimizer=read('content/profile-optimizer.js');
+ assert.match(optimizer,/headings=\[\.\.\.document\.querySelectorAll/);
+ assert.match(optimizer,/text:raw,headings/);
+});
+
+test('LinkedIn profile senders may optimize, but cannot use job-message privileges',()=>{
+ const code=read('background.js'),start=code.indexOf('function getPortalIdFromUrl('),end=code.indexOf('function openPage(');
+ assert.ok(start>=0 && end>start);
+ const context={URL};
+ vm.runInNewContext(code.slice(start,end)+';globalThis.allowed=canReceivePortalMessage;',context);
+ assert.equal(context.allowed('https://www.linkedin.com/in/example/','jobpilot:profile-optimize'),true);
+ assert.equal(context.allowed('https://www.linkedin.com/in/example/details/skills/','jobpilot:profile-optimize'),true);
+ for(const type of ['jobpilot:capture','jobpilot:rank-list-ai','jobpilot:inline-analyze','jobpilot:toggle-applied']){
+  assert.equal(context.allowed('https://www.linkedin.com/in/example/',type),false,type);
+ }
+ assert.equal(context.allowed('https://www.linkedin.com/feed/','jobpilot:profile-optimize'),false);
+ assert.equal(context.allowed('https://evil.example/in/example/','jobpilot:profile-optimize'),false);
+ assert.equal(context.allowed('http://www.linkedin.com/in/example/','jobpilot:profile-optimize'),false);
+ assert.equal(context.allowed('https://www.linkedin.com/jobs/view/123','jobpilot:capture'),true);
+});
+
+test('Puter AI job batch remains deliberately capped at two in both call sites',async()=>{
+ const {MAX_AI_BATCH}=await import('../core/puter-client.js');
+ assert.equal(MAX_AI_BATCH,2);
+ assert.match(read('background.js'),/\.slice\(0, MAX_AI_BATCH\)\.map\(key=>cache\[key\]\)/);
+ assert.match(read('core/puter-client.js'),/jobs\.slice\(0, MAX_AI_BATCH\)/);
+});
