@@ -433,7 +433,7 @@ portal listing/detail
 → inline portal UI
 ```
 
-LinkedIn permissions are limited to `/jobs/*`; JobPilot does not intentionally inject into the normal feed/profile experience.
+LinkedIn job-capture scripts run only on `/jobs/*`. On `https://www.linkedin.com/in/*`, JobPilot runs only the profile optimizer (no listing/detail capture scripts); other LinkedIn feed pages are not injected. A profile scan runs only when you click the optimizer button.
 
 Portal HTML changes over time, so each adapter has its own acceptance checks in `tests/MULTI_PORTAL_CHECKLIST.md`.
 

@@ -25,6 +25,7 @@ import {
 } from "./core/storage.js";
 import {
   analyzeJobBatchForCandidate,
+  MAX_AI_BATCH,
   analyzeJobWithAi,
   optimizeProfileWithAi
 } from "./core/puter-client.js";
@@ -81,7 +82,8 @@ const PORTAL_FILE_MAP = {
 const COMMON_RUNTIME_FILES = [
   "core/relevance-gate.js",
   "content/portal-runtime.js",
-  "content/detail-intelligence.js"
+  "content/detail-intelligence.js",
+  "content/profile-optimizer.js"
 ];
 
 const STARTUP_PORTAL_URLS = [
@@ -137,6 +139,21 @@ function getPortalIdFromUrl(value) {
 
 function isSupportedPortalUrl(value) {
   return Boolean(getPortalIdFromUrl(value));
+}
+
+function isLinkedInProfileUrl(value) {
+  try {
+    const url = new URL(String(value || ""));
+    return url.protocol === "https:" && url.hostname === "www.linkedin.com" &&
+      /^\/in\/[^/]+(?:\/|$)/i.test(url.pathname);
+  } catch (_) {
+    return false;
+  }
+}
+
+function canReceivePortalMessage(url, type) {
+  // LinkedIn /in/ pages may scan profiles, but must not submit job captures or analysis.
+  return isSupportedPortalUrl(url) || (type === "jobpilot:profile-optimize" && isLinkedInProfileUrl(url));
 }
 
 function openPage(path) {
@@ -279,7 +296,9 @@ function normalizeProfileText(value) {
 function profileContains(text, value) {
   const needle = normalizeProfileText(value);
   if (!needle || needle.length < 2) return false;
-  return (" " + text + " ").includes(" " + needle + " ") || text.includes(needle);
+  const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  // Skill punctuation is part of the token: Java != JavaScript, Go != Google, C# != C++.
+  return new RegExp("(^|[^a-z0-9+#.\\-])" + escaped + "(?=$|[^a-z0-9+#.\\-])").test(normalizeProfileText(text));
 }
 
 async function buildProfileOptimization(page = {}) {
@@ -294,7 +313,7 @@ async function buildProfileOptimization(page = {}) {
 
   if (!state?.profile) throw new Error("Save your JobPilot profile first.");
 
-  const visibleText = String(page.text || "").replace(/\s+/g, " ").trim().slice(0, 30000);
+  const visibleText = String(page.text || "").trim().slice(0, 30000);
   const text = normalizeProfileText(visibleText);
   if (text.length < 80) throw new Error("Not enough visible profile text was found on this page.");
 
@@ -326,15 +345,20 @@ async function buildProfileOptimization(page = {}) {
   const frequentCovered = topAppliedSkills.filter(row => profileContains(text, row.skill));
   const roleCovered = targetRoles.filter(role => profileContains(text, role));
 
-  const savedCoverage = savedSkills.length ? savedCovered.length / Math.min(savedSkills.length, 30) : 0;
+  const savedCoverage = savedSkills.length ? Math.min(1, savedCovered.length / Math.min(savedSkills.length, 30)) : 0;
   const frequentWeight = topAppliedSkills.reduce((sum,row) => sum + row.count, 0);
   const frequentCoveredWeight = frequentCovered.reduce((sum,row) => sum + row.count, 0);
   const marketCoverage = frequentWeight ? frequentCoveredWeight / frequentWeight : 0;
   const roleCoverage = targetRoles.length ? roleCovered.length / targetRoles.length : 0;
 
-  const hasSummarySignal = /summary|about|profile|overview/.test(text);
-  const hasExperienceSignal = /experience|employment|work history|professional/.test(text);
-  const hasSkillsSignal = /skills|key skills|technical skills/.test(text);
+  const headings = [
+    ...(Array.isArray(page.headings) ? page.headings : []),
+    ...visibleText.split(/\r?\n/).filter(line => line.trim().length <= 64)
+  ].map(normalizeProfileText);
+  const hasHeading = pattern => headings.some(heading => pattern.test(heading));
+  const hasSummarySignal = hasHeading(/^(?:summary|professional summary|profile summary|career summary|about|about me|overview|career overview)$/);
+  const hasExperienceSignal = hasHeading(/^(?:experience|work experience|professional experience|employment|employment history|work history|career history)$/);
+  const hasSkillsSignal = hasHeading(/^(?:skills|key skills|technical skills|core skills|skills endorsements|skills and endorsements)$/);
   const completeness = [hasSummarySignal, hasExperienceSignal, hasSkillsSignal].filter(Boolean).length / 3;
 
   const localScore = Math.max(0, Math.min(100, Math.round(
@@ -532,7 +556,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (!isExtensionPage(sender)) { sendResponse({ ok: false, error: "Storage access denied." }); return false; }
     return respond(runStorageOperation(message.name, message.args).then(value => ({ value })));
   }
-  if (!isExtensionPage(sender) && !isSupportedPortalUrl(sender.url)) return false;
+  if (!isExtensionPage(sender) && !canReceivePortalMessage(sender.url, message?.type)) return false;
   if (message?.type === "jobpilot:capture") return respond(persistPortalCapture(message.data).then(() => ({})));
 
   if (message?.type === "jobpilot:toggle-applied") {
@@ -575,7 +599,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
         const cache = await getJobCache();
         const jobs = [...new Set((Array.isArray(message.jobs) ? message.jobs : []).map(job=>job?.key))]
-          .slice(0, 2).map(key=>cache[key]).filter(Boolean);
+          .slice(0, MAX_AI_BATCH).map(key=>cache[key]).filter(Boolean);
         if (!jobs.length) throw new Error("No captured jobs are available to analyze.");
         const rankings = await analyzeJobBatchForCandidate(state.profile, preferences, jobs);
         const saved = await saveJobAiRankings(rankings);
