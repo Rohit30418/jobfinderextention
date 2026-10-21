@@ -34,6 +34,7 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: node scripts/browser-smoke.mjs
       - run: node scripts/browser-onboarding.mjs
+      - run: node scripts/browser-portals.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
