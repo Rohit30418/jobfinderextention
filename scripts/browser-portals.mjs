@@ -38,7 +38,7 @@ const portalCases = [
   }
 ];
 
-const text = 'We require React and JavaScript frontend development experience. ' +
+const text = 'React and JavaScript frontend development experience is required. ' +
   'Build accessible applications, collaborate with product designers, ' +
   'maintain web interfaces with HTML and CSS, and review testing coverage. ' +
   'Strong practical knowledge of browser APIs and responsive layouts is required.';
