@@ -320,7 +320,12 @@ function renderReview() {
     ["Resume keywords", profile.resumeKeywords.join(", ") || "None added", "wide"],
     ["Education", profile.education.join(" | ") || "None added", "wide"],
     ["Certifications", profile.certifications.join(", ") || "None added", ""],
-    ["Projects / work", profile.projects.join(" | ") || "None added", "wide"]
+    ["Projects / work", profile.projects
+      .map((item) => typeof item === "string"
+        ? item
+        : [item?.name, item?.description].filter(Boolean).join(" — "))
+      .filter(Boolean)
+      .join(" | ") || "None added", "wide"]
   ];
 
   els.profileReview.innerHTML = items
